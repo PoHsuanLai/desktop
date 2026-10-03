@@ -8,8 +8,8 @@
 #
 # Inside: /dev/input, /dev/dri, /dev/uinput, wayland-0 and the system bus are absent; udmabuf is
 # present; the filesystem is read-only apart from scratch; there is no network; HOME and the XDG
-# dirs are scratch; a private bus works; fabricated GPU nodes (when asked) are the only ones in
-# /sys/dev/char. Checks only stat paths, so running it outside the jail opens no device either.
+# dirs are scratch; a private bus works; fabricated GPU nodes (when asked, render-range minors the drm crate accepts) are the only ones in
+# /sys/dev/char; USER is set. Checks only stat paths, so running it outside the jail opens no device either.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/all.sh
@@ -27,11 +27,27 @@ read_only() { ! writable "$1"; }
 only_loopback() { [ "$(awk -F'[: ]+' 'NR > 2 { print $2 }' /proc/net/dev | grep -vxc lo)" = 0 ]; }
 under_scratch() { case "$1" in "${JAIL_SCRATCH:-/nonexistent}"/*) return 0 ;; *) return 1 ;; esac; }
 
-fabricated_gpus_exact() { # N: exactly the fabricated nodes 226:200.. exist, each with device/drm
+fabricated_gpus_exact() { # N: exactly the fabricated nodes 226:128.. exist, each with device/drm
   local n=$1 i
   [ "$(find /sys/dev/char -mindepth 1 -maxdepth 1 | wc -l)" = "$n" ] || return 1
-  for ((i = 0; i < n; i++)); do [ -d "/sys/dev/char/226:$((200 + i))/device/drm" ] || return 1; done
+  for ((i = 0; i < n; i++)); do [ -d "/sys/dev/char/226:$((128 + i))/device/drm" ] || return 1; done
 }
+
+# Mirrors drm 0.14 DrmNode::from_dev_id (node/mod.rs): the major must be 226 (DRM_MAJOR) and the
+# minor's `minor >> 6` must be 0 (primary), 1 (control) or 2 (render); 192..255 is "not a DRM node".
+drm_crate_accepts() { # MAJOR:MINOR
+  local major=${1%%:*} minor=${1##*:}
+  [ "$major" = 226 ] && [ $((minor >> 6)) -le 2 ]
+}
+fabricated_gpus_are_render_nodes() { # every entry in /sys/dev/char is a render node the drm crate accepts
+  local e
+  for e in /sys/dev/char/*; do
+    [ -e "$e" ] || continue
+    e=${e##*/}
+    drm_crate_accepts "$e" && [ $((${e##*:} >> 6)) = 2 ] || return 1
+  done
+}
+drm_rule_rejects_out_of_range() { ! drm_crate_accepts 226:200 && ! drm_crate_accepts 226:192 && ! drm_crate_accepts 8:130 && drm_crate_accepts 226:128 && drm_crate_accepts 226:191; }
 
 private_bus_works() {
   ( private_bus_start && trap private_bus_stop EXIT \
@@ -69,6 +85,9 @@ checks() {
   check "private bus starts, serves both roles" private_bus_works
   check "every EGL renderer is llvmpipe (when eglinfo exists)" egl_surfaceless_llvmpipe
   check "fabricated GPU nodes match JAIL_GPUS=${JAIL_GPUS:-0}" fabricated_gpus_exact "${JAIL_GPUS:-0}"
+  check "fabricated nodes are DRM render nodes (drm crate: major 226, minor >> 6 == 2)" fabricated_gpus_are_render_nodes
+  check "the drm node rule rejects minors 192..255 (the old 226:200)" drm_rule_rejects_out_of_range
+  check "USER is set" bash -c '[ -n "${USER:-}" ]'
 }
 
 in_jail_mode() {

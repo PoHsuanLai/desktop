@@ -10,7 +10,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | `harness/lib/` | `require_jail`, step timing and exit codes, budgets, run ids, a private dbus-daemon |
 | `harness/selftest.sh` | proves the jail holds (`--all` also runs the negative check outside) |
 | `gate/desktop-gate.sh` | `--self`, `--merge`, `--phase P<n>`: prints `DESKTOP GATE GREEN (<tier>)` |
-| `gate/manifest-check.sh` | every Cargo.lock agrees with the manifest |
+| `gate/manifest-check.sh` | every Cargo.lock agrees with the manifest, and resolves `--locked` against the pinned siblings |
 | `gate/expected-skips.toml` | scenarios not runnable yet, each with a finding id and the closing phase |
 | `scenarios/` | whole-desktop scenarios; each calls `require_jail` first and exits with the plan's codes |
 

@@ -1,5 +1,6 @@
 # The version manifest: which revs of which repos are known to work together.
-# Written 2026-10-03 (S0) from each repo's own branch tip; the working trees were not consulted.
+# Written 2026-10-03 (S0), refreshed the same day (S0-D2) to each repo's own branch tip (git rev-parse of
+# the branch; the working trees were not consulted). casement-protocols is a private GitHub repo.
 # `gate` is `lane` (the desktop gate runs ~/rs-wt/gate-lane-jailed.sh on a checkout at `rev`) or
 # `none`. `gate_args` are the extra clippy/test args of that repo's lane gate (plan §6.3).
 # `gate_extra` is a command run in the checkout, outside the jail, after the lane gate.
@@ -13,7 +14,7 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "64091759039579ccb3f441c870c658470592c7c3"
+rev = "8d13a48ec2176cb89b104517b429207ad2888bde"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
@@ -39,44 +40,44 @@ gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "e29deb4e1c0bb5b686f8fbfe46a3a0f1cc591020"
+rev = "a5ef52a2177c09697f75b135e663091011cf9913"
 branch = "main"
 gate = "lane"
 
 [repo.palmrest]
 url = "https://github.com/PoHsuanLai/palmrest.git"
-rev = "d7b83f5bd57af06c5b37cbfb661ed77c2c75df55"
+rev = "aadb78bcea620ab8674d7a13e8bf91bcf57562d4"
 branch = "master"
 gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "bf056552a0695ec6c50b551cfee5ae7774fc7f18"
+rev = "747c98b384c2f2b3685c2c8e2ad52f519a473fc4"
 branch = "master"
 gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "79d678879344cbf06ea13d8063eae06d8dbe0e64"
+rev = "ec51aa2eabc5eb06c96e85657d1103e82e4a3913"
 branch = "master"
 gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "7a405ccf0a32279e98346813b968936c0acc9693"
+rev = "07378d3a7616e3164a73b129717f40499373e7b4"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "47fa3df96fa5bf3f75de0ab589e717a3488a3df9"
+rev = "d33336c578d58e783c06451890607e7bf325bf95"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "616e9a0f8121434a30c830656b751d432df85a67"
+rev = "4636570825abcfa8919d69b35b8da979dd3e0f00"
 branch = "master"
 gate = "lane"
 
@@ -96,4 +97,10 @@ gate = "none"
 url = "https://github.com/PoHsuanLai/anyview.git"
 rev = "a1f7b536c4e488828fdbcd4970439bdc1869d091"
 branch = "main"
+gate = "none"
+
+[repo.casement-protocols]
+url = "https://github.com/PoHsuanLai/casement-protocols.git"
+rev = "a0ca1740bf3be9d5ce662bfda58cb73cfcd00e48"
+branch = "master"
 gate = "none"

@@ -11,20 +11,23 @@
 #   --bind DIR           make DIR writable inside (the lane's worktree, its cargo target dir)
 #   --scratch DIR        use DIR (created) as scratch instead of a fresh temporary one, which is
 #                        removed on exit; HOME, XDG_CONFIG/STATE/CACHE_HOME live under it
-#   --fabricate-gpus N   fabricate N soft GPU nodes: /sys/dev/char/226:(200+n)/device/drm, n < N,
-#                        and hide every real /sys/dev/char entry (drm_node from_dev_id only stats it)
+#   --fabricate-gpus N   fabricate N soft GPU nodes (N <= 64): /sys/dev/char/226:(128+n)/device/drm,
+#                        n < N, and hide every real /sys/dev/char entry. The minors are in the render
+#                        range because the drm crate (0.14, DrmNode::from_dev_id) types a node by
+#                        `minor >> 6` and rejects 192..255 as "not a DRM node"; hiding the real
+#                        entries means renderD128 cannot collide
 #   --env K=V            set one more variable inside (the environment is otherwise cleared)
 #   --net-none           accepted and implied: the network namespace is always unshared
 #
 # Beyond the plan's command line: `--proc /proc` (so PID 1 of the namespace, bwrap, is visible
-# to require_jail, and the host's processes are not), and PATH, LANG, TERM carried in.
+# to require_jail, and the host's processes are not), and PATH, USER, LANG, TERM carried in.
 #
 # Exit codes (plan §6.1): the command's own; 3 = bubblewrap or /dev/udmabuf or a --bind dir missing.
 set -euo pipefail
 
 binds=() envs=() gpus=0 scratch="" own_scratch=0
 die3() { echo "jail: $1" >&2; echo "jail: fix: $2" >&2; exit 3; }
-usage() { sed -n '2,20p' "$0" >&2; exit 64; }
+usage() { sed -n '2,24p' "$0" >&2; exit 64; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -39,7 +42,7 @@ while [ $# -gt 0 ]; do
 done
 [ $# -gt 0 ] || usage
 case "$gpus" in ''|*[!0-9]*) usage ;; esac
-[ "$gpus" -le 55 ] || usage   # minors 200..255
+[ "$gpus" -le 64 ] || usage   # render minors 128..191 (drm crate: minor >> 6 == 2)
 
 command -v bwrap >/dev/null || die3 "bubblewrap (bwrap) not found" "sudo dnf install bubblewrap"
 [ -c /dev/udmabuf ] || die3 "/dev/udmabuf is missing" "log in locally (it needs a uaccess ACL) or run: sudo modprobe udmabuf"
@@ -65,7 +68,7 @@ args=(
 )
 n=0
 while [ "$n" -lt "$gpus" ]; do
-  args+=(--dir "/sys/dev/char/226:$((200 + n))/device/drm")
+  args+=(--dir "/sys/dev/char/226:$((128 + n))/device/drm")
   n=$((n + 1))
 done
 args+=(--bind "$scratch" "$scratch")
@@ -77,7 +80,7 @@ done
 args+=(
   --unshare-net --unshare-ipc --unshare-pid --die-with-parent --new-session
   --clearenv
-  --setenv PATH "$PATH" --setenv LANG "${LANG:-C.UTF-8}" --setenv TERM "${TERM:-dumb}"
+  --setenv PATH "$PATH" --setenv USER "${USER:-$(id -un)}" --setenv LANG "${LANG:-C.UTF-8}" --setenv TERM "${TERM:-dumb}"
   --setenv HOME "$scratch/home" --setenv XDG_RUNTIME_DIR "/run/user/$uid"
   --setenv XDG_CONFIG_HOME "$scratch/config" --setenv XDG_STATE_HOME "$scratch/state"
   --setenv XDG_CACHE_HOME "$scratch/cache"
