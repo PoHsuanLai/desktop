@@ -1,0 +1,34 @@
+# Scenarios that cannot run yet (exit 2). Plan §6.1: a skip fails the gate unless listed here with a
+# FINDINGS id and the phase that closes it; `desktop-gate.sh --phase P<n>` fails if an entry whose
+# `closes` is P<n> or earlier is still listed, so the list is empty at each phase's exit.
+# FINDINGS ids are placeholders until the merge applies the rows (S0-D report).
+
+[[skip]]
+scenario = "appearance-reaches-apps"
+finding = "FD-01"
+closes = "P0"
+
+[[skip]]
+scenario = "sill-boots-on-casement"
+finding = "FD-02"
+closes = "P0"
+
+[[skip]]
+scenario = "shell-host-on-casement-and-kwin"
+finding = "FD-03"
+closes = "P0"
+
+[[skip]]
+scenario = "space-id-survives-restart"
+finding = "FD-04"
+closes = "P1"
+
+[[skip]]
+scenario = "minimise-target-round-trip"
+finding = "FD-05"
+closes = "P2"
+
+[[skip]]
+scenario = "keycap-yields-and-regrabs"
+finding = "FD-06"
+closes = "P4"

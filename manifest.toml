@@ -1,0 +1,99 @@
+# The version manifest: which revs of which repos are known to work together.
+# Written 2026-10-03 (S0) from each repo's own branch tip; the working trees were not consulted.
+# `gate` is `lane` (the desktop gate runs ~/rs-wt/gate-lane-jailed.sh on a checkout at `rev`) or
+# `none`. `gate_args` are the extra clippy/test args of that repo's lane gate (plan §6.3).
+# `gate_extra` is a command run in the checkout, outside the jail, after the lane gate.
+# [protocols] are the wire versions this set speaks; gate/manifest-check.sh compares them with
+# what each repo declares once the repos declare them (S0-PZ onwards).
+
+[protocols]
+casement_protocols = 1
+keycap = 1
+palmrest = 1
+
+[repo.quire]
+url = "https://github.com/PoHsuanLai/quire.git"
+rev = "64091759039579ccb3f441c870c658470592c7c3"
+branch = "master"
+gate = "lane"
+gate_extra = "./scripts/check-consumer.sh"
+
+[repo.sill]
+url = "https://github.com/PoHsuanLai/sill.git"
+rev = "bd86efd0d6f664530681515e9edbbda7c6be4cf2"
+branch = "master"
+gate = "lane"
+gate_args = "--features sill/debug"
+
+[repo.shell-host]
+url = "https://github.com/PoHsuanLai/shell-host.git"
+rev = "932011bfde55b2a182c481ce066d45b1dcf2ba69"
+branch = "master"
+gate = "lane"
+
+[repo.blitz-kit]
+url = "https://github.com/PoHsuanLai/blitz-kit.git"
+rev = "bd2bccc5926745a1143c60fd77aa82eaff61b424"
+branch = "master"
+gate = "none"
+
+[repo.keycap]
+url = "https://github.com/PoHsuanLai/keycap.git"
+rev = "e29deb4e1c0bb5b686f8fbfe46a3a0f1cc591020"
+branch = "main"
+gate = "lane"
+
+[repo.palmrest]
+url = "https://github.com/PoHsuanLai/palmrest.git"
+rev = "d7b83f5bd57af06c5b37cbfb661ed77c2c75df55"
+branch = "master"
+gate = "lane"
+
+[repo.porter]
+url = "https://github.com/PoHsuanLai/porter.git"
+rev = "bf056552a0695ec6c50b551cfee5ae7774fc7f18"
+branch = "master"
+gate = "lane"
+
+[repo.stoker]
+url = "https://github.com/PoHsuanLai/stoker.git"
+rev = "79d678879344cbf06ea13d8063eae06d8dbe0e64"
+branch = "master"
+gate = "lane"
+
+[repo.almanac]
+url = "https://github.com/PoHsuanLai/almanac.git"
+rev = "7a405ccf0a32279e98346813b968936c0acc9693"
+branch = "master"
+gate = "lane"
+gate_args = "--exclude recall-fastembed"
+
+[repo.docket]
+url = "https://github.com/PoHsuanLai/docket.git"
+rev = "47fa3df96fa5bf3f75de0ab589e717a3488a3df9"
+branch = "master"
+gate = "lane"
+
+[repo.cua]
+url = "https://github.com/PoHsuanLai/cua.git"
+rev = "616e9a0f8121434a30c830656b751d432df85a67"
+branch = "master"
+gate = "lane"
+
+[repo.mailo]
+url = "https://github.com/PoHsuanLai/mailo.git"
+rev = "90eb2d095f009d1a5aa462c9b46399c31625f2b0"
+branch = "master"
+gate = "none"
+
+[repo.detent]
+url = "https://github.com/PoHsuanLai/detent.git"
+rev = "b8b79f04facc145994d33360f123d7829c394a03"
+branch = "master"
+gate = "none"
+
+[repo.anyview]
+url = "https://github.com/PoHsuanLai/anyview.git"
+rev = "a1f7b536c4e488828fdbcd4970439bdc1869d091"
+branch = "main"
+gate = "none"
