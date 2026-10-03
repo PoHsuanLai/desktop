@@ -95,7 +95,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "a1f7b536c4e488828fdbcd4970439bdc1869d091"
+rev = "6447a6f68378cb00341b7bd70c47fd2cb92034dd"
 branch = "main"
 gate = "none"
 
