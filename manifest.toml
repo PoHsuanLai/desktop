@@ -40,7 +40,7 @@ gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "a5ef52a2177c09697f75b135e663091011cf9913"
+rev = "8e98fcd8b9c2af4d28a5e8442a72b62cefcf3233"
 branch = "main"
 gate = "lane"
 
