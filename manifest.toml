@@ -58,26 +58,26 @@ gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "ec51aa2eabc5eb06c96e85657d1103e82e4a3913"
+rev = "9e49e320230d524550d68462cb9e65ca80de5293"
 branch = "master"
 gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "07378d3a7616e3164a73b129717f40499373e7b4"
+rev = "e70910a11d722b0c00d537332e9cdabcef5a5d32"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "d63c3aeeff55074640ad9348b4277c8bf095c324"
+rev = "887097b48cdfa4bd1a90dd2e1df3723ca2fac5da"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "4636570825abcfa8919d69b35b8da979dd3e0f00"
+rev = "64962b6237ea9fff9db4ba5a53b95afe95ca6a80"
 branch = "master"
 gate = "lane"
 
