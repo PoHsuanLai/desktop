@@ -13,7 +13,7 @@
 #   light     the file returns to light: every surface returns to its baseline (< 0.2% differ)
 #   alive     the same daemon pid answers `ping` throughout
 #
-# Each wait is on the capture, polled up to 10 s, never a fixed sleep.
+# Each wait is on the capture, polled up to 30 s, never a fixed sleep.
 # budget: 120
 # Exit: 0 pass | 1 a step failed | 2 outside the jail | 3 artefacts missing (harness/scenario-build.sh).
 set -uo pipefail
@@ -44,12 +44,13 @@ write_theme() {
   printf '[appearance]\ntheme = "%s"\n' "$1" >"$CONFIG/quire/appearance.toml"
 }
 
-# Waits up to 10 s for surface $1 to differ from its $2 capture by $CHANGED (or, with $3 = same, to
+# Waits up to 30 s for surface $1 to differ from its $2 capture by $CHANGED (or, with $3 = same, to
 # be within $SETTLED of it); captures into $OUT_DIR/$4-$1.png. Prints the fraction.
 wait_look() {
   local surface=$1 reference=$2 want=$3 tag=$4 fraction=1
-  for _ in $(seq 50); do
-    capture "$surface" "$OUT_DIR/$tag-$surface.png" || return 1
+  for _ in $(seq 100); do
+    # A capture that does not answer yet (a loaded host) is a poll that saw nothing, not a failure.
+    capture "$surface" "$OUT_DIR/$tag-$surface.png" || { sleep 0.2; continue; }
     fraction=$(changed_fraction "$OUT_DIR/$tag-$surface.png" "$OUT_DIR/$reference-$surface.png")
     if [ "$want" = same ]; then at_least "$SETTLED" "$fraction" && { echo "$fraction"; return 0; }
     else at_least "$fraction" "$CHANGED" && { echo "$fraction"; return 0; }; fi

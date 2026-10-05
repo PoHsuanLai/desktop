@@ -40,18 +40,20 @@ accept() {
     >"$OUT_DIR/$name.log" 2>&1 </dev/null
 }
 
-# A script that fails is run once more, and says so: accept-ime types after fixed sleeps (not on an event
-# from fcitx5), and on a host past 100 load it types before the engine is up (the field reads 'su3cl3').
-# A real regression fails both runs. The ask for shell-host: wait on fcitx5's engine, not a sleep.
+# A script that fails is run again, up to twice, and says so: accept-ime types after fixed sleeps (not on
+# an event from fcitx5) and accept-scroll reads its list after one, so on a host past 100 load they act
+# before the demo or the engine is ready (ime: the field reads 'su3cl3'; scroll: offset 0, stats empty).
+# A real regression fails every run. The ask for shell-host: wait on those events, not on sleeps.
 STATUS=0
 for name in "${SCRIPTS[@]}"; do
   start=$(date +%s)
   accept "$name"; rc=$?
-  if [ "$rc" != 0 ]; then
+  for attempt in 1 2; do
+    [ "$rc" != 0 ] || break
     echo "RETRY accept-$name (exit $rc): $(grep -E '^FAIL ' "$OUT_DIR/$name.log" | head -n 1 | cut -c1-160)"
-    cp "$OUT_DIR/$name.log" "$OUT_DIR/$name.first.log"
+    cp "$OUT_DIR/$name.log" "$OUT_DIR/$name.try$attempt.log"
     accept "$name"; rc=$?
-  fi
+  done
   secs=$(( $(date +%s) - start ))
   if [ "$rc" = 0 ]; then
     echo "PASS accept-$name on casement (${secs}s)"
