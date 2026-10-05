@@ -4,19 +4,14 @@
 # FINDINGS ids are placeholders until the merge applies the rows (S0-D report).
 
 [[skip]]
-scenario = "appearance-reaches-apps"
-finding = "FD-01"
-closes = "P0"
+scenario = "appearance-reaches-quire-apps"
+finding = "FD-08"
+closes = "P1"
 
 [[skip]]
-scenario = "sill-boots-on-casement"
-finding = "FD-02"
-closes = "P0"
-
-[[skip]]
-scenario = "shell-host-on-casement-and-kwin"
-finding = "FD-03"
-closes = "P0"
+scenario = "shell-host-on-kwin"
+finding = "FD-07"
+closes = "P2"
 
 [[skip]]
 scenario = "space-id-survives-restart"

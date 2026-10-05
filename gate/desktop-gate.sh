@@ -75,6 +75,9 @@ phase_closed() { # the entry's phase is the current phase or earlier
   [ "$tier" = phase ] && [ "${1#P}" -le "${phase#P}" ]
 }
 
+# A scenario's step budget in seconds: its `# budget: N` header line, else 60.
+scenario_budget() { sed -n 's/^# budget: *\([0-9][0-9]*\).*/\1/p' "$1" | head -n 1 | grep . || echo 60; }
+
 run_scenario() {
   local name=$1 rc=0 f c
   "$JAIL" --fabricate-gpus 2 -- "$ROOT/scenarios/$name.sh" || rc=$?
@@ -126,8 +129,10 @@ step "selftest (jail, 2 fabricated GPUs)" "$JAIL" --fabricate-gpus 2 -- "$ROOT/h
 step "selftest negative (outside the jail)" "$ROOT/harness/selftest.sh" --negative || true
 step "manifest shape" "$HERE/manifest-check.sh" --syntax || true
 step "expected-skips resolve" skip_entries_resolve || true
+# The scenarios' artefacts are built outside the jail (plan A7); DESKTOP_GATE_NO_BUILD=1 skips it.
+if [ -z "${DESKTOP_GATE_NO_BUILD:-}" ]; then step "scenario artefacts (built outside the jail)" "$ROOT/harness/scenario-build.sh" || true; fi
 for s in "$ROOT"/scenarios/*.sh; do
-  STEP_BUDGET=60 step "scenario $(basename "$s" .sh)" run_scenario "$(basename "$s" .sh)" || true
+  STEP_BUDGET=$(scenario_budget "$s") step "scenario $(basename "$s" .sh)" run_scenario "$(basename "$s" .sh)" || true
 done
 
 if [ "$tier" != self ]; then
