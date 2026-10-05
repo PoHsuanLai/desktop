@@ -40,10 +40,18 @@ accept() {
     >"$OUT_DIR/$name.log" 2>&1 </dev/null
 }
 
+# A script that fails is run once more, and says so: accept-ime types after fixed sleeps (not on an event
+# from fcitx5), and on a host past 100 load it types before the engine is up (the field reads 'su3cl3').
+# A real regression fails both runs. The ask for shell-host: wait on fcitx5's engine, not a sleep.
 STATUS=0
 for name in "${SCRIPTS[@]}"; do
   start=$(date +%s)
   accept "$name"; rc=$?
+  if [ "$rc" != 0 ]; then
+    echo "RETRY accept-$name (exit $rc): $(grep -E '^FAIL ' "$OUT_DIR/$name.log" | head -n 1 | cut -c1-160)"
+    cp "$OUT_DIR/$name.log" "$OUT_DIR/$name.first.log"
+    accept "$name"; rc=$?
+  fi
   secs=$(( $(date +%s) - start ))
   if [ "$rc" = 0 ]; then
     echo "PASS accept-$name on casement (${secs}s)"
