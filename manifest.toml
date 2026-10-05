@@ -99,6 +99,14 @@ rev = "6665290e6a833cfd051cdadd525ed1885b663a99"
 branch = "main"
 gate = "none"
 
+[repo.mpv]
+# mpv-wgpu, checked out as ~/mpv: anyview's dist/install.sh --with-plugin mpv builds its C plugin
+# from ../mpv (MPV_WGPU_DIR); nothing links it.
+url = "https://github.com/PoHsuanLai/mpv-wgpu.git"
+rev = "7aba35b3c75786f0b02a356f1d34d1ce888d1f48"
+branch = "master"
+gate = "none"
+
 [repo.casement-protocols]
 url = "https://github.com/PoHsuanLai/casement-protocols.git"
 rev = "a0ca1740bf3be9d5ce662bfda58cb73cfcd00e48"
