@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "7800bcdc89468faf40ebe95d144a9a872ef537b7"
+rev = "9a1b5b0ae05210ccdba758a2cc05f6b833efeda8"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -71,7 +71,7 @@ gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "d33336c578d58e783c06451890607e7bf325bf95"
+rev = "d63c3aeeff55074640ad9348b4277c8bf095c324"
 branch = "master"
 gate = "lane"
 
