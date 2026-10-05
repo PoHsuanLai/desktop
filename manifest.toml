@@ -14,7 +14,7 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "3ac99b8e9e98d3640f09566c92a4e05f9d0521b1"
+rev = "c94f6d06384b47fa230f0c8f0c517010cd13487b"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
@@ -89,7 +89,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "2115533c179930bf1bdfc0a502686ca319193663"
+rev = "67537e945a03d6ff6d83aa5effb98ee0218ff73b"
 branch = "master"
 gate = "none"
 
