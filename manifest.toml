@@ -14,7 +14,7 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "6711efe6f4fc414d9912408732c40b8ab7468598"
+rev = "219d482c16c6c4b3b3b2dd86cbe5f04d318fd7b6"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
