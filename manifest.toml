@@ -112,3 +112,11 @@ url = "https://github.com/PoHsuanLai/casement-protocols.git"
 rev = "a0ca1740bf3be9d5ce662bfda58cb73cfcd00e48"
 branch = "master"
 gate = "none"
+
+[repo.casement]
+# The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
+# session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
+url = "https://github.com/PoHsuanLai/casement.git"
+rev = "0b489698a84223ad4aa13756699165d913ca940c"
+branch = "master"
+gate = "lane"
