@@ -179,7 +179,7 @@ done
 
 if [ "$tier" != self ]; then
   step "check out manifest revs" checkout_repos || true
-  if [ "$STEP_WORST" = 0 ]; then
+  if [ -d "$LANE_DIR/sill" ]; then   # the checkouts exist: every lane gate runs, whatever failed before
     for r in $(manifest_repos); do
       [ "$(manifest_repo_get "$r" gate)" = lane ] || continue
       [ -z "$only" ] || [ "$only" = "$r" ] || continue
