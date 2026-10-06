@@ -152,7 +152,20 @@ sill_accept() {
   return "$rc"
 }
 
+# The lane gate script names its logs $LANE_DIR/gate-target.<step>.log, one set shared by every repo
+# (each repo's run overwrites the last): clear them before a repo's gate and keep that repo's set under
+# build/lane-logs/<repo>/ when it ends, so a failure's cause survives the repos gated after it.
 lane_gate() { # REPO
+  local r=$1 rc=0 dest="$ROOT/build/lane-logs/$1" f
+  rm -f "$LANE_DIR"/gate-target.*.log
+  lane_gate_run "$r" || rc=1
+  rm -rf "$dest"; mkdir -p "$dest"
+  for f in "$LANE_DIR"/gate-target.*.log; do [ ! -e "$f" ] || mv "$f" "$dest/"; done
+  [ "$rc" = 0 ] || echo "  $r logs kept in $dest/"
+  return "$rc"
+}
+
+lane_gate_run() { # REPO
   local r=$1 args extra rc=0
   args=$(manifest_repo_get "$r" gate_args); extra=$(manifest_repo_get "$r" gate_extra)
   # shellcheck disable=SC2086  # gate_args is a word list on purpose
