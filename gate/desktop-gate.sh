@@ -186,7 +186,8 @@ if [ "$tier" != self ]; then
       step "lane gate $r @ $(manifest_repo_get "$r" rev | cut -c1-9)" lane_gate "$r" || true
     done
   fi
-  if [ "$tier" = phase ] && [ "$STEP_WORST" = 0 ] && { [ -z "$only" ] || [ "$only" = sill ]; }; then
+  # Whatever failed before, this check still runs (the checkouts exist): a phase gate names every failure.
+  if [ "$tier" = phase ] && [ -d "$LANE_DIR/sill" ] && { [ -z "$only" ] || [ "$only" = sill ]; }; then
     step "sill acceptance on casement (dev/accept.sh --compositor casement, pinned sill)" sill_accept || true
   fi
   [ "$keep" = 1 ] || remove_checkouts
