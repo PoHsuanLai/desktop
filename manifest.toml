@@ -58,7 +58,7 @@ gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "33e80498d55bd532f5dc0fb67d73d21defeca3d3"
+rev = "6572b6c9a75e760c20f18f5606d48786744052fa"
 branch = "master"
 gate = "lane"
 
