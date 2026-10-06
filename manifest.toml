@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "852ef25960f385c4ecfdaee6bd004e8b5d794091"
+rev = "dc8638976d4da9451ffbf1557a523a1592532a39"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
