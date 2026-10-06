@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "907a6718af05e0385ba6a294f3f5581365974324"
+rev = "6c39e50e58a73361f1ced674da1e883bc3bcbd32"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -64,20 +64,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "54ec49ded1a97484be4ac67555ea98eab5467045"
+rev = "211d99de847b6d7bfb4c6379106f21300a1740ba"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "34036c253e58a47ef018b3b7bf2f464b62e1effd"
+rev = "4826c446eb2ae46deec38ba66c54dae1a3aa4838"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "31b344d310c83dc5bddcb1788a4262b2a925f4f9"
+rev = "16c2457da61ec7469d5a445551af36ce87b37314"
 branch = "master"
 gate = "lane"
 
