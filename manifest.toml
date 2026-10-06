@@ -64,7 +64,7 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "64c9b6f42ad1dcf6d7fa579f225d6069f39c89fe"
+rev = "8895399f7baceb5ef48295beb29af3549a738bc3"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
@@ -95,7 +95,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "15551a33bd8001ab942a4392e1243c9b218ccf8b"
+rev = "bf9e7e3ed812a4f665ce8d2d1137bdee8ea50ccd"
 branch = "master"
 gate = "none"
 
