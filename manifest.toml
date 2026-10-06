@@ -14,27 +14,27 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "219d482c16c6c4b3b3b2dd86cbe5f04d318fd7b6"
+rev = "cbd749e14a2ba40fcd3ebd08964d652aeb323498"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "6cb73f3723586e070e7cc950907768d21131de4f"
+rev = "dd3d77f364dcffa7858a0a1c012032cee4dd94e8"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "121d57786cc62b089fe272bb2d9f8fd99005f615"
+rev = "e2265b106706e8847849979ace599cb7370966cd"
 branch = "master"
 gate = "lane"
 
 [repo.blitz-kit]
 url = "https://github.com/PoHsuanLai/blitz-kit.git"
-rev = "bd2bccc5926745a1143c60fd77aa82eaff61b424"
+rev = "6ca8b48985265b3be97d0b8279153ea09439fcef"
 branch = "master"
 gate = "none"
 
@@ -95,7 +95,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "e8fb3561c493744e2b6c440da6233f2a7e5d20d4"
+rev = "9bc498b78ecd6d890f75e4247abb5a2a2a220b5e"
 branch = "main"
 gate = "none"
 
