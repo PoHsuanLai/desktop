@@ -58,7 +58,7 @@ gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "9e49e320230d524550d68462cb9e65ca80de5293"
+rev = "33e80498d55bd532f5dc0fb67d73d21defeca3d3"
 branch = "master"
 gate = "lane"
 
@@ -71,7 +71,7 @@ gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "4826c446eb2ae46deec38ba66c54dae1a3aa4838"
+rev = "d3a90c398a4fd761f69164909cafe0e4248ab682"
 branch = "master"
 gate = "lane"
 
