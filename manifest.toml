@@ -14,7 +14,7 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "94ea1f61628494b6a1d4f3193309fb7434a57df8"
+rev = "8761dd3e6fe9a2ccf7f062fe856c8a901e3c8909"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "48b1ab67946ec0c334ea476be57030ec85cb1ea9"
+rev = "676157129a8859dbfa3db0d1c571a4c79efabc45"
 branch = "master"
 gate = "lane"
 
@@ -89,7 +89,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "99aa0a6ac77c83edeca29ee69e832daecbf898f9"
+rev = "63951b4fa49f6031d361c86da4d0ca76cebfd952"
 branch = "master"
 gate = "none"
 
