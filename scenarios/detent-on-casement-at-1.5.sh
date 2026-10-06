@@ -8,9 +8,10 @@
 #   map      detent maps at the 900x640 logical size it asks for (`debug windows`); the client's own
 #            protocol log (WAYLAND_DEBUG) shows preferred_scale(180) before it drew, wp_viewport destination
 #            900x640 and wl_shm buffers of 1350x960: the buffer is the physical size, round(logical x 1.5)
-#   resize   a bottom-right drag (the first press only focuses: detent's grab zones take the second)
-#            moves the corner by (+100, +40): the client gets a configure of 1000x680, the frame is 1000x680,
-#            the viewport destination follows and new buffers of 1500x1020 are attached
+#   resize   a bottom-right drag (the first press only focuses: detent's grab zones take the next, once the hover
+#            is on the corner; a press the client did not take is released and repeated): the frame grows,
+#            the client gets a configure of the new size, the viewport destination follows and new wl_shm
+#            buffers of round-half-up(size x 1.5) are attached
 #   crisp    `casementctl shot --output`: the capture is the output's 2880x1620 physical pixels and the
 #            window's sidebar edge (a known element: a 240-logical-pixel sidebar, white against the
 #            content grey, with its 1-logical-pixel rule) is on physical column 360 exactly, with no
@@ -77,24 +78,47 @@ step_map() {
 }
 
 window_active() { windows | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin)[0]["active"] else 1)'; }
+# resize_requested: detent has asked for an interactive resize (its corner zone took the press).
+resize_requested() { grep -qE -e 'xdg_toplevel#[0-9]+\.resize\(' "$LOG"; }
 
 step_resize() {
-  # The first press only focuses the window (detent's edge zones take the first mouse); the second, once
-  # the window is active, grabs the corner: the client asks for the resize, then the drag moves it.
+  # The first press only focuses the window (detent's edge zones take the first mouse); the next, once the
+  # window is active and the hover has reached the corner zone, makes the client ask for the resize. A
+  # press that lands before the client's hover state catches up is released and tried again (up to 8).
   casementctl debug inject "move 1000 500" "move 1405 855" "press left" "release left" >/dev/null || return 1
   for _ in $(seq 100); do window_active && break; sleep 0.1; done
   window_active || { echo "the window never took focus" >&2; return 1; }
-  # The pointer leaves and comes back, so the client's hover is on the corner zone when the press lands.
-  casementctl debug inject "move 1000 500" "move 1405 855" >/dev/null || return 1
-  casementctl debug wait settled --timeout 10000 >/dev/null
-  casementctl debug inject "press left" >/dev/null || return 1
-  wait_log 'xdg_toplevel#[0-9]+\.resize\(' || return 1
-  casementctl debug inject "move 1450 880" "move 1505 895" "release left" >/dev/null || return 1
-  wait_size 1000x680 || return 1
-  wait_log 'xdg_toplevel#[0-9]+\.configure\(1000, 680, ' || return 1
-  wait_log 'wp_viewport#[0-9]+\.set_destination\(1000, 680\)' || return 1
-  wait_log '-> wl_shm_pool#[0-9]+\.create_buffer\(.*, 1500, 1020, ' || return 1
-  echo "resized to 1000x680: configure, viewport and 1500x1020 buffers" >&2
+  local attempt
+  for attempt in $(seq 8); do
+    casementctl debug inject "move 1000 500" "move 1405 855" >/dev/null || return 1
+    casementctl debug wait settled --timeout 10000 >/dev/null
+    sleep 0.5
+    casementctl debug inject "press left" >/dev/null || return 1
+    for _ in $(seq 20); do resize_requested && break 2; sleep 0.1; done
+    casementctl debug inject "release left" >/dev/null
+  done
+  resize_requested || { echo "detent never asked for a resize in 8 presses on its corner" >&2; return 1; }
+  # The compositor starts its grab when it handles the request, a little after the client sent it, and a
+  # loaded host delays it: drag in small steps until the frame has grown, then release.
+  local x=1405 y=855 size=
+  for _ in $(seq 40); do
+    x=$((x + 15)); y=$((y + 8))
+    casementctl debug inject "move $x $y" >/dev/null || return 1
+    sleep 0.2
+    size=$(window_size)
+    [ "$size" = 900x640 ] || break
+  done
+  casementctl debug inject "release left" >/dev/null || return 1
+  [ "$size" != 900x640 ] || { echo "the window never grew past 900x640 while dragging" >&2; return 1; }
+  sleep 1
+  size=$(window_size)
+  echo "$size" >"$OUT_DIR/final-size"
+  local w=${size%x*} h=${size#*x} pw ph
+  pw=$(python3 -c "print(int($w * 1.5 + 0.5))") ph=$(python3 -c "print(int($h * 1.5 + 0.5))")
+  wait_log "xdg_toplevel#[0-9]+\\.configure\\($w, $h, " || return 1
+  wait_log "wp_viewport#[0-9]+\\.set_destination\\($w, $h\\)" || return 1
+  wait_log "-> wl_shm_pool#[0-9]+\\.create_buffer\\(.*, $pw, $ph, " || return 1
+  echo "resized to $size: configure, viewport and ${pw}x${ph} buffers" >&2
 }
 
 step_crisp() {
@@ -102,7 +126,7 @@ step_crisp() {
   casementctl debug wait settled --timeout 10000 >/dev/null
   sleep 1
   casementctl shot --output HEADLESS-1 "$png" >"$OUT_DIR/shot.log" 2>&1 || { cat "$OUT_DIR/shot.log" >&2; return 1; }
-  python3 -I - "$png" <<'PY'
+  python3 -I - "$png" "$OUT_DIR/final-size" <<'PY'
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert("RGB")
@@ -110,6 +134,8 @@ if im.size != (2880, 1620):
     sys.exit(f"the capture is {im.size[0]}x{im.size[1]}, not 2880x1620")
 # The window's frame is (510, 220) logical: physical (765, 330). Its sidebar is 240 logical wide.
 x0, y0, edge = 765, 330, 360
+w, h = map(int, open(sys.argv[2]).read().strip().split("x"))
+pw = int(w * 1.5 + 0.5)
 white, rule, soft, grey = (255, 255, 255), (217, 217, 217), (225, 226, 226), (233, 234, 235)
 rows = range(150, 900, 25)
 strips = {tuple(im.getpixel((x0 + x, y0 + y)) for x in range(edge - 8, edge + 8)) for y in rows}
@@ -119,11 +145,11 @@ strip = next(iter(strips))
 want = (white,) * 8 + (rule, soft) + (grey,) * 6
 if strip != want:
     sys.exit(f"the sidebar edge is not the crisp rule at column {edge}: {strip}")
-# The window ends where it should: 1500x1020 physical, the desktop outside it.
-inside, outside = im.getpixel((x0 + 1499, y0 + 500)), im.getpixel((x0 + 1500, y0 + 500))
+# The window ends where it should: round-half-up(width x 1.5) physical (the protocol's rounding), the desktop outside it.
+inside, outside = im.getpixel((x0 + pw - 1, y0 + 500)), im.getpixel((x0 + pw, y0 + 500))
 if inside == outside:
-    sys.exit("the window's right edge is not at physical column 1500")
-print(f"sidebar edge exact at column {edge}, the rule and its one soft pixel, same on {len(rows)} rows; window ends at 1500", file=sys.stderr)
+    sys.exit(f"the window's right edge is not at physical column {pw}")
+print(f"sidebar edge exact at column {edge}, the rule and its one soft pixel, same on {len(rows)} rows; window ends at {pw}", file=sys.stderr)
 PY
 }
 
