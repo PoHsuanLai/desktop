@@ -8,6 +8,8 @@
 #   build/sill-target/debug/sill                                         sill with --features debug (the fake DDC)
 #   build/shell-host-target/debug/examples/demo_*                        shell-host's real-input demos
 #   build/src/{sill,shell-host}                                          private checkouts of the siblings' HEADs the scripts run from
+#   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
+#   build/detent-target/debug/detent                                     detent at its pin, for the detent-on-casement-at-1.5 scenario
 #
 # The siblings are the checkouts beside this one (<this>/../sill, ...): the lane's symlinks, or ~ itself.
 # Exit codes: 0 built, 2 run inside a jail, 3 a host tool is missing or a build failed.
@@ -70,6 +72,26 @@ checkouts() {
   done
 }
 
+# pinned: a detached checkout of every manifest repo at its manifest rev under build/pin, side by side so
+# path dependencies resolve at the pins (what the desktop gate's lane checkouts do). detent is built from here:
+# its pin does not build against the siblings' newer HEADs.
+pinned() {
+  local repo rev dir
+  mkdir -p "$SCEN_BUILD/pin"
+  for repo in $(manifest_repos); do
+    rev=$(manifest_repo_get "$repo" rev); dir="$SCEN_BUILD/pin/$repo"
+    [ "$(git -C "$dir" rev-parse HEAD 2>/dev/null)" != "$rev" ] || continue
+    git -C "$HOME/$repo" worktree remove --force "$dir" 2>/dev/null || rm -rf "$dir"
+    git -C "$HOME/$repo" worktree prune
+    git -C "$HOME/$repo" worktree add --detach "$dir" "$rev" || return 1
+  done
+  ln -sfn "$ROOT" "$SCEN_BUILD/pin/desktop"
+}
+
+build_detent() {
+  (cd "$SCEN_BUILD/pin/detent" && CARGO_TARGET_DIR="$SCEN_BUILD/detent-target" cargo build -p detent)
+}
+
 build_sill() {
   (cd "$SCEN_SRC/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" cargo build -p sill --features debug)
 }
@@ -92,4 +114,6 @@ stage "foot" fetch_foot
 stage "checkouts of sill and shell-host" checkouts
 stage "sill (--features debug)" build_sill
 stage "shell-host demos" build_shell_host
+stage "every repo at its manifest rev" pinned
+stage "detent (at its pin)" build_detent
 echo "scenario-build: done ($SCEN_BUILD)"

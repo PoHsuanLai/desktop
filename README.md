@@ -8,10 +8,11 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
 | `harness/jail.sh` | the one jail: a bubblewrap namespace with no input devices, no GPU, no session, no network |
 | `harness/lib/` | `require_jail`, step timing and exit codes, budgets, run ids, a private dbus-daemon |
-| `harness/scenario-build.sh` | outside the jail: builds what the scenarios run (casement tools, foot, sill, shell-host's demos) into the git-ignored `build/`; the gate runs it first |
+| `harness/scenario-build.sh` | outside the jail: builds what the scenarios run (casement tools, foot, sill, shell-host's demos, detent at its pin) into the git-ignored `build/`; the gate runs it first |
 | `harness/selftest.sh` | proves the jail holds (`--all` also runs the negative check outside) |
 | `gate/desktop-gate.sh` | `--self`, `--merge`, `--phase P<n>`: prints `DESKTOP GATE GREEN (<tier>)` |
 | `gate/manifest-check.sh` | every Cargo.lock agrees with the manifest, and resolves `--locked` against the pinned siblings |
+| `gate/sill-accept-skips.txt` | the scripts of sill's `dev/accept.sh --compositor casement` that may SKIP in the phase gate, with the closing phase |
 | `gate/expected-skips.toml` | scenarios not runnable yet, each with a finding id and the closing phase |
 | `scenarios/` | whole-desktop scenarios; each calls `require_jail` first and exits with the plan's codes |
 

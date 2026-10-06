@@ -12,7 +12,10 @@
 #           dependencies resolve at the manifest's revs) and run through
 #           ~/rs-wt/gate-lane-jailed.sh, plus manifest-check (Cargo.lock agreement).
 # --phase   --merge, and additionally an entry of expected-skips.toml whose `closes` is P<n> or
-#           earlier must be gone: the list is empty at that phase's exit.
+#           earlier must be gone: the list is empty at that phase's exit; and sill's own acceptance
+#           suite on casement (dev/accept.sh --compositor casement from the pinned sill, its skips
+#           listed in sill-accept-skips.txt). The scenarios launcher-p95-on-casement and
+#           detent-on-casement-at-1.5 are the phase's other checks and run with every scenario.
 # --only    with --merge/--phase: gate just that repo (its siblings are still checked out)
 # --keep    leave the checkouts in place
 #
@@ -35,10 +38,10 @@ while [ $# -gt 0 ]; do
     --phase) tier=phase; phase=${2:-}; [[ "$phase" =~ ^P[0-9]+$ ]] || { echo "usage: --phase P<n>" >&2; exit 64; }; shift 2 ;;
     --only) only=${2:-}; shift 2 ;;
     --keep) keep=1; shift ;;
-    *) sed -n '2,24p' "$0" >&2; exit 64 ;;
+    *) sed -n '2,23p' "$0" >&2; exit 64 ;;
   esac
 done
-[ -n "$tier" ] || { sed -n '2,24p' "$0" >&2; exit 64; }
+[ -n "$tier" ] || { sed -n '2,23p' "$0" >&2; exit 64; }
 label=$tier; [ "$tier" != phase ] || label="phase $phase"
 
 # Preflight: environment incomplete is exit 3 with the fix printed.
@@ -110,6 +113,45 @@ remove_checkouts() {
   rm -f "$LANE_DIR/desktop"
 }
 
+# sill's own acceptance suite on casement (plan 20 §5.2: "sill's 19 minus listed WM-state steps"), from
+# the checkout at the manifest pin, every script in its own jail on a headless casement. Everything is
+# built outside the jail first (accept.sh --build: sill, the testkit's examples, sill-services' bins,
+# docket's intentd, casement's tools from the pinned casement). Exit 0 and 2 (SKIP) are accepted; a SKIP
+# only for a script listed in sill-accept-skips.txt whose phase has not closed; any FAIL is rerun once,
+# alone and one at a time (a loaded host starves the timing-sensitive scripts), and says so.
+sill_accept() {
+  local work="$ROOT/build/sill-accept" sill="$LANE_DIR/sill" log rc=0 name why closes
+  local -a failed=() skipped=()
+  rm -rf "$work"; mkdir -p "$work"; log="$work/accept.log"
+  export CARGO_TARGET_DIR="$work/target" CASEMENT_TARGET="$work/casement-target" CASEMENT_TOOLS="$work/casement-tools"
+  "$sill/dev/accept.sh" --compositor casement --build --out "$work/run" >"$log" 2>&1 || rc=$?
+  cat "$log"
+  [ "$rc" != 3 ] && [ "$rc" != 4 ] || { echo "  sill acceptance could not run (exit $rc)"; return "$rc"; }
+  mapfile -t failed < <(sed -n 's/^FAIL \([a-z0-9-]*\) .*/\1/p' "$log")
+  if [ "${#failed[@]}" -gt 0 ]; then
+    echo "  RETRY ${failed[*]} (failed under the parallel run; one at a time now)"
+    rc=0
+    for name in "${failed[@]}"; do
+      "$sill/dev/accept.sh" --compositor casement --jobs 1 --out "$work/retry-$name" "$name" >"$work/retry-$name.log" 2>&1
+      case $? in
+        0) echo "  retry PASS $name" ;;
+        2) echo "  retry SKIP $name"; sed -n 's/^SKIP \([a-z0-9-]*\) .*/\1/p' "$work/retry-$name.log" >>"$work/retry-skips" ;;
+        *) echo "  retry FAIL $name"; cat "$work/retry-$name.log"; rc=1 ;;
+      esac
+    done
+    [ "$rc" = 0 ] || return 1
+  fi
+  mapfile -t skipped < <({ sed -n 's/^SKIP \([a-z0-9-]*\) .*/\1/p' "$log"; cat "$work/retry-skips" 2>/dev/null; } | sort -u)
+  rc=0
+  for name in "${skipped[@]}"; do
+    read -r _ closes why < <(awk -v n="$name" '!/^#/ && $1 == n' "$HERE/sill-accept-skips.txt") || true
+    if [ -z "${closes:-}" ]; then echo "  unexpected SKIP: $name is not in sill-accept-skips.txt"; rc=1; continue; fi
+    if [ "$closes" != never ] && phase_closed "$closes"; then echo "  $name still skips but $closes has closed"; rc=1; continue; fi
+    echo "  expected skip: $name (closes $closes)"
+  done
+  return "$rc"
+}
+
 lane_gate() { # REPO
   local r=$1 args extra rc=0
   args=$(manifest_repo_get "$r" gate_args); extra=$(manifest_repo_get "$r" gate_extra)
@@ -143,6 +185,9 @@ if [ "$tier" != self ]; then
       [ -z "$only" ] || [ "$only" = "$r" ] || continue
       step "lane gate $r @ $(manifest_repo_get "$r" rev | cut -c1-9)" lane_gate "$r" || true
     done
+  fi
+  if [ "$tier" = phase ] && [ "$STEP_WORST" = 0 ] && { [ -z "$only" ] || [ "$only" = sill ]; }; then
+    step "sill acceptance on casement (dev/accept.sh --compositor casement, pinned sill)" sill_accept || true
   fi
   [ "$keep" = 1 ] || remove_checkouts
   step "manifest agrees with every Cargo.lock" "$HERE/manifest-check.sh" || true

@@ -1,0 +1,9 @@
+# The scripts of sill's dev/accept.sh --compositor casement that may exit SKIP (2) in the phase gate:
+# "<script> <closes> <why>". `closes` is the phase whose exit needs the skip gone (P<n>), or `never`
+# for a limit of the jail itself. A script that skips without a line here fails the gate; so does a
+# line whose phase has closed and whose script still skips (desktop-gate.sh --phase P<n>).
+# The WM-state steps are the plan's §5.2 "listed WM-state steps"; the reasons are the scripts' own.
+bar P2 exclusive_zone and step_demo_kwin: casement P0 windows are floating, no maximised configure (casement-probe toplevel --maximised)
+control-center P1 the card's distance from the right edge is read off an output screenshot (casementctl shot, P1-C1)
+switcher P1 the app switcher needs real windows and casement's window management (P1/P2); cosmic-term and kcalc are not jail tools
+launcher never no user systemd manager in the jail (scope path), and cargo does not run in the jail (A7: files tracker sandbox, files open, emoji palette)
