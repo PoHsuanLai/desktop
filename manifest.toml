@@ -64,7 +64,7 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "211d99de847b6d7bfb4c6379106f21300a1740ba"
+rev = "64c9b6f42ad1dcf6d7fa579f225d6069f39c89fe"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
