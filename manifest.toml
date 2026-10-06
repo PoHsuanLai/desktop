@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "10379994738c149623830b0268f257ac418cbef4"
+rev = "b15daf70191f460e813d8fb010cb29b845783a56"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -83,7 +83,7 @@ gate = "lane"
 
 [repo.latchkey]
 url = "https://github.com/PoHsuanLai/latchkey.git"
-rev = "f6a02834f36a81bc09d007db8bc34248e5783788"
+rev = "7b250b9e3b17bccd2a20126c6106461bc2050313"
 branch = "master"
 gate = "lane"
 
