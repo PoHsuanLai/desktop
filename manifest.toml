@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "676157129a8859dbfa3db0d1c571a4c79efabc45"
+rev = "54ba78d7a1f0a12283953c2982120cc5edac3520"
 branch = "master"
 gate = "lane"
 
