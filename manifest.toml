@@ -77,7 +77,7 @@ gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "4ffc38bb1d3847ad16d3c57c6531d71377934ff7"
+rev = "02f8fba120f44b008ba9d07751f6ec83db80b04a"
 branch = "master"
 gate = "lane"
 
