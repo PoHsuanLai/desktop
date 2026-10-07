@@ -432,27 +432,6 @@ detent_click() {
 # click on the title bar's text makes the following clicks count.
 detent_focus() { detent_click 450 14; }
 
-# acc_seed_grant APP ISOLATION ACCOUNT KIND CLASS USAGE: an Allow/Always grant put in the registry while accountd is
-# stopped (it is started again). A daemon cannot draw a consent sheet and nothing in Settings offers syncd's grant yet
-# (porter FINDINGS, "syncd storage: the grant that makes a mirror ..."), so the owner's act is seeded the way porter's
-# own tests seed it.
-acc_seed_grant() {
-  accountd_stop
-  python3 -I - "$STATE/porter/registry.json" "$@" <<'PY' || return 1
-import json, sys, time
-path, app, iso, account, kind, cls, usage = sys.argv[1:8]
-d = json.load(open(path))
-n = len(d["grants"]) + 1
-d["grants"].append({
-    "id": "seeded-%d" % n,
-    "key": {"app": {"name": app, "isolation": iso}, "account": account, "kind": kind, "class": cls,
-            "usage": usage, "space": {"kind": "any"}},
-    "decision": "allow", "scope": "always", "at": int(time.time())})
-json.dump(d, open(path, "w"))
-PY
-  accountd_start
-}
-
 # sheet_settled: the sheet's drawing has stopped changing (two captures 0.6 s apart are the same): its first animation
 # and the focus on its search field are done, so typed keys land.
 sheet_settled() {

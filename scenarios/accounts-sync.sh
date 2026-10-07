@@ -6,9 +6,11 @@
 # No network.
 #
 #   boot      as accounts-oauth-browser: a Microsoft-shaped account added through the browser sign-in
-#   grant     syncd's Files grant on it (class files, background): SEEDED in the registry (accountd restarted): a daemon
-#             cannot draw a consent sheet and no Settings action offers it yet. The grant is for the app accountd names
-#             syncd (callers.toml: org.quire.Sync, unit syncd.service)
+#   grant     Settings makes syncd's Files grant: detent starts, Accounts > Manage on the account, and the Sync group's
+#             "Keep this account's files on this computer" switch is clicked in the real window (coordinates, as
+#             accounts-settings; detent exposes no tree the harness can query); accountd's `sync.files` row says "on"
+#             (capture 6-sync-on). The grant is for the app accountd names syncd (callers.toml: org.quire.Sync,
+#             unit syncd.service)
 #   mirror    syncd starts with SYNCD_RESCAN_S=2 (it reads grants again that often; the default is 600 s); the dataset
 #             `<account segment>/storage_app_folder` is listed to its owner (org.quire.Files); a file the rig puts on the drive
 #             (the remote edit lever /graph/put) shows in $XDG_DATA_HOME/porter/storage/<account>/
@@ -32,6 +34,9 @@ acc_env
 source "$SCEN_BUILD/pin/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out accounts-sync)
 OWNER=org.quire.Files
+# Where the controls are, relative to detent's window frame: the sidebar's Accounts, the list's Manage, the account
+# screen's Sync group switch for files.
+ACCOUNTS_ITEM="77 284"; MANAGE="666 90"; SYNC_FILES_SWITCH="662 399"
 
 cleanup() { acc_stop_all; stop_daemon; stop_compositor; scratch_drop; }
 trap cleanup EXIT
@@ -41,6 +46,9 @@ segment() { echo "${ACCOUNT//[-.]/_}"; }
 folder() { echo "$DATA/porter/storage/$(segment)"; }
 local_is() { [ "$(cat "$(folder)/$1" 2>/dev/null)" = "$2" ]; }
 remote_is() { [ "$(rigctl GET "/graph/file?path=$1")" = "$2" ]; }
+detent_mapped() { [ -n "$(detent_frame 2>/dev/null)" ]; }
+sync_files() { settings_get "accounts.$ACCOUNT.sync.files"; }
+sync_on() { [ "$(sync_files)" = on ]; }
 dataset_listed() { rigc $OWNER datasets 2>/dev/null | grep -q "$(segment)/storage_app_folder"; }
 
 step_boot() {
@@ -57,7 +65,16 @@ step_boot() {
 }
 
 step_grant() {
-  acc_seed_grant org.quire.Sync unsandboxed "$ACCOUNT" storage files background || return 1
+  detent_start
+  acc_wait 30 detent_mapped || { echo "detent never mapped" >&2; tail -5 "$OUT_DIR/detent.log" >&2; return 1; }
+  sleep 4
+  detent_focus
+  detent_click $ACCOUNTS_ITEM; sleep 1; acc_shot 1-accounts-list
+  detent_click $MANAGE; sleep 1; acc_shot 2-account
+  [ "$(sync_files)" = off ] || echo "before the click accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2
+  detent_click $SYNC_FILES_SWITCH; sleep 1
+  acc_wait 15 sync_on || { acc_shot 5-sync-not-on; echo "the switch did not make the grant: accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
+  acc_shot 6-sync-on
 }
 
 step_mirror() {

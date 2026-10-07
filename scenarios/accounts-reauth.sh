@@ -10,8 +10,8 @@
 #             `needs_reauth` in accountd (state, and the NeedsReauth signal sill listens for)
 #   notice    sill posts "<address> needs you to sign in" (capture of its banner); hovering shows "Sign in again"
 #   sign-in   pressing it asks accountd to Reauthenticate: the sheet shows the browser wait, sill opens the issuer's
-#             authorize page, the sign-in finishes by itself (the Microsoft sign-in again still ends on the review step: Done): the account is
-#             `ok` again and the notice is withdrawn
+#             authorize page, the sign-in finishes by itself (no review step on a sign-in again, for any family; Done): the sheet
+#             goes, the account is `ok` again and the notice is withdrawn
 #   scan      the secret scan
 #
 # budget: 300
@@ -87,15 +87,14 @@ step_sign_in() {
     return 1
   }
   sheet_shot 3-browser-wait
-  # The Microsoft sign-in ends on its review step even when it is a sign-in again (the generic one does not): Done.
-  sleep 4; if sheet_shown; then sheet_shot 4-review-again; sheet_key Enter; fi
   acc_wait 30 account_ok || {
     rigctl GET /graph/hits >"$OUT_DIR/graph-hits.json" 2>&1
     echo "the account is still $(settings_get "accounts.$ACCOUNT.state"); the sheet answered: $(request_responses); Graph saw: $(cat "$OUT_DIR/graph-hits.json")" >&2
     return 1
   }
-  sheet_gone || return 1
+  sheet_gone || { sheet_shot 4-review-again; acc_shot 4-review-again-output; echo "the sheet did not go by itself after the sign-in again (a review step shows?)" >&2; return 1; }
   acc_wait 20 eval '! banner_shown' || { echo "the notice is still shown" >&2; return 1; }
+  acc_shot 5-end
 }
 
 step_scan() { scan_end; }
