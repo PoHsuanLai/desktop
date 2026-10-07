@@ -52,26 +52,26 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "e92f4126ae8020b4fcf7f13286fc3994b82a8615"
+rev = "fe84c50c5c71c6e9461b305aa095ae3e44040a48"
 branch = "master"
 gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "6572b6c9a75e760c20f18f5606d48786744052fa"
+rev = "f0ba7c7fa2becea5ba4f5eeaa0e7e50aa99d25bd"
 branch = "master"
 gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "a8fff6d4a6230b4129778758fbb31195c29c541b"
+rev = "39d5936ee75ea51370a7c27c95dccceec5bfbb6b"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "c63a6698588adb8de9f281cfadc98abe4d92dc4f"
+rev = "01b513e814a89ee32c97be58ef9bf0c7c3db011b"
 branch = "master"
 gate = "lane"
 
