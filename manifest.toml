@@ -95,13 +95,13 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "bf9e7e3ed812a4f665ce8d2d1137bdee8ea50ccd"
+rev = "008edb863e5f7cc5c14c59a42c85daf1c6bb404b"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "627de8999f340fd8fa2e75065304748cd6e797a2"
+rev = "ccfa9d2c9cb7970542b0b5f699b195a286e472e5"
 branch = "main"
 gate = "none"
 
