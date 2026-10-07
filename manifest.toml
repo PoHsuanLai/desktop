@@ -14,14 +14,14 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "8427f268be50b75d7927b999f722bacdd374dc62"
+rev = "c2375087b86204fbcda00da77b181f8103980972"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "c1db4689eb0d56c13dd210cc4bf5d08c0e9e8868"
+rev = "6d7530f3abf2264eaf38c557f1954e6ee7807557"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -95,7 +95,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "0b2e55e8a96c287c1186ecfe022fbe70f8d4c12b"
+rev = "ec628f6f825f112a18afb53ee7ec8deaa2ac122d"
 branch = "master"
 gate = "none"
 
