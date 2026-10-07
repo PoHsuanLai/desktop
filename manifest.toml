@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "7e3b45803ba9f6f89de68204bc20dc6306b57698"
+rev = "c1db4689eb0d56c13dd210cc4bf5d08c0e9e8868"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "5c4e3e7897bc2f23485f8584bc4fac539cf95669"
+rev = "d9f7ada5cef72e9fe53cb0d73b4ef10f4da8f348"
 branch = "master"
 gate = "lane"
 
@@ -64,7 +64,7 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "575673f643ca63460aec93a3298596fec004ca55"
+rev = "fc94bf7fd6d5b83387e83c4b7b94be5bb2fa7c16"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
@@ -89,7 +89,7 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "c5d03c6a906c261c1c719e137e99b70453f4099f"
+rev = "7373641173117da8c70ec879d9b6c9d8737a2b7f"
 branch = "master"
 gate = "none"
 
@@ -101,7 +101,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "c747bf51760ff0919510c14f74048dac37219005"
+rev = "65ee1b1c2c13e162e6f7e8f427a321958cce6f9c"
 branch = "main"
 gate = "none"
 
