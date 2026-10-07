@@ -10,10 +10,21 @@
 #   build/src/{sill,shell-host}                                          private checkouts of the siblings' HEADs the scripts run from
 #   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
 #   build/detent-target/debug/detent                                     detent at its pin, for the detent-on-casement-at-1.5 scenario
+#   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug (the accounts-* scenarios: the pin has the accounts sheet)
+#   build/porter-target/debug/{accountd,syncd,inferd}                    porter branch rig-syncd (see build_porter), test-proc-root builds
+#   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
+#
+#   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig)
 #
 # The siblings are the checkouts beside this one (<this>/../sill, ...): the lane's symlinks, or ~ itself.
 # Exit codes: 0 built, 2 run inside a jail, 3 a host tool is missing or a build failed.
 set -euo pipefail
+only_accounts=0
+case "${1:-}" in
+  "") ;;
+  --accounts) only_accounts=1 ;;
+  *) echo "usage: scenario-build.sh [--accounts]" >&2; exit 64 ;;
+esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/all.sh
 source "$ROOT/harness/lib/all.sh"
@@ -109,11 +120,43 @@ build_shell_host() {
     --example demo_popup_keys --example demo_window --example probe_toplevel)
 }
 
+# Porter's daemons and test rig, from porter's branch `rig-syncd` (ba86570: syncd's Storage over Graph, manual-server's
+# typed mail form, crates/porter-rig), NOT the manifest pin: it is not on porter master yet. SWITCH BACK TO THE MANIFEST
+# PIN (build/pin/porter) once porter master has it. A detached worktree beside the pins, so ../quire and ../stoker resolve.
+# Test builds: `test-proc-root` makes each daemon read caller identities from a fixture /proc tree
+# (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs in a systemd scope.
+# A release build ignores the variables; the features are never default.
+PORTER_RIG_REV=ba86570
+build_porter() {
+  local dir="$SCEN_BUILD/pin/porter-rig"
+  if [ "$(git -C "$dir" rev-parse --short=7 HEAD 2>/dev/null)" != "$PORTER_RIG_REV" ]; then
+    git -C "$HOME/porter" worktree remove --force "$dir" 2>/dev/null || rm -rf "$dir"
+    git -C "$HOME/porter" worktree prune
+    git -C "$HOME/porter" worktree add --detach "$dir" "$PORTER_RIG_REV" || return 1
+  fi
+  # One invocation per daemon: `-p a -p b --features a/f,b/f` left syncd without its feature (the binary then ignores
+  # SYNCD_PROC_ROOT and no caller is known), `-p x --features f` is what each needs.
+  local d
+  for d in accountd syncd inferd; do
+    (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p "$d" --features test-proc-root) || return 1
+  done
+  (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p porter-rig)
+}
+
+# sill at its pin: the accounts-* scenarios need the accounts sheet, which the sibling's HEAD may lack.
+build_sill_pin() {
+  (cd "$SCEN_BUILD/pin/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" cargo build -p sill --features debug)
+}
+
 stage "casement (bootstrap --build-only)" build_casement
-stage "foot" fetch_foot
-stage "checkouts of sill and shell-host" checkouts
-stage "sill (--features debug)" build_sill
-stage "shell-host demos" build_shell_host
+if [ "$only_accounts" = 0 ]; then
+  stage "foot" fetch_foot
+  stage "checkouts of sill and shell-host" checkouts
+  stage "sill (--features debug)" build_sill
+  stage "shell-host demos" build_shell_host
+fi
 stage "every repo at its manifest rev" pinned
 stage "detent (at its pin)" build_detent
+stage "sill at its pin (--features debug)" build_sill_pin
+stage "porter rig-syncd: daemons (test-proc-root) and porter-rig" build_porter
 echo "scenario-build: done ($SCEN_BUILD)"
