@@ -11,7 +11,7 @@
 #   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
 #   build/detent-target/debug/detent                                     detent at its pin, for the detent-on-casement-at-1.5 scenario
 #   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug (the accounts-* scenarios: the pin has the accounts sheet)
-#   build/porter-target/debug/{accountd,syncd,inferd}                    porter at 5231807 (see build_porter), test-proc-root builds
+#   build/porter-target/debug/{accountd,syncd,inferd}                    porter at its pin, test-proc-root builds
 #   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
 #
 #   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig)
@@ -120,20 +120,16 @@ build_shell_host() {
     --example demo_popup_keys --example demo_window --example probe_toplevel)
 }
 
-# Porter's daemons and test rig (crates/porter-rig) at 5231807, NOT the manifest pin (ba86570): the pin lacks the accounts
-# fixes (a spent Once grant, NeedsReauth on a refused refresh, reauthenticate by the sheet host and Settings, local runtimes in
-# the real accountd, Changed on add and remove) and the rig's later levers. SWITCH BACK TO THE MANIFEST PIN (build/pin/porter)
-# once it is at 5231807 or later. A detached worktree beside the pins, so ../quire and ../stoker resolve.
+# Porter's daemons and test rig (crates/porter-rig) at the manifest pin (build/pin/porter, beside the other pins so ../quire
+# and ../stoker resolve). The separate porter-rig checkout an earlier pin needed is removed if a build dir still has it.
 # Test builds: `test-proc-root` makes each daemon read caller identities from a fixture /proc tree
 # (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs in a systemd scope.
 # A release build ignores the variables; the features are never default.
-PORTER_RIG_REV=5231807
 build_porter() {
-  local dir="$SCEN_BUILD/pin/porter-rig"
-  if [ "$(git -C "$dir" rev-parse --short=7 HEAD 2>/dev/null)" != "$PORTER_RIG_REV" ]; then
-    git -C "$HOME/porter" worktree remove --force "$dir" 2>/dev/null || rm -rf "$dir"
+  local dir="$SCEN_BUILD/pin/porter" old="$SCEN_BUILD/pin/porter-rig"
+  if [ -e "$old" ]; then
+    git -C "$HOME/porter" worktree remove --force "$old" 2>/dev/null || rm -rf "$old"
     git -C "$HOME/porter" worktree prune
-    git -C "$HOME/porter" worktree add --detach "$dir" "$PORTER_RIG_REV" || return 1
   fi
   # One invocation per daemon: `-p a -p b --features a/f,b/f` left syncd without its feature (the binary then ignores
   # SYNCD_PROC_ROOT and no caller is known), `-p x --features f` is what each needs.
@@ -159,5 +155,5 @@ fi
 stage "every repo at its manifest rev" pinned
 stage "detent (at its pin)" build_detent
 stage "sill at its pin (--features debug)" build_sill_pin
-stage "porter 5231807: daemons (test-proc-root) and porter-rig" build_porter
+stage "porter at its pin: daemons (test-proc-root) and porter-rig" build_porter
 echo "scenario-build: done ($SCEN_BUILD)"

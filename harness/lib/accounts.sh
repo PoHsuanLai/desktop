@@ -20,7 +20,7 @@ acc_need() {
   scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" \
     "$SCEN_BUILD/sill-pin-target/debug/sill" "$ARIG/accountd" "$ARIG/syncd" "$ARIG/inferd" \
     "$ARIG/porter-rig-servers" "$ARIG/porter-rig-client" "$ARIG/porter-rig-secrets" \
-    "$SCEN_BUILD/pin/porter-rig/providers/microsoft.toml" "$SCEN_BUILD/pin/porter-rig/dist/callers.toml" "$@"
+    "$SCEN_BUILD/pin/porter/providers/microsoft.toml" "$SCEN_BUILD/pin/porter/dist/callers.toml" "$@"
 }
 
 # acc_env NAME: the variables every accounts scenario sets before sourcing sill's lib.
@@ -114,8 +114,8 @@ secrets_start() {
 # acc_config: the caller table (porter's own), the shipped provider files, and the person's clients file
 # (acc_clients_for_issuer).
 acc_config() {
-  cp "$SCEN_BUILD/pin/porter-rig/dist/callers.toml" "$CONFIG/porter/callers.toml"
-  cp "$SCEN_BUILD"/pin/porter-rig/providers/*.toml "$PROV/"
+  cp "$SCEN_BUILD/pin/porter/dist/callers.toml" "$CONFIG/porter/callers.toml"
+  cp "$SCEN_BUILD"/pin/porter/providers/*.toml "$PROV/"
 }
 
 # acc_clients_for_issuer: clients.toml pointing the Microsoft client at the fake issuer.
@@ -135,7 +135,7 @@ EOF
 
 # acc_provider_microsoft_on_rig: the shipped microsoft.toml with Graph at the rig's drive.
 acc_provider_microsoft_on_rig() {
-  sed -e "s#https://graph.microsoft.com#$(rigj graph.url)#g" "$SCEN_BUILD/pin/porter-rig/providers/microsoft.toml" >"$PROV/microsoft.toml"
+  sed -e "s#https://graph.microsoft.com#$(rigj graph.url)#g" "$SCEN_BUILD/pin/porter/providers/microsoft.toml" >"$PROV/microsoft.toml"
 }
 
 # acc_providers_only ID...: leaves only the named provider files (so the sheet's list is short).
@@ -467,7 +467,7 @@ sheet_settled() {
 
 # acc_provider_openai_on_rig: the shipped openai.toml with its API at the rig's LLM API fake (needs --llm-api).
 acc_provider_openai_on_rig() {
-  sed -e "s#https://api.openai.com/v1#$(rigj llm_api.api_url)#" "$SCEN_BUILD/pin/porter-rig/providers/openai.toml" >"$PROV/openai.toml"
+  sed -e "s#https://api.openai.com/v1#$(rigj llm_api.api_url)#" "$SCEN_BUILD/pin/porter/providers/openai.toml" >"$PROV/openai.toml"
 }
 
 # sheet_click X Y: a click at surface coordinates (the sheet is drawn at the output's size) through `sill debug click`.
