@@ -71,7 +71,7 @@ gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "d9b24650225503f5a89a4d29d83866f948bc60d4"
+rev = "6b7b9e3b7f2d37a319d5d96b9f98547ce5bba8f4"
 branch = "master"
 gate = "lane"
 
