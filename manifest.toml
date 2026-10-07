@@ -21,20 +21,20 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "4014b5b77508bcbe5798965b6cfe2e21418ca11d"
+rev = "dbc3123566f9932cf5278aa88d7871a782cb9a73"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "e2265b106706e8847849979ace599cb7370966cd"
+rev = "4b16234783dfc52657fc76705fc5547d20ed6533"
 branch = "master"
 gate = "lane"
 
 [repo.blitz-kit]
 url = "https://github.com/PoHsuanLai/blitz-kit.git"
-rev = "6ca8b48985265b3be97d0b8279153ea09439fcef"
+rev = "f181d2a571022aa76c34ca6b19ec8df1af42b22f"
 branch = "master"
 gate = "none"
 
