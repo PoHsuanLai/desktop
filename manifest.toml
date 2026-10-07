@@ -123,6 +123,6 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "7810ea6860571e4c6977e0c74c1e524f0a84104e"
+rev = "939679c11d0c1d3605ca8dc9c083f5c5c78e0ced"
 branch = "master"
 gate = "lane"
