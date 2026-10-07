@@ -14,27 +14,27 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "c2375087b86204fbcda00da77b181f8103980972"
+rev = "09b09e617b7dc3a16f37efd1ec2e7570a7e18bb5"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "e3bbb7b918810f918520c87f7540ada394a9986d"
+rev = "9c0414b6dc606da7ac0350b8c3f56dab8b5edfe4"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "a7037a86bff678ead9815d8130a2af3c2fa0c0e1"
+rev = "b7595df81115111b11137322a61efbc148165956"
 branch = "master"
 gate = "lane"
 
 [repo.blitz-kit]
 url = "https://github.com/PoHsuanLai/blitz-kit.git"
-rev = "f181d2a571022aa76c34ca6b19ec8df1af42b22f"
+rev = "c6b142d062046c19139c2f423496faf436e52bd7"
 branch = "master"
 gate = "none"
 
@@ -52,32 +52,32 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "fe84c50c5c71c6e9461b305aa095ae3e44040a48"
+rev = "8846f263f005766bd3dcde0349ad5f9428dd0f58"
 branch = "master"
 gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "f0ba7c7fa2becea5ba4f5eeaa0e7e50aa99d25bd"
+rev = "b24f6d456e7915f1052c722f5aebabf1ee0f0e74"
 branch = "master"
 gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "39d5936ee75ea51370a7c27c95dccceec5bfbb6b"
+rev = "ed21dfb1a100448738e594133e4ecc1c00e6e490"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "01b513e814a89ee32c97be58ef9bf0c7c3db011b"
+rev = "0f061a6d3177c30629b8f5e6e971ac5bf40c56f5"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "02f8fba120f44b008ba9d07751f6ec83db80b04a"
+rev = "396df8d04d13aa7cc8929aa6924e50b07cbc8948"
 branch = "master"
 gate = "lane"
 
@@ -89,19 +89,19 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "4d706490654373d85e52c84a9ecc971e197df2c1"
+rev = "1d67baa49ea7634e639cee06bb40cc781cea1bfc"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "2cab53c2f31f8693280e88b8666c14d3fbc9c317"
+rev = "51ee2589e57734ca96a956e9c779fa163fa65f24"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "c3c2a65c514dbce993e5efb9b7462234dacfd1e4"
+rev = "8f4db7ac6270a7bbd3828c2d31512955d94e2151"
 branch = "main"
 gate = "none"
 
