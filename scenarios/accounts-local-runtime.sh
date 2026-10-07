@@ -35,14 +35,14 @@ has_ollama() { settings_describe 2>/dev/null | python3 -I -c 'import json,sys; s
 ollama_offline() { [ "$(settings_get accounts.ollama.state 2>/dev/null)" = offline ]; }
 detent_mapped() { [ -n "$(detent_frame 2>/dev/null)" ]; }
 
-# green_row SHOT: the y of the first row of green pixels in the runtime's status dot (x 1150 to 1180 of the output), or nothing.
+# green_row SHOT: the y of the first row of green pixels in the runtime's status dot (the row's trailing edge, x 1230 to 1290 of the output, left of its state and Manage), or nothing.
 green_row() {
   python3 -I - "$1" <<'PY'
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert("RGB")
 for y in range(250, 860):
-    for x in range(1150, 1180):
+    for x in range(1230, 1290):
         r, g, b = im.getpixel((x, y))
         if g > r + 25 and g > b + 25:
             print(y); sys.exit(0)

@@ -36,7 +36,7 @@ OUT_DIR=$(scenario_out accounts-sync)
 OWNER=org.quire.Files
 # Where the controls are, relative to detent's window frame: the sidebar's Accounts, the list's Manage, the account
 # screen's Sync group switch for files.
-ACCOUNTS_ITEM="77 284"; MANAGE="666 90"; SYNC_FILES_SWITCH="662 399"
+ACCOUNTS_ITEM="77 284"; MANAGE="-60 90"; SYNC_FILES_SWITCH="-56 399"
 
 cleanup() { acc_stop_all; stop_daemon; stop_compositor; scratch_drop; }
 trap cleanup EXIT

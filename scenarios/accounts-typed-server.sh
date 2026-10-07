@@ -75,10 +75,11 @@ step_form() {
 step_typed() {
   click "$PROTOCOL"; sheet_key ArrowDown; sheet_key Enter; sleep 1; sheet_shot 3-pop3
   replace "$SERVER" 127.0.0.1
-  click "$SECURITY"; sheet_key ArrowDown; sheet_key Enter; sleep 0.4
+  # The Security pop-up redraws the form below it: a field typed before that settles is lost (seen under a loaded gate).
+  click "$SECURITY"; sheet_key ArrowDown; sheet_key Enter; sleep 1.5
   replace "$PORT" "$(rigj pop3.port)"
   replace "$OUT_SERVER" 127.0.0.1
-  click "$OUT_SECURITY"; sheet_key ArrowDown; sheet_key Enter; sleep 0.4
+  click "$OUT_SECURITY"; sheet_key ArrowDown; sheet_key Enter; sleep 1.5
   replace "$OUT_PORT" "$(rigj smtp.port)"
   replace "$USER" "$(rigj pop3.user)"
   sheet_shot 4-filled
@@ -96,6 +97,8 @@ step_relay() {
   sheet_await || { cat "$OUT_DIR/grant.log" >&2; return 1; }
   sleep 1; sheet_key Tab; sheet_key Enter
   acc_wait 20 grep -q '"result":"granted"' "$OUT_DIR/grant.log" || { cat "$OUT_DIR/grant.log" >&2; return 1; }
+  # The account must carry the ports typed in step_typed: a default port here means a typed field was lost, not a relay fault.
+  grep -q "127.0.0.1:$(rigj pop3.port)" "$OUT_DIR/grant.log" || { echo "the account's POP3 endpoint is not the typed port $(rigj pop3.port) (step_typed lost a field; capture 4 shows the form): $(cat "$OUT_DIR/grant.log")" >&2; return 1; }
   sheet_gone || return 1
   rigc org.quire.Mail open-authenticated mail --class mail --family pop3 >"$OUT_DIR/relay.log" 2>&1 || { cat "$OUT_DIR/relay.log" >&2; return 1; }
   grep -q '"greeting":"+OK porter relay ready' "$OUT_DIR/relay.log" || { echo "no relay greeting: $(cat "$OUT_DIR/relay.log")" >&2; return 1; }

@@ -37,7 +37,7 @@ trap cleanup EXIT
 
 # Where the controls are, relative to detent's window frame (900x640, with sill's bar above it): the sidebar's Accounts,
 # the account list's Manage, and the account screen's controls.
-ACCOUNTS_ITEM="77 284"; MANAGE="666 90"; SIGN_IN_AGAIN="685 162"; MAIL_SWITCH="662 244"; REVOKE="670 359"; REMOVE="695 446"; REMOVE_NO_APPS="695 332"
+ACCOUNTS_ITEM="77 284"; MANAGE="-60 90"; SIGN_IN_AGAIN="-79 162"; MAIL_SWITCH="-56 244"; REVOKE="-64 359"; REMOVE="-89 446"; REMOVE_NO_APPS="-89 332"
 QUESTION_REMOVE="376 363"; QUESTION_KEEP="524 363"
 
 mail_has_no_grants() { rigc org.quire.Mail grants | python3 -I -c 'import json,sys; sys.exit(0 if json.loads(sys.stdin.readline()).get("grants") == [] else 1)'; }

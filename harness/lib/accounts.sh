@@ -417,11 +417,15 @@ w = json.load(sys.stdin)
 print(*[int(v) for v in w[0]["frame"]])'
 }
 # detent_click RX RY: a left click at (RX, RY) relative to detent's window origin (the pointer is moved first and
-# given a moment: detent's hover state must catch up before a press counts).
+# given a moment: detent's hover state must catch up before a press counts). A negative RX counts from the window's
+# right edge.
 detent_click() {
   local x y w h
   read -r x y w h < <(detent_frame) || return 1
-  casementctl debug inject "move $((x + $1)) $((y + $2))" >/dev/null || return 1
+  # A negative RX is measured from the window's right edge (a Setting row's control sits at the row's trailing edge).
+  local rx=$1
+  [ "$rx" -ge 0 ] || rx=$((w + rx))
+  casementctl debug inject "move $((x + rx)) $((y + $2))" >/dev/null || return 1
   casementctl debug wait settled --timeout 10000 >/dev/null 2>&1
   sleep 0.3
   casementctl debug inject "press left" "release left" >/dev/null || return 1
