@@ -89,7 +89,7 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "16cf5f2a32c34e6860574b6b26c97d5b7542fc4e"
+rev = "4c642a7f6e072caa5a196e4292a6e6126cad09d6"
 branch = "master"
 gate = "none"
 
