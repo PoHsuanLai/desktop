@@ -64,14 +64,14 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "39b93cc7bac9c866a4b18567d7c14698ff08be07"
+rev = "a8fff6d4a6230b4129778758fbb31195c29c541b"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "e962855951d715eb094a23364677762869c77fd8"
+rev = "c63a6698588adb8de9f281cfadc98abe4d92dc4f"
 branch = "master"
 gate = "lane"
 
