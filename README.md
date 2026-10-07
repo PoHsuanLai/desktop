@@ -15,7 +15,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | `gate/sill-accept-skips.txt` | the scripts of sill's `dev/accept.sh --compositor casement` that may SKIP in the phase gate, with the closing phase |
 | `gate/expected-skips.toml` | scenarios not runnable yet, each with a finding id and the closing phase |
 | `scenarios/` | whole-desktop scenarios; each calls `require_jail` first and exits with the plan's codes |
-| `harness/lib/accounts.sh` | what the `accounts-*` scenarios share: porter's real daemons (accountd, syncd, inferd) and porter's test rig (`porter-rig-servers`, `-client`, `-secrets`) on casement's private bus with sill drawing the sheets and detent as Settings; the caller identities (a fixture /proc for the daemons' `test-proc-root` builds); the secret scan (`secret-scan.py`) over a `busctl monitor` record. `accounts-app.py` (AddAccount), `sheet-standin.py` (a sheet host for the typed form sill cannot draw yet) and `graph-front.py` (`/v1.0/me` in front of the fake Graph) are the three small pieces the rig lacks |
+| `harness/lib/accounts.sh` | what the `accounts-*` scenarios share: porter's real daemons (accountd, syncd, inferd) and porter's test rig (`porter-rig-servers`, `-client`, `-secrets`) on casement's private bus with sill drawing the sheets and detent as Settings; the caller identities (a fixture /proc for the daemons' `test-proc-root` builds); the secret scan (`secret-scan.py`) over a `busctl monitor` record |
 
 Nothing that can see input devices, a GPU output or the user's session runs outside
 `harness/jail.sh`. Exit codes: 0 pass, 1 test failed, 2 could not run safely (a SKIP, fails unless

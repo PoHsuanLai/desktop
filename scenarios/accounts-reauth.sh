@@ -6,13 +6,11 @@
 #   boot      as accounts-oauth-browser: a Microsoft-shaped account added through the browser sign-in, an app
 #             (org.quire.Files) granted Storage on it
 #   refusal   the issuer refuses refreshes (rig lever /issuer/refuse-refreshes, what a revoked refresh token is to
-#             accountd: invalid_grant); the app opens a relay to Graph and is refused NeedsReauth, and the account
-#             must now be `needs_reauth` in accountd (state, and the NeedsReauth signal sill listens for)
-#   seed      WORKAROUND while `refusal` fails: accountd is stopped, the account's state is set to needs_reauth in
-#             its registry file and accountd is started again, so the rest of the chain can be proven
+#             accountd: invalid_grant); the app opens a relay to Graph and is refused NeedsReauth, and the account is
+#             `needs_reauth` in accountd (state, and the NeedsReauth signal sill listens for)
 #   notice    sill posts "<address> needs you to sign in" (capture of its banner); hovering shows "Sign in again"
 #   sign-in   pressing it asks accountd to Reauthenticate: the sheet shows the browser wait, sill opens the issuer's
-#             authorize page, the sign-in finishes by itself (a sign-in again has no review step): the account is
+#             authorize page, the sign-in finishes by itself (the Microsoft sign-in again still ends on the review step: Done): the account is
 #             `ok` again and the notice is withdrawn
 #   scan      the secret scan
 #
@@ -51,7 +49,6 @@ step_boot() {
   build || return 1
   scan_begin
   rig_start --graph || return 1
-  graph_front_start || return 1
   secrets_start || return 1
   acc_config; acc_clients_for_issuer; acc_provider_microsoft_on_rig
   accountd_start || return 1
@@ -71,22 +68,6 @@ step_refusal() {
   [ "$state" = needs_reauth ] || { echo "the app was refused NeedsReauth but the account is still '$state': no NeedsReauth signal, so nobody is told" >&2; return 1; }
 }
 
-step_seed() {
-  [ "$(settings_get "accounts.$ACCOUNT.state")" = needs_reauth ] && return 0
-  accountd_stop
-  python3 -I - "$STATE/porter/registry.json" <<'PY' || return 1
-import json, sys
-p = sys.argv[1]
-d = json.load(open(p))
-for a in d["accounts"]:
-    a["state"] = "needs_reauth"
-json.dump(d, open(p, "w"))
-PY
-  accountd_start || return 1
-  [ "$(settings_get "accounts.$ACCOUNT.state")" = needs_reauth ] || return 1
-  echo "seeded: the registry says needs_reauth (the refusal above did not set it)" >&2
-}
-
 step_notice() {
   acc_wait 20 banner_shown || { echo "sill never showed the notice" >&2; sill notifications status >&2; return 1; }
   sleep 1; sill debug capture "$BANNERS" "$OUT_DIR/1-notice.png" >>"$OUT_DIR/capture.log" 2>&1
@@ -95,21 +76,31 @@ step_notice() {
 }
 
 step_sign_in() {
+  # The sign-in gets a fresh refresh token the issuer honours (the old one was the one it refused); the refusal lever
+  # would also refuse the first refresh of the new one.
+  rigctl POST "/issuer/refuse-refreshes?n=0" >"$OUT_DIR/lever.log" 2>&1
   : >"$RIG_DIR/opened.log"
   sill debug click "$BANNERS" 127 105 >>"$OUT_DIR/keys.log" 2>&1 || return 1
   acc_wait 20 test -s "$RIG_DIR/opened.log" || {
+    rigctl GET /graph/hits >"$OUT_DIR/graph-hits.json" 2>&1
     echo "pressing Sign in again opened no browser; accountd answered the Reauthenticate it was asked with: $(request_responses)" >&2
     return 1
   }
   sheet_shot 3-browser-wait
-  acc_wait 30 account_ok || { echo "the account is still $(settings_get "accounts.$ACCOUNT.state")" >&2; return 1; }
+  # The Microsoft sign-in ends on its review step even when it is a sign-in again (the generic one does not): Done.
+  sleep 4; if sheet_shown; then sheet_shot 4-review-again; sheet_key Enter; fi
+  acc_wait 30 account_ok || {
+    rigctl GET /graph/hits >"$OUT_DIR/graph-hits.json" 2>&1
+    echo "the account is still $(settings_get "accounts.$ACCOUNT.state"); the sheet answered: $(request_responses); Graph saw: $(cat "$OUT_DIR/graph-hits.json")" >&2
+    return 1
+  }
   sheet_gone || return 1
   acc_wait 20 eval '! banner_shown' || { echo "the notice is still shown" >&2; return 1; }
 }
 
 step_scan() { scan_end; }
 
-run_steps step_boot step_refusal step_seed step_notice step_sign_in step_scan
+run_steps step_boot step_refusal step_notice step_sign_in step_scan
 if [ "$STATUS" != 0 ]; then
   for f in accountd daemon rig-servers secrets add; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }

@@ -133,18 +133,9 @@ device = "$(rigj oauth.device)"
 EOF
 }
 
-# graph_front_start: harness/lib/graph-front.py in front of the rig's Graph drive (the drive has no /v1.0/me, which the
-# Microsoft sign-in reads); sets GRAPH_FRONT to its URL.
-GRAPH_FRONT=
-graph_front_start() {
-  acc_bg "$OUT_DIR/graph-front.log" python3 -I "$HARNESS_LIB/graph-front.py" --upstream "$(rigj graph.url)" --port-file "$RIG_DIR/graph-front.port"
-  acc_wait 10 test -s "$RIG_DIR/graph-front.port" || { echo "graph-front never listened" >&2; cat "$OUT_DIR/graph-front.log" >&2; return 1; }
-  GRAPH_FRONT="http://127.0.0.1:$(cat "$RIG_DIR/graph-front.port")"
-}
-
-# acc_provider_microsoft_on_rig: the shipped microsoft.toml with Graph at the front of the rig's drive.
+# acc_provider_microsoft_on_rig: the shipped microsoft.toml with Graph at the rig's drive.
 acc_provider_microsoft_on_rig() {
-  sed -e "s#https://graph.microsoft.com#$GRAPH_FRONT#g" "$SCEN_BUILD/pin/porter-rig/providers/microsoft.toml" >"$PROV/microsoft.toml"
+  sed -e "s#https://graph.microsoft.com#$(rigj graph.url)#g" "$SCEN_BUILD/pin/porter-rig/providers/microsoft.toml" >"$PROV/microsoft.toml"
 }
 
 # acc_providers_only ID...: leaves only the named provider files (so the sheet's list is short).
@@ -171,7 +162,7 @@ accountd_stop() { [ -z "$ACCOUNTD_PID" ] || acc_kill "$ACCOUNTD_PID"; ACCOUNTD_P
 
 SYNCD_PID=
 syncd_start() {
-  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" "$ARIG/syncd"
+  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" "$ARIG/syncd"
   SYNCD_PID=$ACC_LAST
   acc_identity syncd.service "$SYNCD_PID"
   acc_wait 20 bus_has_owner org.quire.Sync1 || { echo "syncd never took org.quire.Sync1:" >&2; cat "$OUT_DIR/syncd.log" >&2; return 1; }
@@ -199,8 +190,10 @@ EOF
   mkdir -p "$CONFIG/sill"; : >"$CONFIG/sill/settings.toml"
   backdrop_seed "$CONFIG" || return 1
   IN_ENV_EXTRA=("PATH=$BIN_DIR:$PATH")
+  # sill names itself to accountd within its first moments (its accounts service asks NeedingReauth as it connects, and a
+  # refused first ask is not repeated), so its identity is written by the shell that execs it, before it exists.
+  LAUNCH_PREFIX=(bash -c 'mkdir -p "$0/$$"; echo "0::/user.slice/user-1000.slice/user@1000.service/app.slice/sill-shell.scope" >"$0/$$/cgroup"; exec "$@"' "$PROC")
   launch_daemon || return 1
-  acc_identity sill-shell.scope "$DAEMON"
   NAME=$(output_name) || return 1
   SHEET="sill-accounts-sheet-$NAME"
 }
@@ -228,10 +221,16 @@ sheet_gone() { acc_wait "${1:-15}" sheet_hidden || { echo "the sheet never went"
 # sheet_shot NAME: a capture of the sheet into the scenario's output dir.
 sheet_shot() { sill debug capture "$SHEET" "$OUT_DIR/$1.png" >>"$OUT_DIR/capture.log" 2>&1; }
 sheet_key() { sill debug key "$SHEET" "$1" >>"$OUT_DIR/keys.log" 2>&1; }
-# sheet_type TEXT: typed through the compositor (casementctl debug inject "type TEXT": each character, with Shift where
-# the keymap needs it). `sill debug key` cannot type '@' (shell-host's key_spec has no code for it), and the sheet
-# holds the keyboard focus, so the compositor's own input reaches its field.
-sheet_type() { casementctl debug inject "type $1" >>"$OUT_DIR/keys.log" 2>&1; }
+# sheet_type TEXT: one `sill debug key` per character (shell-host e411b25 types the US shifted symbols, `@` among them, with
+# Shift held; the pin has it).
+sheet_type() {
+  local text=$1 i c
+  for (( i = 0; i < ${#text}; i++ )); do
+    c=${text:i:1}
+    case "$c" in " ") c=Space ;; esac
+    sill debug key "$SHEET" "$c" >>"$OUT_DIR/keys.log" 2>&1 || { echo "sill debug key refused '$c'" >&2; return 1; }
+  done
+}
 
 # --- a record of the bus -------------------------------------------------------------------------------------
 MONITOR_PID=
@@ -301,16 +300,25 @@ v = { access = "read_write", send = "present", delta = "poll", transport = "imap
 EOT
 }
 
-# acc_add_start APP-ID: AddAccount as that app, in the background (its Response lands in $OUT_DIR/add.log).
+# acc_add_start APP-ID [PROVIDER]: AddAccount as that app (porter-rig-client add-account), in the background; its answer
+# lands in $OUT_DIR/add.log as one line: {"result":"added","account":..} or {"result":"refused",..}.
 acc_add_start() {
   : >"$OUT_DIR/add.log"
-  acc_bg "$OUT_DIR/add.log" python3 -I "$HARNESS_LIB/accounts-app.py" --bus "$BUS" --proc "$PROC" --app "$1" add-account "${2:-}"
+  rigc_bg "$OUT_DIR/add.log" "$1" add-account ${2:+"$2"}
   ADD_PID=$ACC_LAST
 }
-# acc_add_response: waits for the Response line of acc_add_start and prints it.
+# acc_add_response [SECONDS]: waits for the answer line and prints it.
 acc_add_response() {
-  acc_wait "${1:-30}" grep -q '"response"' "$OUT_DIR/add.log" || return 1
-  grep '"response"' "$OUT_DIR/add.log" | tail -n 1
+  acc_wait "${1:-30}" grep -q '"result"' "$OUT_DIR/add.log" || return 1
+  grep '"result"' "$OUT_DIR/add.log" | tail -n 1
+}
+# acc_added RESPONSE: the account was added; sets ACCOUNT.
+acc_added() {
+  ACCOUNT=$(python3 -I -c '
+import json, sys
+m = json.loads(sys.argv[1])
+if m.get("result") != "added": sys.exit(1)
+print(m["account"])' "$1") || return 1
 }
 HARNESS_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -348,12 +356,12 @@ sheet_add_fake_mail() {
   sheet_key Enter
   local response
   response=$(acc_add_response 30) || { echo "AddAccount never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
-  case "$response" in '{"response": 0'*) ;; *) echo "AddAccount answered $response" >&2; return 1 ;; esac
+  acc_added "$response" || { echo "AddAccount answered $response" >&2; return 1; }
   sheet_gone
 }
 
 # sheet_add_microsoft: the whole browser sign-in through the sheet as an app asks for it (accounts-oauth-browser checks
-# the steps one by one); needs the rig started with --graph, graph_front_start, acc_clients_for_issuer and
+# the steps one by one); needs the rig started with --graph, acc_clients_for_issuer and
 # acc_provider_microsoft_on_rig. Sets ACCOUNT to the account's id.
 sheet_add_microsoft() {
   : >"$RIG_DIR/opened.log"
@@ -364,8 +372,7 @@ sheet_add_microsoft() {
   sleep 3; sheet_key Enter
   local response
   response=$(acc_add_response 30) || { echo "AddAccount never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
-  case "$response" in '{"response": 0'*) ;; *) echo "AddAccount answered $response" >&2; return 1 ;; esac
-  ACCOUNT=$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1])["results"]["account"])' "$response")
+  acc_added "$response" || { echo "AddAccount answered $response" >&2; return 1; }
   sheet_gone
 }
 
@@ -462,3 +469,8 @@ sheet_settled() {
 acc_provider_openai_on_rig() {
   sed -e "s#https://api.openai.com/v1#$(rigj llm_api.api_url)#" "$SCEN_BUILD/pin/porter-rig/providers/openai.toml" >"$PROV/openai.toml"
 }
+
+# sheet_click X Y: a click at surface coordinates (the sheet is drawn at the output's size) through `sill debug click`.
+sheet_click() { sill debug click "$SHEET" "$1" "$2" >>"$OUT_DIR/keys.log" 2>&1; sleep 0.4; }
+# sheet_replace X Y TEXT: click the text field at (X, Y), select its content and type TEXT.
+sheet_replace() { sheet_click "$1" "$2"; sheet_key a+ctrl; sheet_type "$3"; sleep 0.3; }

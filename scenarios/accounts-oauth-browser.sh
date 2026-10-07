@@ -12,7 +12,7 @@
 #   boot      casement, recorded bus, issuer + Graph, fake Secret Service, accountd, sill
 #   sign-in   AddAccount, "Micro" filters, Return picks Microsoft: the sheet shows the browser wait (capture); sill
 #             opens the issuer's authorize URL (PKCE S256 and the loopback redirect); the sign-in finishes on its own
-#             and the review step shows (capture); Return is Done; Response is 0
+#             and the review step shows (capture); Return is Done; add-account answers `added`
 #   stored    the account is `ok` in accountd's settings module, signed_in is in the audit file, the account is in
 #             the registry (and, by the scan below, no token is in any file)
 #   graph     an app asks for Storage (the consent sheet, Always Allow) and opens a relay to Graph: GET /v1.0/me/drive
@@ -41,7 +41,6 @@ step_boot() {
   build || return 1
   scan_begin
   rig_start --graph || return 1
-  graph_front_start || return 1
   secrets_start || return 1
   acc_config; acc_clients_for_issuer; acc_provider_microsoft_on_rig
   accountd_start || return 1
@@ -62,8 +61,7 @@ step_sign_in() {
   sheet_key Enter
   local response
   response=$(acc_add_response 30) || { echo "AddAccount never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
-  case "$response" in '{"response": 0'*) ;; *) echo "AddAccount answered $response" >&2; return 1 ;; esac
-  ACCOUNT=$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1])["results"]["account"])' "$response")
+  acc_added "$response" || { echo "AddAccount answered $response" >&2; return 1; }
   sheet_gone || return 1
   echo "added $ACCOUNT" >&2
 }

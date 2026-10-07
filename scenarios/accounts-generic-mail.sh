@@ -8,10 +8,11 @@
 #             trusts through SSL_CERT_FILE), the fake Secret Service, accountd, sill; sill is the sheet host
 #   list      an app asks AddAccount: sill draws the provider list (capture)
 #   sign-in   "Fake" filters the list, Return picks it; the address and the password are typed (through the
-#             compositor), Return sends them, the review step shows Mail, Return is Done: the Request's Response is 0
+#             compositor), Return sends them, the review step shows Mail, Return is Done: the add-account answers `added`
 #   listed    accountd's settings module says the account is `ok` and labelled with the address
 #   relay     an app (porter-rig-client) asks for Mail, the consent sheet is drawn (capture), Always Allow; the app's
-#             open-authenticated gets a `* PREAUTH` greeting from the IMAP fake: the relay logged in, the app held no
+#             open-authenticated gets a `* PREAUTH` greeting from the IMAP fake and the fake's attempts lever (GET
+#             /imap/attempts) lists one accepted login as the account's user: the relay logged in, the app held no
 #             password, and the audit file says proxy_opened without a value
 #   scan      no planted secret outside the places the design lets it through (harness/lib/secret-scan.py)
 #
@@ -68,7 +69,7 @@ step_sign_in() {
   sheet_key Enter
   local response
   response=$(acc_add_response 30) || { echo "AddAccount never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
-  case "$response" in '{"response": 0'*) ;; *) echo "AddAccount answered $response" >&2; return 1 ;; esac
+  acc_added "$response" || { echo "AddAccount answered $response" >&2; return 1; }
   sheet_gone || return 1
   echo "added: $response" >&2
 }
@@ -88,6 +89,8 @@ step_relay() {
   sheet_gone || return 1
   rigc org.quire.Mail open-authenticated mail --class mail --family imap >"$OUT_DIR/relay.log" 2>&1 || { cat "$OUT_DIR/relay.log" >&2; return 1; }
   grep -q '"greeting":"\* PREAUTH' "$OUT_DIR/relay.log" || { echo "no PREAUTH greeting: $(cat "$OUT_DIR/relay.log")" >&2; return 1; }
+  rigctl GET /imap/attempts | grep -q "\"outcome\":\"accepted\"" || { echo "the IMAP fake saw no accepted login from the relay: $(rigctl GET /imap/attempts)" >&2; return 1; }
+  rigctl GET /imap/attempts | grep -q "\"user\":\"$(rigj imap.user)\"" || { echo "the login was not as $(rigj imap.user): $(rigctl GET /imap/attempts)" >&2; return 1; }
   grep -q proxy_opened "$STATE/quire/accountd/audit.jsonl" || { echo "no proxy_opened in the audit file:" >&2; cat "$STATE/quire/accountd/audit.jsonl" >&2; return 1; }
   echo "relay: $(cat "$OUT_DIR/relay.log")" >&2
 }

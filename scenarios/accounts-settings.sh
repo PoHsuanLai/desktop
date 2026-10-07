@@ -14,12 +14,8 @@
 #   revoke    Revoke on the app's row: the app's grants (porter-rig-client grants) are empty
 #   remove    Remove account, then Remove account in the question: the account is gone from the registry and from
 #             the settings module, and the audit file says removed
-#   added     an account added through the sheet while detent is open shows in its pane (accountd tells the pane):
-#             today it does not (accountd sends no Changed for a new account), so this step fails and the next one
-#             restarts detent to go on
-#   sign-in   (last, as the account must still exist) Sign in again: accountd must open the sign-in sheet; today it
-#             refuses `unknown_grant` (the caller, Settings, holds no grant on the account: porter-service
-#             add_flow.rs run_reauthenticate), so nothing opens and this step fails
+#   added     an account added through the sheet while detent is open shows in its pane (accountd sends Changed on an add)
+#   sign-in   Sign in again on that account: accountd opens the sign-in sheet (Settings reauthenticates any account)
 #   scan      the secret scan
 #
 # budget: 300
@@ -41,7 +37,7 @@ trap cleanup EXIT
 
 # Where the controls are, relative to detent's window frame (900x640, with sill's bar above it): the sidebar's Accounts,
 # the account list's Manage, and the account screen's controls.
-ACCOUNTS_ITEM="77 252"; MANAGE="840 90"; SIGN_IN_AGAIN="823 160"; MAIL_SWITCH="847 242"; REVOKE="838 356"; REMOVE="814 443"; REMOVE_NO_APPS="814 329"
+ACCOUNTS_ITEM="77 284"; MANAGE="840 90"; SIGN_IN_AGAIN="821 165"; MAIL_SWITCH="844 248"; REVOKE="836 363"; REMOVE="811 450"; REMOVE_NO_APPS="811 336"
 QUESTION_REMOVE="376 363"; QUESTION_KEEP="524 363"
 
 mail_has_no_grants() { rigc org.quire.Mail grants | python3 -I -c 'import json,sys; sys.exit(0 if json.loads(sys.stdin.readline()).get("grants") == [] else 1)'; }
@@ -136,18 +132,11 @@ step_added_shows() {
   sleep 4; acc_shot 7-after-add
   window_differs 6-removed 7-after-add || {
     echo "detent still shows 'No accounts' 4 s after an account was added: accountd sent no SettingsModule1.Changed for it, so the pane never re-reads" >&2
-    DETENT_STALE=1
     return 1
   }
 }
 
 step_sign_in() {
-  if [ -n "${DETENT_STALE:-}" ]; then
-    # Workaround: a fresh detent reads the list again.
-    acc_kill "$DETENT_PID"; detent_start
-    acc_wait 30 detent_mapped || return 1
-    sleep 4; detent_focus
-  fi
   click "$ACCOUNTS_ITEM"; sleep 1; click "$MANAGE"; sleep 1; acc_shot 8-account-again
   click "$SIGN_IN_AGAIN"; sleep 2; acc_shot 9-after-sign-in-again
   if sheet_shown; then sheet_shot 10-sign-in-again; sheet_key Escape; return 0; fi

@@ -97,7 +97,7 @@ step_api_key() {
   sheet_key Enter
   local response
   response=$(acc_add_response 30) || { echo "AddAccount never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
-  case "$response" in '{"response": 0'*) ;; *) echo "AddAccount answered $response" >&2; return 1 ;; esac
+  acc_added "$response" || { echo "AddAccount answered $response" >&2; return 1; }
   sheet_gone || return 1
 }
 

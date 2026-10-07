@@ -2,14 +2,14 @@
 # Scenario `accounts-sync` (design 31 §6, porter 5fdeafa Sync1.Resolve): syncd mirrors a OneDrive app folder from the
 # rig's fake Graph through accountd's relay, a two-sided edit makes a Conflict signal with its number, and the owning
 # app settles it with Sync1.Resolve keep_remote: the next cycle takes the remote.
-# Real accountd and syncd (porter's branch rig-syncd: syncd runs Storage over Graph), the rig's issuer and Graph (behind
-# harness/lib/graph-front.py for /v1.0/me), sill as sheet host for the sign-in. No network.
+# Real accountd and syncd (syncd runs Storage over Graph), the rig's issuer and Graph, sill as sheet host for the sign-in.
+# No network.
 #
 #   boot      as accounts-oauth-browser: a Microsoft-shaped account added through the browser sign-in
 #   grant     syncd's Files grant on it (class files, background): SEEDED in the registry (accountd restarted): a daemon
 #             cannot draw a consent sheet and no Settings action offers it yet. The grant is for the app accountd names
 #             syncd (callers.toml: org.quire.Sync, unit syncd.service)
-#   mirror    syncd starts (it looks for grants at start and every 600 s: no env shortens it); the dataset
+#   mirror    syncd starts with SYNCD_RESCAN_S=2 (it reads grants again that often; the default is 600 s); the dataset
 #             `<account segment>/storage_app_folder` is listed to its owner (org.quire.Files); a file the rig puts on the drive
 #             (the remote edit lever /graph/put) shows in $XDG_DATA_HOME/porter/storage/<account>/
 #   conflict  the owner's watch joins syncd, then both sides edit the file within a moment; the next cycle (the poll is
@@ -19,7 +19,7 @@
 #             the drive keeps it
 #   scan      the secret scan
 #
-# budget: 360
+# budget: 300
 # Exit: 0 pass | 1 a step failed | 2 outside the jail | 3 artefacts missing (harness/scenario-build.sh --accounts).
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../harness/lib/all.sh"
@@ -49,7 +49,6 @@ step_boot() {
   build || return 1
   scan_begin
   rig_start --graph || return 1
-  graph_front_start || return 1
   secrets_start || return 1
   acc_config; acc_clients_for_issuer; acc_provider_microsoft_on_rig
   accountd_start || return 1

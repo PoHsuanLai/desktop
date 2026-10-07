@@ -6,18 +6,12 @@
 # greys it. Real accountd, inferd and detent on casement; no sill (no sheet is needed).
 #
 #   boot       casement, recorded bus, the fake Ollama, Secret Service, accountd, inferd, detent (org.quire.Settings)
-#   appears    the account `ollama` is in accountd's settings module and `ok`. FAILS today: accountd answers inferd's
-#              ReportLocal InvalidArgs(UnknownProvider) because the daemon's catalogue holds only the providers a family
-#              serves (accountd/src/main.rs `served`: "no family serves provider `ollama` yet"), and
-#              porter-service local.rs `report_local` looks the provider up in that catalogue
-#   seed       WORKAROUND while `appears` fails: accountd is stopped, an `ollama` account (local_runtime, ok) is put in
-#              its registry file and accountd is started again, so the rest can be proven
+#   appears    the account `ollama` is in accountd's settings module and `ok` (inferd's Peer.ReportLocal is taken)
 #   place      `accounts.ollama.place` is this_computer
-#   listed     detent's Intelligence page, under On this computer, lists it (capture)
-#   offline    the fake is stopped (rig lever /ollama/stop); inferd's next look reports it offline. FAILS today for the
-#              same reason (the report is refused, the account stays `ok`)
-#   greyed     WORKAROUND: the registry says offline (accountd restarted), and detent's page changes (capture): the
-#              runtime is greyed
+#   listed     detent's Intelligence page, under On this computer, lists it as Running (capture)
+#   offline    the fake is stopped (rig lever /ollama/stop); inferd's next look reports it offline and the account is
+#              `offline`
+#   greyed     detent's page changes at the runtime's row: it reads Offline and is greyed (capture)
 #   scan       the secret scan
 #
 # budget: 300
@@ -32,7 +26,7 @@ acc_env
 # shellcheck source=/dev/null
 source "$SCEN_BUILD/pin/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out accounts-local-runtime)
-INTELLIGENCE_ITEM="77 308"
+INTELLIGENCE_ITEM="77 348"
 
 cleanup() { acc_stop_all; stop_compositor; scratch_drop; }
 trap cleanup EXIT
@@ -41,39 +35,40 @@ has_ollama() { settings_describe 2>/dev/null | python3 -I -c 'import json,sys; s
 ollama_offline() { [ "$(settings_get accounts.ollama.state 2>/dev/null)" = offline ]; }
 detent_mapped() { [ -n "$(detent_frame 2>/dev/null)" ]; }
 
-# set_ollama STATE: accountd stopped, the registry's `ollama` account put in STATE (added when absent), accountd started.
-set_ollama() {
-  accountd_stop
-  python3 -I - "$STATE/porter/registry.json" "$1" <<'PY' || return 1
-import json, os, sys
-path, state = sys.argv[1], sys.argv[2]
-d = json.load(open(path)) if os.path.exists(path) else {"vocab": 4, "accounts": [], "grants": [], "toggles": []}
-for a in d["accounts"]:
-    if a["id"] == "ollama":
-        a["state"] = state
-        break
-else:
-    d["accounts"].append({
-        "id": "ollama", "provider": "ollama", "label": "Ollama", "state": state, "auth": "local_runtime",
-        "capabilities": [{"subject": {"kind": "model", "v": "llama3.2-3b"}, "provenance": "discovered",
-                          "offer": {"kind": "present", "v": {"kind": "llm", "v": {
-                              "features": ["chat"], "context": 8192, "max_output": 2048, "wire": "ollama_native"}}}}],
-        "restriction": {"verification": {"kind": "not_needed"}, "token_lifetime": "standard", "consent": "user", "limits": []},
-        "endpoints": []})
-os.makedirs(os.path.dirname(path), exist_ok=True)
-json.dump(d, open(path, "w"))
+# green_row SHOT: the y of the first row of green pixels in the runtime's status dot (x 1235 to 1265 of the output), or nothing.
+green_row() {
+  python3 -I - "$1" <<'PY'
+import sys
+from PIL import Image
+im = Image.open(sys.argv[1]).convert("RGB")
+for y in range(250, 860):
+    for x in range(1235, 1266):
+        r, g, b = im.getpixel((x, y))
+        if g > r + 25 and g > b + 25:
+            print(y); sys.exit(0)
 PY
-  accountd_start
 }
 
-# scroll_to_runtimes: the wheel over detent's page until "On this computer" is in view (the page is longer than the window).
+# scroll_to_runtimes: the wheel over detent's page, a detent at a time, until the "On this computer" row's status dot is in
+# view (the page is longer than the window and a wheel's distance depends on the toolkit, so the way is found, not counted);
+# sets RUNTIME_STEPS (how far it went) and RUNTIME_Y.
+RUNTIME_STEPS= RUNTIME_Y=
 scroll_to_runtimes() {
-  local x y w h i
+  local x y w h i steps=${RUNTIME_STEPS:-}
   read -r x y w h < <(detent_frame)
   casementctl debug inject "move $((x + 500)) $((y + 300))" >/dev/null
-  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do casementctl debug inject "axis vertical -90" >/dev/null; sleep 0.2; done   # to the top
-  for i in 1 2 3 4 5 6; do casementctl debug inject "axis vertical 60" >/dev/null; sleep 0.3; done
-  sleep 1
+  for i in $(seq 40); do casementctl debug inject "axis vertical -150" >/dev/null; sleep 0.1; done   # to the top
+  sleep 0.5
+  for i in $(seq 80); do
+    casementctl debug inject "axis vertical 15" >/dev/null; sleep 0.25
+    if [ -n "$steps" ]; then [ "$i" -lt "$steps" ] && continue; else
+      acc_shot .scroll; RUNTIME_Y=$(green_row "$OUT_DIR/.scroll.png"); [ -z "$RUNTIME_Y" ] && continue
+    fi
+    RUNTIME_STEPS=$i; sleep 1.5; acc_shot .scroll; RUNTIME_Y=$(green_row "$OUT_DIR/.scroll.png"); [ -n "$RUNTIME_Y" ] && return 0
+    echo "the status dot was in view and then was not" >&2; return 1
+  done
+  echo "the On this computer row never came into view" >&2
+  return 1
 }
 
 # reports: what accountd answered inferd's ReportLocal calls, from the bus record.
@@ -122,13 +117,6 @@ step_appears() {
   [ "$(settings_get accounts.ollama.state)" = ok ] || { echo "the ollama account is $(settings_get accounts.ollama.state)" >&2; return 1; }
 }
 
-step_seed() {
-  has_ollama && return 0
-  set_ollama ok || return 1
-  has_ollama || return 1
-  echo "seeded: the registry holds an ollama account (inferd's report was refused)" >&2
-}
-
 step_place() {
   [ "$(settings_get accounts.ollama.place)" = this_computer ] || { echo "place is $(settings_get accounts.ollama.place)" >&2; return 1; }
 }
@@ -148,13 +136,11 @@ step_offline() {
 }
 
 step_greyed() {
-  ollama_offline || set_ollama offline || return 1
-  # accountd restarted: detent follows the name and reads the rows again.
-  sleep 6; scroll_to_runtimes; acc_shot 2-intelligence-offline
-  python3 -I - "$OUT_DIR/1-intelligence-online.png" "$OUT_DIR/2-intelligence-offline.png" <<'PY'
+  sleep 4; scroll_to_runtimes; acc_shot 2-intelligence-offline
+  python3 -I - "$OUT_DIR/1-intelligence-online.png" "$OUT_DIR/2-intelligence-offline.png" "$RUNTIME_Y" <<'PY'
 import sys
 from PIL import Image, ImageChops
-box = (772, 612, 1388, 652)   # the runtime's row, with the page scrolled the same way both times
+box = (772, int(sys.argv[3]) - 24, 1388, int(sys.argv[3]) + 24)   # the runtime's row, with the page scrolled the same way both times
 a = Image.open(sys.argv[1]).convert("RGB").crop(box)
 b = Image.open(sys.argv[2]).convert("RGB").crop(box)
 diff = ImageChops.difference(a, b).convert("L").point(lambda v: 255 if v > 12 else 0)
@@ -166,7 +152,7 @@ PY
 
 step_scan() { scan_end; }
 
-run_steps step_boot step_appears step_seed step_place step_listed step_offline step_greyed step_scan
+run_steps step_boot step_appears step_place step_listed step_offline step_greyed step_scan
 if [ "$STATUS" != 0 ]; then
   for f in accountd inferd detent rig-servers secrets; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
