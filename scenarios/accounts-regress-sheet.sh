@@ -11,7 +11,7 @@
 #   S1        "Other..." picks `generic-imap` and shows its form, not the calendar and contacts one [bus: Input, Update]
 #   S5        the step title follows the provider's label, never its id: two providers with one label and two ids draw
 #             the same title, one with another label draws another [capture of the card's title band]
-#   S6        Microsoft with no client id: the failure is `needs_client_id`; Return (Done, the default) dismisses; Tab
+#   S6        Microsoft with no client id (the client goes between the list and the pick: porter 1c9a8e8 leaves a clientless provider off the list): the failure is `needs_client_id`; Return (Done, the default) dismisses; Tab
 #             twice then Return still dismisses, so there is no Try Again between Back and Done [bus: Input]
 #   add       one Fake Mail account added through the sheet, for the consent window
 #   S5        an agent's app id is shown as written: `org.example.Agent.Zq-Bx` and its lowercase twin draw different
@@ -70,8 +70,17 @@ step_s4_cancel_stays() {
   reg_verdict
 }
 
+# Batch 7 (porter 1c9a8e8): the add list leaves out an OAuth provider whose issuer has no client for this build, so
+# Google is listed (and "Google" + Return picks it, not google-ai) only once a Google client is registered. The
+# shipped file is the jail's /usr/share overlay; the files are read again each time a sheet opens.
+acc_clients_google() {
+  mkdir -p /usr/share/porter
+  printf '[[client]]\nissuer = "google"\nchannel = "stable"\nclient_id = "rig.apps.googleusercontent.com"\n' >/usr/share/porter/clients.toml
+}
+
 step_s2_google() {
   local n
+  acc_clients_google
   open_sheet || return 1
   n=$(bus_count)
   sheet_type Google; sleep 0.5; sheet_key Enter; sleep 1
@@ -109,18 +118,26 @@ step_s5_titles() {
   reg_verdict
 }
 
+# S6 reaches the failed card with a client that is there when the list is drawn and gone when the sign-in starts
+# (Microsoft with no client is no longer listed at all, so it cannot be picked; porter reads the files at each sign-in).
+s6_pick_microsoft_without_client() {
+  acc_clients_for_issuer
+  open_sheet || return 1
+  sheet_type Micro; sleep 0.5
+  rm -f /usr/share/porter/clients.toml
+  sheet_key Enter; sleep 2.5
+}
+
 step_s6_no_client() {
   local n
-  open_sheet || return 1
-  n=$(bus_count); sheet_type Micro; sleep 0.5; sheet_key Enter; sleep 2.5; sheet_shot s6-no-client
+  n=$(bus_count); s6_pick_microsoft_without_client || return 1; sheet_shot s6-no-client
   must "S6 Microsoft with no client id fails as needs_client_id" bus_saw "$n" '"kind":"failed","v":{"provider":"microsoft"'
   must "S6 the fault is needs_client_id" bus_saw "$n" '"fault":"needs_client_id"'
   sheet_key Enter; sleep 1
   must "S6 Return on it is Dismiss (Done is the default)" bus_saw "$n" 'input {"kind":"dismiss"}'
   must "S6 and it never retried or went back" not bus_saw "$n" 'input {"kind":"retry"}'
   close_sheet
-  open_sheet || return 1
-  n=$(bus_count); sheet_type Micro; sleep 0.5; sheet_key Enter; sleep 2.5
+  n=$(bus_count); s6_pick_microsoft_without_client || return 1
   sheet_key Tab; sheet_key Tab; sheet_key Enter; sleep 1
   must "S6 Tab, Tab, Return is Dismiss: no Try Again between Back and Done" bus_saw "$n" 'input {"kind":"dismiss"}'
   must "S6 and no Retry was sent" not bus_saw "$n" 'input {"kind":"retry"}'
