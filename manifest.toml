@@ -14,14 +14,14 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "5143eaa230a4e47db7a2fab361ceb93be49c8518"
+rev = "db321897069ad54de99b6cab95e16ffa51b4c618"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "92016f3952f481a5e7df77fc8a15a560c8e6961a"
+rev = "245cc25331b4bc0c407d28888b3b951d3ef3c351"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "82e6515b76b691821fb8dff74c3dbfaeeee30b92"
+rev = "5d4ef2dfb13d8cc24276f5e4971893874bfebb4f"
 branch = "master"
 gate = "lane"
 
@@ -64,20 +64,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "66e9ba4e5d5cce49a12ee7f6e2e4a17a7843f03c"
+rev = "d8777da0e59dd2eddc49d84f83adfe4fedcc3d3a"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "bbfb801fea9773a5ae80bb7047afb5315274eba0"
+rev = "7b1328b0683f439d9ad85d37778cb7755ee0a05c"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "4f0fde193a046b6fa807049150497c189af1f778"
+rev = "b7855ab80ef8b29de77acaa92bcc02ff057036a9"
 branch = "master"
 gate = "lane"
 
@@ -89,19 +89,19 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "cd98c36d9714849a047b8faf492937d2e2bfeb5e"
+rev = "1ed9f2007dde52ca32c1229b98942e576c5dbb92"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "fad6e195168ca557058dbf34575f461d45ccf445"
+rev = "06f582931ce99c16562b2592fc51a36388442a31"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "2227bf232b17edb9f7e5785e188eada9ed7f3927"
+rev = "17622c5c8441319242272097399163c07225fef7"
 branch = "main"
 gate = "none"
 
