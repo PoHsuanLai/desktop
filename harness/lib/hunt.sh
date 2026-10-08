@@ -40,6 +40,7 @@ hunt_boot_mail() {
   start_compositor || return 1
   scratch_new; acc_dirs
   build || return 1
+  [ -z "${HUNT_THEME:-}" ] || printf '[appearance]\ntheme = "%s"\n' "$HUNT_THEME" >"$CONFIG/quire/appearance.toml"
   scan_begin
   rig_start --imap --smtp --tls implicit || return 1
   secrets_start || return 1
@@ -64,6 +65,9 @@ print(" ".join(ids))'
 
 # sheet_state: shown | hidden.
 sheet_state() { if sheet_shown; then echo shown; else echo hidden; fi; }
+
+# dkey NAME: a real key press into the focused window (detent) through casement's inject.
+dkey() { casementctl debug inject "key $1 down" "sleep 30" "key $1 up" "sleep 150" >/dev/null; sleep 0.25; }
 
 # keep_shots: copies this run's shots next to the worktree's shots dir.
 HUNT_SHOTS="${HUNT_SHOTS:-$HOME/rs-wt/accounts-hunt/shots}"
