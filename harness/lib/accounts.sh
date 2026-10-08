@@ -130,15 +130,18 @@ secrets_start() {
 
 # --- configuration -------------------------------------------------------------------------------------------
 # acc_config: the caller table (porter's own), the shipped provider files, and the person's clients file
-# (acc_clients_for_issuer).
+# (acc_clients_for_issuer writes the shipped one).
 acc_config() {
   cp "$SCEN_BUILD/pin/porter/dist/callers.toml" "$CONFIG/porter/callers.toml"
   cp "$SCEN_BUILD"/pin/porter/providers/*.toml "$PROV/"
 }
 
-# acc_clients_for_issuer: clients.toml pointing the Microsoft client at the fake issuer.
+# acc_clients_for_issuer: the shipped clients.toml (/usr/share/porter, the jail's throwaway overlay) pointing the
+# Microsoft client at the fake issuer: porter takes endpoints that leave the issuer only from the shipped file, never
+# from the person's own (sec-4).
 acc_clients_for_issuer() {
-  cat >"$CONFIG/porter/clients.toml" <<EOF
+  mkdir -p /usr/share/porter
+  cat >/usr/share/porter/clients.toml <<EOF
 [[client]]
 issuer = "microsoft"
 channel = "stable"

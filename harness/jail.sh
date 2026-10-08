@@ -64,6 +64,10 @@ trap cleanup EXIT
 args=(
   --ro-bind / / --dev /dev --dev-bind /dev/udmabuf /dev/udmabuf --proc /proc
   --tmpfs /run --dir "/run/user/$uid" --tmpfs /tmp
+  # /usr/share is a throwaway overlay: a scenario may write what an install ships there (porter's
+  # /usr/share/porter/clients.toml, which it trusts and a person's own file cannot widen), and the
+  # machine's /usr/share is never touched.
+  --overlay-src /usr/share --tmp-overlay /usr/share
   --tmpfs /sys/dev/char
 )
 n=0

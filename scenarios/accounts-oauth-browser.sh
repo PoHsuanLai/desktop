@@ -7,7 +7,7 @@
 # the page the sheet shows (BrowserWait), the opener records the address and follows it with curl, redirects
 # included, so the issuer's authorize page answers with a redirect to accountd's loopback listener, which takes the
 # code. The person's consent is the issuer's default (grant); the Microsoft client and its endpoints are the
-# person's clients.toml, Graph is the shipped microsoft.toml with its host pointed at the fake.
+# shipped clients.toml (the jail's /usr/share overlay), Graph is the shipped microsoft.toml with its host pointed at the fake.
 #
 #   boot      casement, recorded bus, issuer + Graph, fake Secret Service, accountd, sill
 #   sign-in   AddAccount, "Micro" filters, Return picks Microsoft: the sheet shows the browser wait (capture); sill
