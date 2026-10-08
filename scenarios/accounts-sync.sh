@@ -68,7 +68,7 @@ step_grant() {
   sleep 4
   detent_focus
   detent_press option Accounts; sleep 1; acc_shot 1-accounts-list
-  detent_press button Manage; sleep 1; acc_shot 2-account
+  detent_press button "Manage …"; sleep 1; acc_shot 2-account
   [ "$(sync_files)" = off ] || echo "before the click accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2
   detent_press switch "$SYNC_FILES_LABEL"; sleep 1
   acc_wait 15 sync_on || { acc_shot 5-sync-not-on; echo "the switch did not make the grant: accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }

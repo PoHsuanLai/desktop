@@ -6,6 +6,8 @@ Each window of process PID writes DIR/PID-W.tsv, one control per line: role, x, 
 separated; the box is the border box in the window's logical pixels from its top-left corner). Prints
 "CX CY" (the box's centre, rounded) of the first control with exactly this role and name (the Nth with --nth,
 counted from 1; negative counts from the end, -1 the last), or with --state its state words. Exit 1 when there is none, so a poll can wait for one.
+A NAME ending in " …" names a lead: it matches the words before it alone or followed by a space and more
+("Manage …" matches "Manage" and "Manage Home cloud"), for controls whose name carries the thing they act on.
 """
 import argparse
 import sys
@@ -26,10 +28,20 @@ try:
 except OSError:
     sys.exit(1)
 
+LEAD = " …"
+
+
+def names(name):
+    if not args.name.endswith(LEAD):
+        return name == args.name
+    stem = args.name[: -len(LEAD)]
+    return name == stem or name.startswith(stem + " ")
+
+
 found = []
 for line in text.splitlines():
     cols = line.split("\t")
-    if len(cols) == 7 and cols[0] == args.role and cols[6] == args.name:
+    if len(cols) == 7 and cols[0] == args.role and names(cols[6]):
         found.append(cols)
 index = args.nth - 1 if args.nth > 0 else args.nth
 if args.nth == 0 or not -len(found) <= index < len(found):

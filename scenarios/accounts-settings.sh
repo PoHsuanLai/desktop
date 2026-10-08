@@ -40,16 +40,17 @@ service_mail() { settings_get "accounts.$ACCOUNT.service.mail"; }
 detent_mapped() { [ -n "$(detent_frame 2>/dev/null)" ]; }
 no_account() { ! has_account; }
 has_account() { settings_describe | python3 -I -c 'import json,sys; sys.exit(0 if any(k["path"].startswith("accounts.'"$ACCOUNT"'.") for k in json.load(sys.stdin)["key"]) else 1)'; }
-# The controls, by role and accessible name (detent's labels; detent_press, harness/lib/accounts.sh).
+# The controls, by role and accessible name (detent's labels; detent_press, harness/lib/accounts.sh). A row's
+# buttons name the account or app they act on ("Manage Home cloud"), so they are pressed by their lead ("Manage …").
 press_accounts() { detent_press option Accounts; }
-press_manage() { detent_press button Manage; }
+press_manage() { detent_press button "Manage …"; }
 press_mail_switch() { detent_press switch Mail; }
-press_revoke() { detent_press button Revoke; }
-press_remove() { detent_press button "Remove account"; }
-press_sign_in_again() { detent_press button "Sign in again"; }
+press_revoke() { detent_press button "Revoke …"; }
+press_remove() { detent_press button "Remove account …"; }
+press_sign_in_again() { detent_press button "Sign in again …"; }
 # The question's buttons come after the page's own Remove account button in the document.
 press_question_keep() { detent_press button Keep; }
-press_question_remove() { detent_press button "Remove account" -1; }
+press_question_remove() { detent_press button "Remove account …" -1; }
 
 step_boot() {
   start_compositor || return 1
