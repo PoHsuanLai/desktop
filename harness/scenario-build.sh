@@ -9,7 +9,7 @@
 #   build/shell-host-target/debug/examples/demo_*                        shell-host's real-input demos
 #   build/src/{sill,shell-host}                                          private checkouts of the siblings' HEADs the scripts run from
 #   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
-#   build/detent-target/debug/detent                                     detent at its pin, for the detent-on-casement-at-1.5 scenario
+#   build/detent-target/debug/detent                                     detent at its pin with ds-blitz/debug-probe, for the accounts-* and detent-on-casement-at-1.5 scenarios
 #   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug (the accounts-* scenarios: the pin has the accounts sheet)
 #   build/porter-target/debug/{accountd,syncd,inferd}                    porter at its pin, test-proc-root builds
 #   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
@@ -99,8 +99,11 @@ pinned() {
   ln -sfn "$ROOT" "$SCEN_BUILD/pin/desktop"
 }
 
+# detent is built with quire's ds-blitz `debug-probe` feature (a feature of a direct dependency, so detent's own manifest
+# is untouched): with QUIRE_DEBUG_PROBE=<dir> set it lists its controls by role and name (harness/lib/accounts.sh,
+# detent_press). Never a release build.
 build_detent() {
-  (cd "$SCEN_BUILD/pin/detent" && CARGO_TARGET_DIR="$SCEN_BUILD/detent-target" cargo build -p detent)
+  (cd "$SCEN_BUILD/pin/detent" && CARGO_TARGET_DIR="$SCEN_BUILD/detent-target" cargo build -p detent --features ds-blitz/debug-probe)
 }
 
 build_sill() {

@@ -34,9 +34,7 @@ acc_env
 source "$SCEN_BUILD/pin/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out accounts-sync)
 OWNER=org.quire.Files
-# Where the controls are, relative to detent's window frame: the sidebar's Accounts, the list's Manage, the account
-# screen's Sync group switch for files.
-ACCOUNTS_ITEM="77 284"; MANAGE="-60 90"; SYNC_FILES_SWITCH="-56 399"
+SYNC_FILES_LABEL="Keep this account's files on this computer"
 
 cleanup() { acc_stop_all; stop_daemon; stop_compositor; scratch_drop; }
 trap cleanup EXIT
@@ -69,10 +67,10 @@ step_grant() {
   acc_wait 30 detent_mapped || { echo "detent never mapped" >&2; tail -5 "$OUT_DIR/detent.log" >&2; return 1; }
   sleep 4
   detent_focus
-  detent_click $ACCOUNTS_ITEM; sleep 1; acc_shot 1-accounts-list
-  detent_click $MANAGE; sleep 1; acc_shot 2-account
+  detent_press option Accounts; sleep 1; acc_shot 1-accounts-list
+  detent_press button Manage; sleep 1; acc_shot 2-account
   [ "$(sync_files)" = off ] || echo "before the click accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2
-  detent_click $SYNC_FILES_SWITCH; sleep 1
+  detent_press switch "$SYNC_FILES_LABEL"; sleep 1
   acc_wait 15 sync_on || { acc_shot 5-sync-not-on; echo "the switch did not make the grant: accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
   acc_shot 6-sync-on
 }

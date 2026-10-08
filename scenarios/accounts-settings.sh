@@ -35,19 +35,21 @@ ACCOUNT=fake-mail-ada-rig.test
 cleanup() { acc_stop_all; stop_daemon; stop_compositor; scratch_drop; }
 trap cleanup EXIT
 
-# Where the controls are, relative to detent's window frame (900x640, with sill's bar above it): the sidebar's Accounts,
-# the account list's Manage, and the account screen's controls.
-ACCOUNTS_ITEM="77 284"; MANAGE="-60 90"; SIGN_IN_AGAIN="-79 162"; MAIL_SWITCH="-56 244"; REVOKE="-64 359"; REMOVE="-89 446"; REMOVE_NO_APPS="-89 332"
-QUESTION_REMOVE="376 363"; QUESTION_KEEP="524 363"
-
 mail_has_no_grants() { rigc org.quire.Mail grants | python3 -I -c 'import json,sys; sys.exit(0 if json.loads(sys.stdin.readline()).get("grants") == [] else 1)'; }
 service_mail() { settings_get "accounts.$ACCOUNT.service.mail"; }
 detent_mapped() { [ -n "$(detent_frame 2>/dev/null)" ]; }
 no_account() { ! has_account; }
 has_account() { settings_describe | python3 -I -c 'import json,sys; sys.exit(0 if any(k["path"].startswith("accounts.'"$ACCOUNT"'.") for k in json.load(sys.stdin)["key"]) else 1)'; }
-# click NAME: a click at a named control of the table above.
-# shellcheck disable=SC2086
-click() { detent_click $1; }
+# The controls, by role and accessible name (detent's labels; detent_press, harness/lib/accounts.sh).
+press_accounts() { detent_press option Accounts; }
+press_manage() { detent_press button Manage; }
+press_mail_switch() { detent_press switch Mail; }
+press_revoke() { detent_press button Revoke; }
+press_remove() { detent_press button "Remove account"; }
+press_sign_in_again() { detent_press button "Sign in again"; }
+# The question's buttons come after the page's own Remove account button in the document.
+press_question_keep() { detent_press button Keep; }
+press_question_remove() { detent_press button "Remove account" -1; }
 
 step_boot() {
   start_compositor || return 1
@@ -68,40 +70,39 @@ step_boot() {
 }
 
 step_open() {
-  click "$ACCOUNTS_ITEM"; sleep 1; acc_shot 1-accounts-list
-  click "$MANAGE"; sleep 1; acc_shot 2-account
+  press_accounts; sleep 1; acc_shot 1-accounts-list
+  press_manage; sleep 1; acc_shot 2-account
 }
 
 step_service() {
   local before after
   before=$(service_mail)
-  click "$MAIL_SWITCH"; sleep 1; acc_shot 3-mail-off
+  press_mail_switch; sleep 1; acc_shot 3-mail-off
   after=$(service_mail)
   [ "$before" != "$after" ] || { echo "the Mail switch changed nothing in accountd (service.mail is still $before)" >&2; return 1; }
   rigc org.quire.Mail request-grant mail --class mail >"$OUT_DIR/off.log" 2>&1
   grep -q '"result":"none"' "$OUT_DIR/off.log" || { echo "with Mail off the app is still offered the account: $(cat "$OUT_DIR/off.log")" >&2; return 1; }
-  click "$MAIL_SWITCH"; sleep 1
+  press_mail_switch; sleep 1
   [ "$(service_mail)" = "$before" ] || { echo "turned on again, service.mail is $(service_mail), not $before" >&2; return 1; }
   rigc org.quire.Mail request-grant mail --class mail >"$OUT_DIR/on.log" 2>&1
   grep -q '"result":"granted"' "$OUT_DIR/on.log" || { echo "with Mail on again the app is not offered the account: $(cat "$OUT_DIR/on.log")" >&2; return 1; }
 }
 
 step_revoke() {
-  click "$REVOKE"; sleep 1; acc_shot 4-revoked
+  press_revoke; sleep 1; acc_shot 4-revoked
   acc_wait 10 mail_has_no_grants \
     || { echo "the app still has grants: $(rigc org.quire.Mail grants)" >&2; return 1; }
 }
 
 step_keep() {
-  click "$REMOVE"; sleep 1; acc_shot 5-remove-question
-  click "$QUESTION_KEEP"; sleep 1
+  press_remove; sleep 1; acc_shot 5-remove-question
+  press_question_keep; sleep 1
   has_account || { echo "Keep removed the account" >&2; return 1; }
 }
 
 step_remove() {
-  # The Apps block is gone (its only grant was revoked), so the button moved up.
-  click "$REMOVE_NO_APPS"; sleep 1
-  click "$QUESTION_REMOVE"
+  press_remove; sleep 1
+  press_question_remove
   acc_wait 15 no_account || { echo "the account is still in the settings module after Remove" >&2; return 1; }
   sleep 1; acc_shot 6-removed
   grep -q "$ACCOUNT" "$STATE/porter/registry.json" && { echo "the registry still holds the account" >&2; return 1; }
@@ -137,8 +138,8 @@ step_added_shows() {
 }
 
 step_sign_in() {
-  click "$ACCOUNTS_ITEM"; sleep 1; click "$MANAGE"; sleep 1; acc_shot 8-account-again
-  click "$SIGN_IN_AGAIN"; sleep 2; acc_shot 9-after-sign-in-again
+  press_accounts; sleep 1; press_manage; sleep 1; acc_shot 8-account-again
+  press_sign_in_again; sleep 2; acc_shot 9-after-sign-in-again
   if sheet_shown; then sheet_shot 10-sign-in-again; sheet_key Escape; return 0; fi
   echo "Sign in again opened no sheet: $(grep reauthenticate "$OUT_DIR/accountd.log" | tail -n 1)" >&2
   return 1

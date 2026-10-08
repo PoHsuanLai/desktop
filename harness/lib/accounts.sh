@@ -11,6 +11,7 @@
 #
 # Every process is stopped by its PID (acc_stop_all); nothing is found by name.
 
+ACC_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARIG="$SCEN_BUILD/porter-target/debug"
 ACC_PIDS=()
 ACC_BG=()
@@ -399,7 +400,8 @@ detent_start() {
   echo ran >"$STATE/detent/first-run"
   # Not through `nested` (a function: the background job would be its subshell, not detent, and the identity written
   # below must be for the process that holds the bus connection).
-  env WAYLAND_DISPLAY="$WL" XDG_RUNTIME_DIR="$(dirname "$WL")" HOME="$HOME_DIR" XDG_CONFIG_HOME="$CONFIG" XDG_DATA_HOME="$data" XDG_DATA_DIRS="$data" XDG_STATE_HOME="$STATE" \
+  PROBE_DIR="$SCRATCH/probe"; mkdir -p "$PROBE_DIR"
+  env QUIRE_DEBUG_PROBE="$PROBE_DIR" WAYLAND_DISPLAY="$WL" XDG_RUNTIME_DIR="$(dirname "$WL")" HOME="$HOME_DIR" XDG_CONFIG_HOME="$CONFIG" XDG_DATA_HOME="$data" XDG_DATA_DIRS="$data" XDG_STATE_HOME="$STATE" \
     XDG_CACHE_HOME="$CACHE" DBUS_SESSION_BUS_ADDRESS="$BUS" "$SCEN_BUILD/detent-target/debug/detent" >"$OUT_DIR/detent.log" 2>&1 &
   DETENT_PID=$!
   ACC_PIDS+=("$DETENT_PID")
@@ -416,20 +418,56 @@ import json, sys
 w = json.load(sys.stdin)
 print(*[int(v) for v in w[0]["frame"]])'
 }
-# detent_click RX RY: a left click at (RX, RY) relative to detent's window origin (the pointer is moved first and
-# given a moment: detent's hover state must catch up before a press counts). A negative RX counts from the window's
-# right edge.
-detent_click() {
-  local x y w h
-  read -r x y w h < <(detent_frame) || return 1
-  # A negative RX is measured from the window's right edge (a Setting row's control sits at the row's trailing edge).
-  local rx=$1
-  [ "$rx" -ge 0 ] || rx=$((w + rx))
-  casementctl debug inject "move $((x + rx)) $((y + $2))" >/dev/null || return 1
+# casement_tap X Y: a left click at (X, Y) in the output (the pointer is moved first and given a moment: the app's hover
+# state must catch up before a press counts).
+casement_tap() {
+  casementctl debug inject "move $1 $2" >/dev/null || return 1
   casementctl debug wait settled --timeout 10000 >/dev/null 2>&1
   sleep 0.3
   casementctl debug inject "press left" "release left" >/dev/null || return 1
   sleep 0.7
+}
+
+# detent_click RX RY: a left click at (RX, RY) relative to detent's window origin. A negative RX counts from the window's
+# right edge. Only for what has no name (see detent_press for the rest).
+detent_click() {
+  local x y w h
+  read -r x y w h < <(detent_frame) || return 1
+  local rx=$1
+  [ "$rx" -ge 0 ] || rx=$((w + rx))
+  casement_tap $((x + rx)) $((y + $2))
+}
+
+# --- detent's controls by role and name ----------------------------------------------------------------------------
+# detent runs with QUIRE_DEBUG_PROBE (detent_start), built with ds-blitz's `debug-probe` feature (scenario-build.sh):
+# its window lists every control by ARIA role and accessible name with its box (quire's ds-blitz probe). A scenario
+# presses "button Manage", never a place. The roles are the ones the markup has: button, switch, option (a sidebar row),
+# checkbox, textbox ...; the name is the aria-label, else the visible text.
+
+# detent_centre ROLE NAME [NTH]: "X Y", the control's centre in detent's window; exit 1 when there is none. NTH counts from
+# 1 in document order; -1 is the last (an alert's button, after the page's of the same name).
+detent_centre() { python3 -I "$ACC_LIB/probe-find.py" "$PROBE_DIR" "$DETENT_PID" "$1" "$2" ${3:+--nth "$3"}; }
+
+# detent_state ROLE NAME [NTH]: the control's state words (checked, pressed, selected, expanded, disabled, or -).
+detent_state() { python3 -I "$ACC_LIB/probe-find.py" "$PROBE_DIR" "$DETENT_PID" "$1" "$2" ${3:+--nth "$3"} --state; }
+
+# detent_listing: what detent shows now, one control per line (role x y w h state name).
+detent_listing() { cat "$PROBE_DIR/$DETENT_PID-0.tsv" 2>/dev/null; }
+
+# detent_press ROLE NAME [NTH]: waits for the control, waits until it stands still (two reads 0.3 s apart agree: a page
+# change slides), then clicks its centre as detent_click would.
+detent_press() {
+  local role=$1 name=$2 nth=${3:-} c1 c2 x y w h i
+  for i in $(seq 100); do
+    c1=$(detent_centre "$role" "$name" $nth) && { sleep 0.3; c2=$(detent_centre "$role" "$name" $nth) && [ "$c1" = "$c2" ] && break; }
+    sleep 0.1
+  done
+  [ -n "${c2:-}" ] && [ "$c1" = "$c2" ] || {
+    echo "detent shows no $role \"$name\" (it shows:)" >&2; detent_listing >&2; return 1
+  }
+  read -r x y w h < <(detent_frame) || return 1
+  read -r cx cy <<<"$c1"
+  casement_tap $((x + cx)) $((y + cy))
 }
 
 # detent_focus: the first press into a window only focuses it (detent's own grab zones take the next), so one harmless

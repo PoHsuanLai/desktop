@@ -26,7 +26,6 @@ acc_env
 # shellcheck source=/dev/null
 source "$SCEN_BUILD/pin/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out accounts-local-runtime)
-INTELLIGENCE_ITEM="77 348"
 
 cleanup() { acc_stop_all; stop_compositor; scratch_drop; }
 trap cleanup EXIT
@@ -125,7 +124,7 @@ step_listed() {
   detent_start
   acc_wait 30 detent_mapped || { echo "detent never mapped" >&2; return 1; }
   sleep 4; detent_focus
-  detent_click $INTELLIGENCE_ITEM; sleep 2
+  detent_press option Intelligence; sleep 2
   scroll_to_runtimes; acc_shot 1-intelligence-online
   [ -s "$OUT_DIR/1-intelligence-online.png" ]
 }
