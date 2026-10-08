@@ -6,8 +6,9 @@
 # Identity. The daemons are test-proc-root builds: they name the process behind a bus connection from
 # $PROC/<pid>/cgroup (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs
 # in a systemd scope; the role of each is the caller table ($CONFIG/porter/callers.toml: porter's dist copy).
-# `acc_identity UNIT PID` writes a unit's cgroup (sill-shell.scope, syncd.service, inferd.service), `acc_app APP
-# PID` an app scope (org.quire.Settings for detent).
+# `acc_identity UNIT PID` writes a unit's cgroup (sill-shell.scope, syncd.service, inferd.service) and, for a service
+# unit, its main pid ($PROC/units/<unit>); `acc_app APP PID` names detent the Settings unit (org.quire.Settings.service)
+# and any other app a Flatpak (its scope and $PROC/<pid>/root/.flatpak-info).
 #
 # Every process is stopped by its PID (acc_stop_all); nothing is found by name.
 
@@ -73,13 +74,29 @@ bus_has_owner() {
 }
 
 # --- identity ------------------------------------------------------------------------------------------------
-acc_identity() { # LEAF PID: a unit's cgroup
+# The Settings app is known by its unit: detent running as org.quire.Settings.service and being that unit's
+# main process (accountd asks systemd; with a fixture proc root it reads $PROC/units/<unit>).
+SETTINGS_UNIT=org.quire.Settings.service
+
+acc_identity() { # LEAF PID: a unit's cgroup; a service unit also gets its main pid ($PROC/units/<unit>)
   mkdir -p "$PROC/$2"
   printf '0::/user.slice/user-1000.slice/user@1000.service/app.slice/%s\n' "$1" >"$PROC/$2/cgroup"
+  case "$1" in
+    *.service) mkdir -p "$PROC/units"; printf '%s\n' "$2" >"$PROC/units/$1" ;;
+  esac
 }
-acc_app() { # APP-ID PID: a native app scope `app-<id>-1.scope`
-  mkdir -p "$PROC/$2"
-  printf '0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-%s-1.scope\n' "${1//-/\\x2d}" >"$PROC/$2/cgroup"
+# acc_flatpak APP-ID PID: a Flatpak app: its scope, and the sandbox's own metadata, which is what names the app.
+acc_flatpak() {
+  local esc=${1//-/\\x2d}
+  mkdir -p "$PROC/$2/root"
+  printf '0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-flatpak-%s-%s.scope\n' "$esc" "$2" >"$PROC/$2/cgroup"
+  printf '[Application]\nname=%s\n' "$1" >"$PROC/$2/root/.flatpak-info"
+}
+acc_app() { # APP-ID PID: Settings is its service unit, any other app a Flatpak
+  case "$1" in
+    org.quire.Settings) acc_identity "$SETTINGS_UNIT" "$2" ;;
+    *) acc_flatpak "$1" "$2" ;;
+  esac
 }
 
 # --- the fakes -----------------------------------------------------------------------------------------------
@@ -245,16 +262,32 @@ monitor_start() {
 monitor_stop() { [ -z "$MONITOR_PID" ] || acc_kill "$MONITOR_PID"; MONITOR_PID=; }
 
 # --- asking accountd as an app, with nothing but busctl ------------------------------------------------------
-# as_app APP-ID CMD...: runs CMD as a process that accountd names APP-ID (a Flatpak scope written for the shell's
-# own pid before the exec, so the pid the bus reports is the command's), then removes the identity.
+# as_app APP-ID CMD...: runs CMD as a process that accountd names APP-ID (written for the pid that becomes CMD, so the pid
+# the bus reports is CMD's). Any app but Settings is a Flatpak. Settings is its service unit's main process: while CMD
+# runs, the unit's pid file ($PROC/units/<unit>) holds CMD's pid, and the previous pid (detent's) is put back after, so
+# detent itself is refused for the length of the call and not after.
 as_app() {
   local app=$1; shift
+  # shellcheck disable=SC2016  # the script is for the inner bash, which expands it
   in_env bash -c '
-    app=$1; proc=$2; shift 2
+    app=$1; proc=$2; unit=$3; shift 3
+    if [ "$app" = org.quire.Settings ]; then
+      prev=$(cat "$proc/units/$unit" 2>/dev/null) || prev=
+      bash -c '"'"'
+        proc=$1; unit=$2; shift 2
+        mkdir -p "$proc/$$" "$proc/units"
+        printf "0::/user.slice/user-1000.slice/user@1000.service/app.slice/%s\n" "$unit" >"$proc/$$/cgroup"
+        printf "%s\n" "$$" >"$proc/units/$unit"
+        exec "$@"'"'"' _ "$proc" "$unit" "$@"
+      status=$?
+      [ -z "$prev" ] || printf "%s\n" "$prev" >"$proc/units/$unit"
+      exit "$status"
+    fi
     esc=$(printf %s "$app" | sed "s/-/\\\\x2d/g")
-    mkdir -p "$proc/$$"
+    mkdir -p "$proc/$$/root"
     printf "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-flatpak-%s-$$.scope\n" "$esc" >"$proc/$$/cgroup"
-    exec "$@"' _ "$app" "$PROC" "$@"
+    printf "[Application]\nname=%s\n" "$app" >"$proc/$$/root/.flatpak-info"
+    exec "$@"' _ "$app" "$PROC" "$SETTINGS_UNIT" "$@"
 }
 
 # settings_describe: accountd's settings module schema (JSON), read as the Settings app.
