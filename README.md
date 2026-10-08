@@ -16,6 +16,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | `gate/expected-skips.toml` | scenarios not runnable yet, each with a finding id and the closing phase |
 | `scenarios/` | whole-desktop scenarios; each calls `require_jail` first and exits with the plan's codes |
 | `harness/lib/accounts.sh` | what the `accounts-*` scenarios share: porter's real daemons (accountd, syncd, inferd) and porter's test rig (`porter-rig-servers`, `-client`, `-secrets`) on casement's private bus with sill drawing the sheets and detent as Settings; the caller identities (a fixture /proc for the daemons' `test-proc-root` builds); the secret scan (`secret-scan.py`) over a `busctl monitor` record |
+| `harness/lib/regress.sh`, `pixels.py`, `sheet-bus.py` | what the `accounts-regress-*` scenarios share: checks that fail a step (`must`), the sheet's traffic read from the recorded bus (what accountd shows it, what the keys sent back), and measurements of a capture (the card's box, equal pixels, dark text, contrast). sill's surfaces write no debug probe (shell-host does not run ds-blitz's), so the sheet is read this way; detent's controls are read by role and name |
 
 Nothing that can see input devices, a GPU output or the user's session runs outside
 `harness/jail.sh`. Exit codes: 0 pass, 1 test failed, 2 could not run safely (a SKIP, fails unless

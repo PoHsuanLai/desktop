@@ -10,7 +10,7 @@
 #   build/src/{sill,shell-host}                                          private checkouts of the siblings' HEADs the scripts run from
 #   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
 #   build/detent-target/debug/detent                                     detent at its pin with ds-blitz/debug-probe, for the accounts-* and detent-on-casement-at-1.5 scenarios
-#   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug (the accounts-* scenarios: the pin has the accounts sheet)
+#   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug,ds-blitz/debug-probe (the accounts-* scenarios: the pin has the accounts sheet; the probe is linked but writes nothing for sill's surfaces)
 #   build/porter-target/debug/{accountd,syncd,inferd}                    porter at its pin, test-proc-root builds
 #   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
 #
@@ -145,7 +145,7 @@ build_porter() {
 
 # sill at its pin: the accounts-* scenarios need the accounts sheet, which the sibling's HEAD may lack.
 build_sill_pin() {
-  (cd "$SCEN_BUILD/pin/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" cargo build -p sill --features debug)
+  (cd "$SCEN_BUILD/pin/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" cargo build -p sill --features debug,ds-blitz/debug-probe)
 }
 
 stage "casement (bootstrap --build-only)" build_casement

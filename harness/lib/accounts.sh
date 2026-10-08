@@ -190,7 +190,9 @@ EOF
   chmod +x "$BIN_DIR/xdg-open"
   mkdir -p "$CONFIG/sill"; : >"$CONFIG/sill/settings.toml"
   backdrop_seed "$CONFIG" || return 1
-  IN_ENV_EXTRA=("PATH=$BIN_DIR:$PATH")
+  # sill is built with ds-blitz's debug-probe (scenario-build.sh): every window of it lists its controls in $SPROBE.
+  SPROBE="$SCRATCH/sill-probe"; mkdir -p "$SPROBE"
+  IN_ENV_EXTRA=("PATH=$BIN_DIR:$PATH" "QUIRE_DEBUG_PROBE=$SPROBE")
   # sill names itself to accountd within its first moments (its accounts service asks NeedingReauth as it connects, and a
   # refused first ask is not repeated), so its identity is written by the shell that execs it, before it exists.
   LAUNCH_PREFIX=(bash -c 'mkdir -p "$0/$$"; echo "0::/user.slice/user-1000.slice/user@1000.service/app.slice/sill-shell.scope" >"$0/$$/cgroup"; exec "$@"' "$PROC")
