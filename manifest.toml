@@ -14,27 +14,27 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "366dcd97ebc26003f466d20fa12123f783180653"
+rev = "267451763728522f04e23e8fa8564c9f83ffda27"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "fe354f256f1804a761c4195abe63ca60d3d1a345"
+rev = "e331545ef127027c33eb800b323c6577d5b259ae"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "b7595df81115111b11137322a61efbc148165956"
+rev = "febcf75e04919c790ee88a3fc05e087ceaf916af"
 branch = "master"
 gate = "lane"
 
 [repo.blitz-kit]
 url = "https://github.com/PoHsuanLai/blitz-kit.git"
-rev = "c6b142d062046c19139c2f423496faf436e52bd7"
+rev = "be460865dec8f844e7111fe79be70826dfea8427"
 branch = "master"
 gate = "none"
 
@@ -52,8 +52,8 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "260a14df80d98dcfde32dc2da909b58482e236f5"
-branch = "master"
+rev = "13fdda866dcfa6fc338a994a866e5e10f2ffe0f6"
+branch = "batch-8"
 gate = "lane"
 
 [repo.stoker]
@@ -64,26 +64,33 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "d0e65a110465e725567b9b725ec197d834c13b37"
+rev = "132a66e7884ca02b61dbaeab38aa1a461b9c61e5"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "30aa26b81626cac46fd58ee5b09e32a5a6c3eff4"
+rev = "557d95de8bf714efb33a31b50c714c726776c392"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "1359652c4c3c6e5dd66b303d0c3267a53df32f71"
+rev = "c19773a38e5fb77efcbeefdea13cb3cdf69430d0"
 branch = "master"
 gate = "lane"
 
 [repo.latchkey]
 url = "https://github.com/PoHsuanLai/latchkey.git"
 rev = "335d7a7c65bc7d196d5f19dfb305896ff3a55958"
+branch = "master"
+gate = "lane"
+
+[repo.bulkhead]
+# The sandbox docket runs agent tools in (public); its kill takes the whole sandbox.
+url = "https://github.com/PoHsuanLai/bulkhead.git"
+rev = "e0471fddae09d1b2a6adb95131aba6e734c06094"
 branch = "master"
 gate = "lane"
 
@@ -96,19 +103,19 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "c54222f098d947c6070bfb53735c9786e8324291"
+rev = "9bc37daa7e0fbdbdf089deb36df2a21b55be1211"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "bb12564ddc8f59e25f4f9b5b05b2d096ecf076bf"
+rev = "53508af483bb5445b5a45317d9f2421a0dfe4f38"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "a289eb3e9c0f60c13b4f3dd98e520d81e675dd1b"
+rev = "ad384e5d9d9ec6fe5bb991963256fc7996267d51"
 branch = "main"
 gate = "none"
 
