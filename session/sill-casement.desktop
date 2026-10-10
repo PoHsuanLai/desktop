@@ -1,0 +1,8 @@
+[Desktop Entry]
+# A wayland-sessions entry for session/desktop-session. install/install.sh writes it with Exec
+# set to the installed path (@BINDIR@ below).
+Name=sill (casement)
+Comment=casement as the compositor with sill as the shell
+Exec=@BINDIR@/desktop-session
+Type=Application
+DesktopNames=quire

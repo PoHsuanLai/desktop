@@ -1,0 +1,11 @@
+# The user target desktop-session starts: it brings graphical-session.target (portals, units that
+# want a graphical session) and XDG autostart with it. Installed by install/install.sh.
+[Unit]
+Description=sill (casement) session
+Documentation=man:systemd.special(7)
+BindsTo=graphical-session.target
+Before=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+Wants=xdg-desktop-autostart.target
+Before=xdg-desktop-autostart.target

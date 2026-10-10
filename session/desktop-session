@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# desktop-session: a login with casement as the compositor and sill as the shell ("sill (casement)").
+# Run by the display manager (session/sill-casement.desktop). Installed by install/install.sh; the
+# first-login checks that need a real login are listed in the final lines of install/install.sh.
+#
+# casement is this script's child and the session's one compositor process: when it exits
+# cleanly (status 0, a logout) the session is over; when it dies the crash guard below decides.
+# What runs beside it, once casement's socket exists, and why each:
+#   sill run                      bar, dock, launcher, control centre, notifications, lock, polkit
+#   xdg-desktop-portal-wlr        the interim ScreenCast/Screenshot portal (the casement portal
+#                                 replaces it at P2); quire-portals.conf routes to it for quire
+# Both are children of this script, ended by PID when casement ends and started again with the
+# next casement. Nothing is looked up or killed by name.
+#
+# The crash-loop guard. A casement run that lasts less than QUICK seconds (default 20) is a quick
+# exit; a longer run clears the count. Three quick exits in a row switch the session to
+# `casement --safe` (pixman, no effects, one output). A quick exit of the safe run, or a safe
+# casement that cannot start, falls back to the stock COSMIC session when it is installed
+# (cosmic-session, else cosmic-comp), and otherwise ends the session with status 1 and a notice.
+# Every decision is appended to $STATE/guard.log.
+#
+# Settings a person may change: ~/.config/desktop-session/session.env (sh syntax, read first), for
+# instance DESKTOP_SESSION_QUICK_SECS. The same variables are how the harness drives this script:
+#   DESKTOP_SESSION_CASEMENT_CMD   the casement command (default: casement); words, no quoting
+#   DESKTOP_SESSION_BACKEND_ARGS   its arguments before --safe (default: --backend tty)
+#   DESKTOP_SESSION_QUICK_SECS     the quick-exit limit (default 20)
+#   DESKTOP_SESSION_STATE          where guard.log and casement.log go (default $XDG_RUNTIME_DIR/desktop-session)
+#   DESKTOP_SESSION_FALLBACK_CMD   the COSMIC fallback command (default: cosmic-session, else cosmic-comp)
+#   DESKTOP_SESSION_COSMIC_ENTRY   the COSMIC session entry that proves it is installed
+#   DESKTOP_SESSION_NESTED=1       no systemd, no login-shell re-exec, no sill, no portal (tests)
+set -euo pipefail
+
+log() { printf 'desktop-session: %s\n' "$*" >&2; }
+
+# Everything below runs in the second stage, after one login shell so ~/.profile's PATH applies.
+if [ "${1:-}" != --in-login-shell ] && [ -n "${SHELL:-}" ] && [ -z "${DESKTOP_SESSION_NESTED:-}" ]; then
+    exec "$SHELL" -l -c "exec '$0' --in-login-shell"
+fi
+
+settings="${XDG_CONFIG_HOME:-$HOME/.config}/desktop-session/session.env"
+if [ -r "$settings" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$settings"
+    set +a
+fi
+
+nested="${DESKTOP_SESSION_NESTED:-}"
+quick_secs="${DESKTOP_SESSION_QUICK_SECS:-20}"
+state="${DESKTOP_SESSION_STATE:-${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/desktop-session}"
+read -r -a casement_cmd <<<"${DESKTOP_SESSION_CASEMENT_CMD:-casement}"
+read -r -a backend_args <<<"${DESKTOP_SESSION_BACKEND_ARGS---backend tty}"
+cosmic_entry="${DESKTOP_SESSION_COSMIC_ENTRY:-/usr/share/wayland-sessions/cosmic.desktop}"
+mkdir -p "$state"
+guard_log="$state/guard.log"
+guard() { printf '%s\n' "$*" >>"$guard_log"; log "$*"; }
+
+export XDG_CURRENT_DESKTOP=quire
+export XDG_SESSION_DESKTOP=quire
+export XDG_SESSION_TYPE=wayland
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM="wayland;xcb"
+export GDK_BACKEND="wayland,x11"
+if command -v fcitx5 >/dev/null; then
+    export XMODIFIERS="${XMODIFIERS-@im=fcitx}"
+    unset GTK_IM_MODULE QT_IM_MODULE
+fi
+
+component_pids=()
+casement_pid=
+
+stop_components() {
+    local pid
+    for pid in "${component_pids[@]}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+    for pid in "${component_pids[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+    component_pids=()
+}
+
+on_term() {
+    [ -z "$casement_pid" ] || kill "$casement_pid" 2>/dev/null || true
+    stop_components
+    [ -n "$nested" ] || systemctl --user stop desktop-session.target 2>/dev/null || true
+    exit 0
+}
+trap on_term TERM INT HUP
+
+# The socket name casement logs ("casement: listening on wayland-1"); empty if it has not yet.
+socket_of() { sed -n 's/^casement: listening on //p' "$1" | head -n 1; }
+
+# The environment D-Bus activation and systemd user units see (portals, autostart, Flatpak).
+publish_environment() {
+    local vars="WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE \
+MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS"
+    [ -z "$nested" ] || return 0
+    # shellcheck disable=SC2086  # a word list on purpose
+    dbus-update-activation-environment --systemd $vars 2>/dev/null || log "could not update the activation environment"
+    # shellcheck disable=SC2086
+    systemctl --user import-environment $vars 2>/dev/null || true
+    systemctl --user unset-environment GTK_IM_MODULE QT_IM_MODULE 2>/dev/null || true
+    systemctl --user start desktop-session.target || log "desktop-session.target did not start"
+}
+
+# Start the components against the casement whose socket is $1 (a name in XDG_RUNTIME_DIR).
+start_components() {
+    export WAYLAND_DISPLAY="$1"
+    publish_environment
+    [ -z "$nested" ] || return 0
+    /usr/libexec/xdg-desktop-portal-wlr & component_pids+=("$!")
+    sill run & component_pids+=("$!")
+}
+
+# Run one casement (extra args "$@") to its end; sets run_status and run_secs.
+run_casement() {
+    local log_file="$state/casement.log" started socket="" tries=0
+    : >"$log_file"
+    started=$(date +%s)
+    # Standard error is casement's log and where it names its socket; kept for the guard.
+    "${casement_cmd[@]}" "${backend_args[@]}" "$@" 2>"$log_file" &
+    casement_pid=$!
+    while [ -z "$socket" ] && kill -0 "$casement_pid" 2>/dev/null && [ "$tries" -lt 300 ]; do
+        socket=$(socket_of "$log_file")
+        [ -n "$socket" ] || { sleep 0.1; tries=$((tries + 1)); }
+    done
+    [ -z "$socket" ] || start_components "$socket"
+    run_status=0
+    wait "$casement_pid" || run_status=$?
+    casement_pid=
+    run_secs=$(($(date +%s) - started))
+    stop_components
+    cat "$log_file" >&2
+}
+
+fall_back_to_cosmic() {
+    local -a cmd
+    if [ -n "${DESKTOP_SESSION_FALLBACK_CMD:-}" ]; then
+        read -r -a cmd <<<"$DESKTOP_SESSION_FALLBACK_CMD"
+    elif command -v cosmic-session >/dev/null; then
+        cmd=(cosmic-session)
+    elif command -v cosmic-comp >/dev/null; then
+        cmd=(cosmic-comp)
+    else
+        return 1
+    fi
+    [ -e "$cosmic_entry" ] || return 1
+    guard "falling back to the stock COSMIC session: ${cmd[*]}"
+    export XDG_CURRENT_DESKTOP=COSMIC XDG_SESSION_DESKTOP=COSMIC
+    exec "${cmd[@]}"
+}
+
+quick=0
+mode=normal
+while :; do
+    if [ "$mode" = safe ]; then
+        guard "starting casement --safe (pixman, no effects, one output)"
+        run_casement --safe
+    else
+        guard "starting casement (quick exits so far: $quick)"
+        run_casement
+    fi
+    if [ "$run_status" = 0 ]; then
+        guard "casement ended cleanly after ${run_secs}s: the session is over"
+        exit 0
+    fi
+    guard "casement exited $run_status after ${run_secs}s (mode: $mode)"
+    if [ "$run_secs" -ge "$quick_secs" ]; then
+        quick=0
+        continue
+    fi
+    if [ "$mode" = safe ]; then
+        guard "casement --safe exited quickly too"
+        fall_back_to_cosmic || { guard "no COSMIC session to fall back to: the session ends"; exit 1; }
+    fi
+    quick=$((quick + 1))
+    if [ "$quick" -ge 3 ]; then
+        guard "three quick exits in a row: switching to casement --safe"
+        mode=safe
+    fi
+    sleep 1
+done
