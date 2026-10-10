@@ -1,0 +1,3 @@
+# repo  lock  rev  why: a lock the repo's own gate never resolves, stale at a release the manifest pins.
+# Each line names one rev and lapses when the manifest moves the repo on; fix the lock upstream first.
+quire examples/consumer/Cargo.lock 4289e369cb62066d3ce9b80058f659a8c0f98b03 quire v0.3.5..v0.3.8 example lock lacks chordkit; fixed on quire master for batch 13

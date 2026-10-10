@@ -73,6 +73,15 @@ if [ "$syntax_only" = 0 ] && [ "$shape_bad" = 0 ]; then
   done
 fi
 
+# waived <repo> <lock> <rev>: a lock listed in gate/stale-locks.txt for exactly this rev (an example
+# or tool lock outside the repo's own gate, stale at a release already pinned). A waiver names one
+# rev, so it lapses by itself as soon as the manifest moves the repo on.
+waived() {
+  local list; list="$(dirname "$0")/stale-locks.txt"
+  [ -f "$list" ] || return 1
+  grep -v '^#' "$list" | awk -v r="$1" -v l="$2" -v v="$3" '$1 == r && $2 == l && $3 == v { found = 1 } END { exit !found }'
+}
+
 # resolve_pinned: export every repo at its rev side by side, then `cargo metadata --locked` in each
 # directory that has both a Cargo.toml and a Cargo.lock.
 resolve_pinned() {
@@ -91,6 +100,8 @@ resolve_pinned() {
       [ -f "$scratch/$r/$dir/Cargo.toml" ] || continue
       if out=$(cd "$scratch/$r/$dir" && command cargo metadata --locked --format-version 1 2>&1 >/dev/null); then
         echo "manifest-check: resolves $r:${dir#.}" | sed 's#:$#:/#'
+      elif waived "$r" "$lock" "$(manifest_repo_get "$r" rev)"; then
+        echo "manifest-check: waived $r:$lock at its pinned rev (gate/stale-locks.txt)"
       else
         note "$r:$lock does not resolve --locked against the pinned siblings: $(grep -m1 -E '^error' <<<"$out" | cut -c1-200)"
         sed -n '1,12p' <<<"$out" | sed 's/^/    /' >&2
