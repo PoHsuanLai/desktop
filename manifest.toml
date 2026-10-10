@@ -14,14 +14,14 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "9de2409fe45384f095b5d18d139fbee7115c06ab"
+rev = "7ce3a8572224e97c6cede443649cddfbe06dc84d"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "3b83a82bc472ff88fc0786ba3fe6d38b8eb23b6e"
+rev = "a0e49d0fd61bf588dea77938aa0c7434ecf99bb2"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "0e98f8d26952b6a18a3546f7618782c682d21b10"
+rev = "9c01699eda3bfae0f8c6504c72c9b05672728243"
 branch = "batch-10"
 gate = "lane"
 
@@ -64,20 +64,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "a1afc1ac016f7053d4cae30b621276eee0c026fd"
+rev = "0fdbcfd6415e7af508a78e404c64546be87dbb34"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "1ed3fc4627c9f4fc9148bac63800392add99afaa"
+rev = "bd83d5ee5bf2743b6468ad72a7c0b209c219bf42"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "fd85e7e1a8ddb52097127b9b6280676e8d5a854f"
+rev = "b9370feaacdc8c79bda9023e58fa5672bfb50b01"
 branch = "master"
 gate = "lane"
 
@@ -103,19 +103,19 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "a1d87f4f280cba4b46cc2d7891cac5978bbd9775"
+rev = "de6881857393b2f07e99136eda13c0f268c983f6"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "d725706c849f5de400a2b679b151666ea3b9ba28"
+rev = "e3b59eaf329b17120790fe9c391037513584f12b"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "e85206194aaee3437bb83a003b036897a0466e7c"
+rev = "05e70f4e8837af11833a0c4f11519cac019de3fb"
 branch = "main"
 gate = "none"
 
