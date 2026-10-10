@@ -14,11 +14,6 @@ finding = "FD-07"
 closes = "P2"
 
 [[skip]]
-scenario = "space-id-survives-restart"
-finding = "FD-04"
-closes = "P1"
-
-[[skip]]
 scenario = "minimise-target-round-trip"
 finding = "FD-05"
 closes = "P2"
