@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Install the "sill (casement)" session: the session script, the portal choice for the quire
-# desktop, the user target and the login-screen entry. Run as yourself; it never runs sudo (a
+# desktop, the user target, casement.service (from the casement
+# repo's dist/, when that sibling checkout has it) and the login-screen entry. Run as yourself; it never runs sudo (a
 # destination you cannot write stops it with the command to run as root). Safe to run again.
 #
 #   install/install.sh --dry-run    print every step, change nothing
@@ -22,6 +23,7 @@ step "1/3 checks"
 for tool in casement sill; do
   command -v "$tool" >/dev/null || note "WARNING: $tool is not on PATH; the session cannot start without it"
 done
+[ -f "$casement_unit" ] || note "WARNING: no casement unit at $casement_unit (build the casement repo's dist/casement.service, or set CASEMENT_UNIT_FILE); the session needs casement.service and will not start casement without it"
 [ -x /usr/libexec/xdg-desktop-portal-wlr ] || note "WARNING: /usr/libexec/xdg-desktop-portal-wlr is missing (dnf install xdg-desktop-portal-wlr)"
 [ -e /usr/share/wayland-sessions/cosmic.desktop ] || note "note: no COSMIC session installed; the crash guard's last fallback would end the session instead"
 
@@ -48,5 +50,5 @@ fi
 
 step "done"
 note "Pick \"sill (casement)\" at the login screen. First-login checks (not testable without a login):"
-note "  the guard's real tty path, sill and the wlr portal against the real casement, the target and"
+note "  the guard's real tty path, sill and the wlr portal against the real casement, the target, casement.service"
 note "  the activation environment, a screen share through the wlr portal, logout through sill's power menu."

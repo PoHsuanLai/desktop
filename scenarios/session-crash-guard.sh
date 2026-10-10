@@ -11,6 +11,8 @@
 #               fallback command (a marker script here, never cosmic-comp) when a COSMIC entry exists,
 #               and ends the session with status 1 when none does
 #   components  none run (DESKTOP_SESSION_NESTED=1: no systemd, no sill, no portal)
+# This is the direct-child path (DESKTOP_SESSION_NESTED=1); the real session runs casement as casement.service
+# (needs a systemd user manager, first-login check) with the same guard decisions.
 # Nothing outside the jail's scratch is read or written; the session is ended by its PID.
 #
 # budget: 90

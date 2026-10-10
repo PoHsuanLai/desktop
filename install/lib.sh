@@ -12,6 +12,9 @@
 # command to run as root, and the script stops there.
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../session" && pwd)"
+# casement's own user unit, shipped in the casement repo's dist/ (a sibling checkout); override with
+# CASEMENT_UNIT_FILE. Installed only when the file is there.
+casement_unit=${CASEMENT_UNIT_FILE:-$SRC/../../casement/dist/casement.service}
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
 sysconfdir=${SYSCONFDIR:-/etc}
@@ -49,6 +52,7 @@ files() {
   echo "644 $SRC/quire-portals.conf $prefix/share/xdg-desktop-portal/quire-portals.conf"
   echo "644 $SRC/desktop-session.target $sysconfdir/systemd/user/desktop-session.target"
   echo "644 $SRC/sill-casement.desktop $sessions_dir/sill-casement.desktop"
+  [ ! -f "$casement_unit" ] || echo "644 $casement_unit $sysconfdir/systemd/user/casement.service"
 }
 
 # content SOURCE: what is installed from SOURCE (the entry gets its Exec path).

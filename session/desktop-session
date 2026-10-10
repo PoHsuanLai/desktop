@@ -3,8 +3,20 @@
 # Run by the display manager (session/sill-casement.desktop). Installed by install/install.sh; the
 # first-login checks that need a real login are listed in the final lines of install/install.sh.
 #
-# casement is this script's child and the session's one compositor process: when it exits
-# cleanly (status 0, a logout) the session is over; when it dies the crash guard below decides.
+# casement runs as the user unit casement.service (shipped by the casement repo, Type=notify): porter's
+# accountd proves the `compositor` caller role only for the main process of that unit, so a bare child
+# would not be trusted. This script starts it with `systemctl --user start casement.service`, which
+# returns once casement has said READY=1, and then watches the unit. When the unit ends cleanly
+# (Result=success, a logout) the session is over; when it fails the crash guard below decides. Logout
+# (a TERM to this script) stops the unit. With DESKTOP_SESSION_NESTED=1 (tests: no systemd) casement is
+# instead this script's direct child, with the same guard.
+#
+# How the unit is driven, nothing under ~/.config or /etc: the session environment is imported into
+# the user manager first; the command line (DESKTOP_SESSION_CASEMENT_CMD, the backend args, --safe) goes
+# in a drop-in written to $XDG_RUNTIME_DIR/systemd/user/casement.service.d/session.conf that replaces
+# ExecStart, turns Restart off (the guard decides) and appends the unit's stderr to $STATE/casement.log.
+# That log file is where the socket name is read from ("casement: listening on wayland-1"), the same
+# file as on the direct-child path. The drop-in is removed when the session ends.
 # What runs beside it, once casement's socket exists, and why each:
 #   sill run                      bar, dock, launcher, control centre, notifications, lock, polkit
 #   xdg-desktop-portal-wlr        the interim ScreenCast/Screenshot portal (the casement portal
@@ -16,7 +28,8 @@
 # exit; a longer run clears the count. Three quick exits in a row switch the session to
 # `casement --safe` (pixman, no effects, one output). A quick exit of the safe run, or a safe
 # casement that cannot start, falls back to the stock COSMIC session when it is installed
-# (cosmic-session, else cosmic-comp), and otherwise ends the session with status 1 and a notice.
+# (cosmic-session, else cosmic-comp; one function, fall_back_to_cosmic, to be deleted when COSMIC is
+# dropped), and otherwise ends the session with status 1 and a notice.
 # Every decision is appended to $STATE/guard.log.
 #
 # Settings a person may change: ~/.config/desktop-session/session.env (sh syntax, read first), for
@@ -27,7 +40,8 @@
 #   DESKTOP_SESSION_STATE          where guard.log and casement.log go (default $XDG_RUNTIME_DIR/desktop-session)
 #   DESKTOP_SESSION_FALLBACK_CMD   the COSMIC fallback command (default: cosmic-session, else cosmic-comp)
 #   DESKTOP_SESSION_COSMIC_ENTRY   the COSMIC session entry that proves it is installed
-#   DESKTOP_SESSION_NESTED=1       no systemd, no login-shell re-exec, no sill, no portal (tests)
+#   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill, no portal (tests)
+#   DESKTOP_SESSION_UNIT           the casement unit (default casement.service)
 set -euo pipefail
 
 log() { printf 'desktop-session: %s\n' "$*" >&2; }
@@ -50,7 +64,8 @@ quick_secs="${DESKTOP_SESSION_QUICK_SECS:-20}"
 state="${DESKTOP_SESSION_STATE:-${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/desktop-session}"
 read -r -a casement_cmd <<<"${DESKTOP_SESSION_CASEMENT_CMD:-casement}"
 read -r -a backend_args <<<"${DESKTOP_SESSION_BACKEND_ARGS---backend tty}"
-cosmic_entry="${DESKTOP_SESSION_COSMIC_ENTRY:-/usr/share/wayland-sessions/cosmic.desktop}"
+unit="${DESKTOP_SESSION_UNIT:-casement.service}"
+unit_dir="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/systemd/user/$unit.d"
 mkdir -p "$state"
 guard_log="$state/guard.log"
 guard() { printf '%s\n' "$*" >>"$guard_log"; log "$*"; }
@@ -83,7 +98,10 @@ stop_components() {
 on_term() {
     [ -z "$casement_pid" ] || kill "$casement_pid" 2>/dev/null || true
     stop_components
-    [ -n "$nested" ] || systemctl --user stop desktop-session.target 2>/dev/null || true
+    if [ -z "$nested" ]; then
+        systemctl --user stop desktop-session.target 2>/dev/null || true
+        stop_unit
+    fi
     exit 0
 }
 trap on_term TERM INT HUP
@@ -113,11 +131,72 @@ start_components() {
     sill run & component_pids+=("$!")
 }
 
-# Run one casement (extra args "$@") to its end; sets run_status and run_secs.
-run_casement() {
-    local log_file="$state/casement.log" started socket="" tries=0
-    : >"$log_file"
-    started=$(date +%s)
+# --- casement as the unit casement.service (the real session) ---------------------------------------
+
+# Stop the unit and take the drop-in away (also run at logout; harmless when nothing runs).
+stop_unit() {
+    systemctl --user stop "$unit" 2>/dev/null || true
+    rm -rf -- "$unit_dir"
+    systemctl --user daemon-reload 2>/dev/null || true
+}
+
+# The environment casement and what it starts must see, set in the user manager before the start.
+# WAYLAND_DISPLAY is not among them: casement makes the socket and publish_environment adds it.
+import_unit_environment() {
+    local vars="XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE MOZ_ENABLE_WAYLAND \
+QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS XDG_SEAT XDG_VTNR XDG_SESSION_ID XDG_SESSION_CLASS"
+    local var set=()
+    for var in $vars; do
+        [ -z "${!var:-}" ] || set+=("$var=${!var}")
+    done
+    systemctl --user set-environment "${set[@]}"
+    systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY GTK_IM_MODULE QT_IM_MODULE 2>/dev/null || true
+}
+
+# Write the drop-in for one run (extra args "$@") and make the manager read it.
+write_dropin() {
+    mkdir -p "$unit_dir"
+    {
+        echo "[Service]"
+        echo "Restart=no"
+        echo "ExecStart="
+        echo "ExecStart=${casement_cmd[*]} ${backend_args[*]} $*"
+        echo "StandardError=append:$state/casement.log"
+    } >"$unit_dir/session.conf"
+    systemctl --user daemon-reload
+}
+
+# Run the casement unit (extra args "$@") to its end; sets run_status. The unit's Result and
+# ExecMainStatus say how it ended; a signal or a start that failed is a nonzero status.
+run_unit_to_end() {
+    local socket="" key value result="" mainstatus=0 tries=0
+    write_dropin "$@" || { run_status=1; return; }
+    systemctl --user reset-failed "$unit" 2>/dev/null || true
+    # Blocks until casement has said READY=1 (Type=notify), or fails if it never does.
+    if ! systemctl --user start "$unit"; then
+        run_status=1
+        return
+    fi
+    while [ -z "$socket" ] && [ "$tries" -lt 50 ]; do
+        socket=$(socket_of "$state/casement.log")
+        [ -n "$socket" ] || { sleep 0.1; tries=$((tries + 1)); }
+    done
+    [ -z "$socket" ] || start_components "$socket"
+    until [ "$(systemctl --user show "$unit" -p ActiveState --value)" != active ]; do sleep 0.5; done
+    while IFS== read -r key value; do
+        case "$key" in
+            Result) result=$value ;;
+            ExecMainStatus) mainstatus=$value ;;
+        esac
+    done < <(systemctl --user show "$unit" -p Result -p ExecMainStatus)
+    run_status=$mainstatus
+    [ "$result" = success ] || [ "$run_status" != 0 ] || run_status=1
+}
+
+# --- casement as this script's direct child (DESKTOP_SESSION_NESTED=1: tests, no systemd) -------------
+
+run_child_to_end() {
+    local log_file="$state/casement.log" socket="" tries=0
     # Standard error is casement's log and where it names its socket; kept for the guard.
     "${casement_cmd[@]}" "${backend_args[@]}" "$@" 2>"$log_file" &
     casement_pid=$!
@@ -129,13 +208,28 @@ run_casement() {
     run_status=0
     wait "$casement_pid" || run_status=$?
     casement_pid=
-    run_secs=$(($(date +%s) - started))
-    stop_components
-    cat "$log_file" >&2
 }
 
+# Run one casement (extra args "$@") to its end; sets run_status and run_secs.
+run_casement() {
+    local started
+    : >"$state/casement.log"
+    started=$(date +%s)
+    if [ -n "$nested" ]; then
+        run_child_to_end "$@"
+    else
+        import_unit_environment
+        run_unit_to_end "$@"
+    fi
+    run_secs=$(($(date +%s) - started))
+    stop_components
+    cat "$state/casement.log" >&2
+}
+
+# --- COSMIC fallback: to be dropped with COSMIC. Delete this block and the one call below. ------------
 fall_back_to_cosmic() {
     local -a cmd
+    local cosmic_entry="${DESKTOP_SESSION_COSMIC_ENTRY:-/usr/share/wayland-sessions/cosmic.desktop}"
     if [ -n "${DESKTOP_SESSION_FALLBACK_CMD:-}" ]; then
         read -r -a cmd <<<"$DESKTOP_SESSION_FALLBACK_CMD"
     elif command -v cosmic-session >/dev/null; then
@@ -148,6 +242,7 @@ fall_back_to_cosmic() {
     [ -e "$cosmic_entry" ] || return 1
     guard "falling back to the stock COSMIC session: ${cmd[*]}"
     export XDG_CURRENT_DESKTOP=COSMIC XDG_SESSION_DESKTOP=COSMIC
+    [ -n "$nested" ] || stop_unit
     exec "${cmd[@]}"
 }
 
@@ -163,6 +258,7 @@ while :; do
     fi
     if [ "$run_status" = 0 ]; then
         guard "casement ended cleanly after ${run_secs}s: the session is over"
+        [ -n "$nested" ] || stop_unit
         exit 0
     fi
     guard "casement exited $run_status after ${run_secs}s (mode: $mode)"
@@ -172,7 +268,7 @@ while :; do
     fi
     if [ "$mode" = safe ]; then
         guard "casement --safe exited quickly too"
-        fall_back_to_cosmic || { guard "no COSMIC session to fall back to: the session ends"; exit 1; }
+        fall_back_to_cosmic || { guard "no COSMIC session to fall back to: the session ends"; [ -n "$nested" ] || stop_unit; exit 1; }
     fi
     quick=$((quick + 1))
     if [ "$quick" -ge 3 ]; then
