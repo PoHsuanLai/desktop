@@ -244,6 +244,19 @@ sheet_gone() { acc_wait "${1:-15}" sheet_hidden || { echo "the sheet never went"
 # sheet_shot NAME: a capture of the sheet into the scenario's output dir.
 sheet_shot() { sill debug capture "$SHEET" "$OUT_DIR/$1.png" >>"$OUT_DIR/capture.log" 2>&1; }
 sheet_key() { sill debug key "$SHEET" "$1" >>"$OUT_DIR/keys.log" 2>&1; }
+# sheet_settle [SECONDS]: wait until two captures 0.2 s apart are the same picture, so what was typed has been
+# drawn (the list filtered) before the next key. A fixed sleep after typing flaked under a loaded gate.
+sheet_settle() {
+  local until=$(( SECONDS + ${1:-8} )) a="$OUT_DIR/.settle-a.png" b="$OUT_DIR/.settle-b.png"
+  sill debug capture "$SHEET" "$a" >/dev/null 2>&1 || return 0
+  while (( SECONDS < until )); do
+    sleep 0.2
+    sill debug capture "$SHEET" "$b" >/dev/null 2>&1 || return 0
+    cmp -s "$a" "$b" && return 0
+    mv -f "$b" "$a"
+  done
+  echo "the sheet kept changing" >&2
+}
 # sheet_type TEXT: one `sill debug key` per character (shell-host e411b25 types the US shifted symbols, `@` among them, with
 # Shift held; the pin has it).
 sheet_type() {

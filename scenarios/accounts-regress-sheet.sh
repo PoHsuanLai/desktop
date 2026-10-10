@@ -83,7 +83,7 @@ step_s2_google() {
   acc_clients_google
   open_sheet || return 1
   n=$(bus_count)
-  sheet_type Google; sleep 0.5; sheet_key Enter; sleep 1
+  sheet_type Google; sheet_settle; sheet_key Enter; sleep 1
   must "S2 Google + Return picks google (picked: $(last_pick "$n"))" [ "$(last_pick "$n")" = google ]
   close_sheet
   reg_verdict
@@ -93,7 +93,8 @@ step_s1_other() {
   local n
   open_sheet || return 1
   n=$(bus_count)
-  sheet_type Other; sleep 0.5; sheet_key ArrowDown; sheet_key ArrowDown; sheet_key Enter; sleep 1.5
+  # "Other…" is always the last row and Down stops there, so enough Downs reach it however many providers match.
+  sheet_type Other; sheet_settle; for _ in 1 2 3 4 5 6; do sheet_key ArrowDown; done; sheet_key Enter; sleep 1.5
   sheet_shot s1-other-form
   must "S1 Other... picks generic-imap (picked: $(last_pick "$n"))" [ "$(last_pick "$n")" = generic-imap ]
   must "S1 and shows its address form" bus_saw "$n" 'update {"kind":"sign_in","v":{"provider":"generic-imap"'
