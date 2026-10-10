@@ -4,11 +4,6 @@
 # FINDINGS ids are placeholders until the merge applies the rows (S0-D report).
 
 [[skip]]
-scenario = "appearance-reaches-quire-apps"
-finding = "FD-08"
-closes = "P1"
-
-[[skip]]
 scenario = "shell-host-on-kwin"
 finding = "FD-07"
 closes = "P2"
