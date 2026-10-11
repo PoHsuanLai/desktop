@@ -138,10 +138,19 @@ step_added_shows() {
   }
 }
 
+# The Accounts page can still be loading (its group disabled) a second after the press; about one run
+# in seven found no Sign in again there, so the path is walked again and the sheet is waited for.
 step_sign_in() {
-  press_accounts; sleep 1; press_manage; sleep 1; acc_shot 8-account-again
-  press_sign_in_again; sleep 2; acc_shot 9-after-sign-in-again
-  if sheet_shown; then sheet_shot 10-sign-in-again; sheet_key Escape; return 0; fi
+  local i j
+  for i in 1 2 3; do
+    press_accounts; sleep 1; press_manage; sleep 1; acc_shot 8-account-again
+    press_sign_in_again || { sleep 2; continue; }
+    for j in $(seq 10); do
+      sleep 0.5
+      if sheet_shown; then acc_shot 9-after-sign-in-again; sheet_shot 10-sign-in-again; sheet_key Escape; return 0; fi
+    done
+  done
+  acc_shot 9-after-sign-in-again
   echo "Sign in again opened no sheet: $(grep reauthenticate "$OUT_DIR/accountd.log" | tail -n 1)" >&2
   return 1
 }
