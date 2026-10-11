@@ -134,8 +134,18 @@ step_offline() {
   acc_wait 20 ollama_offline || { echo "the fake Ollama stopped, inferd looks every second, but the account is $(settings_get accounts.ollama.state), not offline; accountd answered ReportLocal:" >&2; reports >&2; return 1; }
 }
 
+# detent redraws the row when its next look at the accounts lands, which can be a few seconds after the
+# account went offline; one capture at a fixed time caught the old row about one run in three, so it looks again.
 step_greyed() {
-  sleep 4; scroll_to_runtimes; acc_shot 2-intelligence-offline
+  local i
+  for i in 1 2 3 4 5 6; do
+    sleep 3; scroll_to_runtimes; acc_shot 2-intelligence-offline
+    row_changed && return 0
+  done
+  return 1
+}
+
+row_changed() {
   python3 -I - "$OUT_DIR/1-intelligence-online.png" "$OUT_DIR/2-intelligence-offline.png" "$RUNTIME_Y" <<'PY'
 import sys
 from PIL import Image, ImageChops
