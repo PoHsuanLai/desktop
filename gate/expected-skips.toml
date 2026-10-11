@@ -9,11 +9,6 @@ finding = "FD-07"
 closes = "P2"
 
 [[skip]]
-scenario = "minimise-target-round-trip"
-finding = "FD-05"
-closes = "P2"
-
-[[skip]]
 scenario = "keycap-yields-and-regrabs"
 finding = "FD-06"
 closes = "P4"
