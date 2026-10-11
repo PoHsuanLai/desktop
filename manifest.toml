@@ -14,27 +14,27 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "b8292d34706d781eb62b290427465d294e6acc54"
+rev = "319e0b0903657d4af841fdfd09ba1c649ed3cd57"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "f5d8145b9ca6aab3f9ef8b7f32b28548250dce33"
+rev = "837898647902e6cf2b6d77462297544520db6dc1"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "a937e1912ec814646a02d8a9af00b3c46d20f87f"
+rev = "b738a626dc9d5b7934c07be127dc545132922c0e"
 branch = "master"
 gate = "lane"
 
 [repo.blitz-kit]
 url = "https://github.com/PoHsuanLai/blitz-kit.git"
-rev = "2e293d68fc0881a7cbb2c9b9d4b0bcc8792722fc"
+rev = "46fb239a2ecca346f73514be535d63125de92373"
 branch = "master"
 gate = "none"
 
@@ -103,7 +103,7 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "17abfe65ff2fb3682f160a1b61b28d48bad97812"
+rev = "47cd7e9b7a8cd6509421831c76d5edd21b3b9ab2"
 branch = "master"
 gate = "none"
 
@@ -115,7 +115,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "5ec7c568fc5eececb915453c441bf6e63830d196"
+rev = "2f673f86883c8dd1b0632176b09c16dc13886296"
 branch = "main"
 gate = "none"
 
