@@ -71,13 +71,13 @@ gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "1695cff0bae747e9e152c7bf927d34597c86cb29"
+rev = "c9db2e0e48b0fedab7c15326cc30f9e653f2f1d9"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "5d638bb15a0688c3f7fd5b477c48295abf684702"
+rev = "c2f09b3e0172d0cb40c41f8b6464782ce99a2240"
 branch = "master"
 gate = "lane"
 
@@ -115,7 +115,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "6c325c9578e8d959d1531fb2e239ba800c037c49"
+rev = "5ec7c568fc5eececb915453c441bf6e63830d196"
 branch = "main"
 gate = "none"
 
