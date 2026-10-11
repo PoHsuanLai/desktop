@@ -136,21 +136,18 @@ step_added_shows() {
     echo "detent still shows 'No accounts' 4 s after an account was added: accountd sent no SettingsModule1.Changed for it, so the pane never re-reads" >&2
     return 1
   }
+  # The page changing is not enough: an unavailable pane also differs from 'No accounts'. The added
+  # account's row must be there, with its Manage button.
+  detent_centre button "Manage …" >/dev/null || {
+    echo "detent's Accounts pane changed after the add but shows no account row (it shows:)" >&2; detent_listing >&2
+    return 1
+  }
 }
 
-# The Accounts page can still be loading (its group disabled) a second after the press; about one run
-# in seven found no Sign in again there, so the path is walked again and the sheet is waited for.
 step_sign_in() {
-  local i j
-  for i in 1 2 3; do
-    press_accounts; sleep 1; press_manage; sleep 1; acc_shot 8-account-again
-    press_sign_in_again || { sleep 2; continue; }
-    for j in $(seq 10); do
-      sleep 0.5
-      if sheet_shown; then acc_shot 9-after-sign-in-again; sheet_shot 10-sign-in-again; sheet_key Escape; return 0; fi
-    done
-  done
-  acc_shot 9-after-sign-in-again
+  press_accounts; sleep 1; press_manage; sleep 1; acc_shot 8-account-again
+  press_sign_in_again; sleep 2; acc_shot 9-after-sign-in-again
+  if sheet_shown; then sheet_shot 10-sign-in-again; sheet_key Escape; return 0; fi
   echo "Sign in again opened no sheet: $(grep reauthenticate "$OUT_DIR/accountd.log" | tail -n 1)" >&2
   return 1
 }

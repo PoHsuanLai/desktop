@@ -109,7 +109,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "bb50f308176ad73ce9a9e7726a47af3f365f3dd8"
+rev = "5123688d4f5d31533ad72616a87cd1a85a9b9639"
 branch = "master"
 gate = "none"
 
