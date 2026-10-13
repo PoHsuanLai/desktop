@@ -3,7 +3,9 @@
 # server, accountd asks for one by hand (protocol, host, security, port, outgoing server, login name) and the account added
 # from it logs in through the relay. sill draws the form (its dd048640 maps the new fields) and the scenario fills it in with
 # clicks and keys; the server is the rig's fake POP3 with STARTTLS on its own port, the outgoing one its fake SMTP with
-# STARTTLS. Real accountd, sill on casement, the rig's fake Secret Service.
+# STARTTLS. Real accountd, sill on casement, the rig's fake Secret Service. Since porter's accounts split (Phase B) accountd
+# no longer relays an app to the mail server (the app signs in itself, with the password Identities1 hands it), so the typed
+# port is checked where accountd keeps it: the account's endpoints in its registry.
 #
 # The address is a Fastmail one on purpose: the lookup runs offline in the jail, and a lookup that cannot reach anything
 # is answered `failed: unreachable` (no form) -- the typed form is offered only when the lookup MISSES. An address a shipped
@@ -18,9 +20,8 @@
 #             the typed-server form (capture): the protocol pop-up reads IMAP and the server is guessed imap.fastmail.com
 #   typed     POP3 chosen (the server guess becomes pop.fastmail.com), the host, STARTTLS, the fake's port, the outgoing
 #             host, STARTTLS and port, the login name; Continue; the review step shows Mail (capture); Done: `added`
-#   relay     an app asks for Mail (the consent sheet, Always Allow) and opens an authenticated relay to the POP3 server:
-#             the relay logs in (the POP3 fake's attempts lever lists one accepted login as the account's user, with the
-#             password the app never held) and greets the app `+OK porter relay ready`
+#   stored    the registry holds the account with the typed POP3 port and the typed SMTP port (a default port would mean a
+#             typed field was lost), an app continues as the identity (Identities1 offer, Return) and says it uses it
 #   scan      the secret scan
 #
 # budget: 180
@@ -92,26 +93,25 @@ step_typed() {
   echo "added $ACCOUNT" >&2
 }
 
-step_relay() {
-  rigc_bg "$OUT_DIR/grant.log" org.quire.Mail request-grant mail --class mail
-  sheet_await || { cat "$OUT_DIR/grant.log" >&2; return 1; }
-  sleep 1; sheet_key Tab; sheet_key Enter
-  acc_wait 20 grep -q '"result":"granted"' "$OUT_DIR/grant.log" || { cat "$OUT_DIR/grant.log" >&2; return 1; }
-  # The account must carry the ports typed in step_typed: a default port here means a typed field was lost, not a relay fault.
-  grep -q "127.0.0.1:$(rigj pop3.port)" "$OUT_DIR/grant.log" || { echo "the account's POP3 endpoint is not the typed port $(rigj pop3.port) (step_typed lost a field; capture 4 shows the form): $(cat "$OUT_DIR/grant.log")" >&2; return 1; }
+step_stored() {
+  # The account must carry the ports typed in step_typed: a default port here means a typed field was lost.
+  grep -q "127.0.0.1:$(rigj pop3.port)" "$STATE/porter/registry.json" || { echo "the account's POP3 endpoint is not the typed port $(rigj pop3.port) (step_typed lost a field; capture 4 shows the form): $(cat "$STATE/porter/registry.json")" >&2; return 1; }
+  grep -q "127.0.0.1:$(rigj smtp.port)" "$STATE/porter/registry.json" || { echo "the account's SMTP endpoint is not the typed port $(rigj smtp.port): $(cat "$STATE/porter/registry.json")" >&2; return 1; }
+  rigc_bg "$OUT_DIR/offer.log" org.quire.Mail identities offer
+  sheet_await || { cat "$OUT_DIR/offer.log" >&2; return 1; }
+  sleep 1; sheet_key Enter
+  acc_wait 20 grep -q '"result":"picked"' "$OUT_DIR/offer.log" || { echo "the app was not offered the identity: $(cat "$OUT_DIR/offer.log")" >&2; return 1; }
   sheet_gone || return 1
-  rigc org.quire.Mail open-authenticated mail --class mail --family pop3 >"$OUT_DIR/relay.log" 2>&1 || { cat "$OUT_DIR/relay.log" >&2; return 1; }
-  grep -q '"greeting":"+OK porter relay ready' "$OUT_DIR/relay.log" || { echo "no relay greeting: $(cat "$OUT_DIR/relay.log")" >&2; return 1; }
-  rigctl GET /pop3/attempts | grep -q '"outcome":"accepted"' || { echo "the POP3 fake saw no accepted login: $(rigctl GET /pop3/attempts)" >&2; return 1; }
-  rigctl GET /pop3/attempts | grep -q "\"user\":\"$(rigj pop3.user)\"" || { echo "the login was not as $(rigj pop3.user): $(rigctl GET /pop3/attempts)" >&2; return 1; }
-  echo "relay: $(cat "$OUT_DIR/relay.log")" >&2
+  local id; id=$(python3 -I -c 'import json,sys; print(json.loads(sys.stdin.readline())["identity"])' <"$OUT_DIR/offer.log")
+  rigc org.quire.Mail identities register-use "$id" >"$OUT_DIR/use.log" 2>&1 || { echo "register-use refused: $(cat "$OUT_DIR/use.log")" >&2; return 1; }
+  echo "identity: $(cat "$OUT_DIR/offer.log")" >&2
 }
 
 step_scan() { scan_end; }
 
-run_steps step_boot step_form step_typed step_relay step_scan
+run_steps step_boot step_form step_typed step_stored step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd daemon rig-servers secrets add grant relay; do
+  for f in accountd daemon rig-servers secrets add offer use; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi
