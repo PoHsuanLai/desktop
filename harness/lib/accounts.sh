@@ -169,11 +169,27 @@ acc_providers_only() {
 }
 
 # --- the daemons ---------------------------------------------------------------------------------------------
+# Phase B (porter bfd909a): accountd holds identities only; the AI keys and their permits are inferd's
+# (org.quire.Inference1), syncd keeps its own accounts (org.quire.Sync1). A page that reads a daemon never starts it
+# (detent's live/io.rs answers NotRunning), so a scenario starts every daemon its page reads before opening the page.
+# Each daemon reads its caller table at startup only: acc_config installs callers.toml before accountd and syncd start,
+# inferd_write_config writes inferd's own table (inferd.toml) before inferd starts.
+
+# acc_ca_env: SSL_CERT_FILE=<the rig's CA> when the rig made one, else nothing (one word per line, for `env`).
+acc_ca_env() { [ ! -f "$RIG_DIR/servers/ca.pem" ] || echo "SSL_CERT_FILE=$RIG_DIR/servers/ca.pem"; }
+
+# acc_ship_providers: the provider files of $PROV (the pin's, with the rig's brand and fake-host files) into the jail's
+# /usr/share overlay, the Shipped layer. inferd and syncd have no --providers: they read /usr/share/porter/providers and
+# $XDG_DATA_HOME/porter/providers only, and a person's layer may not point a shipped provider at another server.
+acc_ship_providers() {
+  mkdir -p /usr/share/porter/providers
+  cp "$PROV"/*.toml /usr/share/porter/providers/
+}
+
 # accountd_start: the real accountd on the private bus, over the fake Secret Service, trusting the rig's CA.
 ACCOUNTD_PID=
 accountd_start() {
-  local ca=""
-  [ ! -f "$RIG_DIR/servers/ca.pem" ] || ca="SSL_CERT_FILE=$RIG_DIR/servers/ca.pem"
+  local ca; ca=$(acc_ca_env)
   acc_bg "$OUT_DIR/accountd.log" env ACCOUNTD_PROC_ROOT="$PROC" ${ca:+"$ca"} "$ARIG/accountd" --providers "$PROV"
   ACCOUNTD_PID=$ACC_LAST
   acc_wait 20 bus_has_owner org.quire.Accounts1 || { echo "accountd never took org.quire.Accounts1:" >&2; cat "$OUT_DIR/accountd.log" >&2; return 1; }
@@ -183,16 +199,28 @@ accountd_stop() { [ -z "$ACCOUNTD_PID" ] || acc_kill "$ACCOUNTD_PID"; ACCOUNTD_P
 
 SYNCD_PID=
 syncd_start() {
-  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" "$ARIG/syncd"
+  local ca; ca=$(acc_ca_env)
+  acc_ship_providers
+  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" ${ca:+"$ca"} "$ARIG/syncd"
   SYNCD_PID=$ACC_LAST
   acc_identity syncd.service "$SYNCD_PID"
   acc_wait 20 bus_has_owner org.quire.Sync1 || { echo "syncd never took org.quire.Sync1:" >&2; cat "$OUT_DIR/syncd.log" >&2; return 1; }
 }
 syncd_stop() { [ -z "$SYNCD_PID" ] || acc_kill "$SYNCD_PID"; SYNCD_PID=; }
 
+# inferd_write_config: $CONFIG/quire/inferd.toml: what is on stdin (tables of the scenario: [probe], [ai] ...), then the
+# caller table. inferd serves its settings module to the unit org.quire.Settings.service and draws its sheets through
+# the shell (sill-shell.scope); an app in a Flatpak or app scope needs no row. Call it before inferd_start.
+inferd_write_config() {
+  mkdir -p "$CONFIG/quire"
+  { cat; printf '\n[callers]\nsettings = ["%s"]\nshell = ["sill-shell.scope"]\n' "$SETTINGS_UNIT"; } >"$CONFIG/quire/inferd.toml"
+}
+
 INFERD_PID=
-inferd_start() { # [extra inferd.toml text on stdin was written by the caller to $CONFIG/quire/inferd.toml]
-  acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" "$ARIG/inferd"
+inferd_start() { # needs $CONFIG/quire/inferd.toml (inferd_write_config)
+  local ca; ca=$(acc_ca_env)
+  acc_ship_providers
+  acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" ${ca:+"$ca"} "$ARIG/inferd"
   INFERD_PID=$ACC_LAST
   acc_identity inferd.service "$INFERD_PID"
   acc_wait 20 bus_has_owner org.quire.Inference1 || { echo "inferd never took org.quire.Inference1:" >&2; cat "$OUT_DIR/inferd.log" >&2; return 1; }
@@ -306,19 +334,64 @@ as_app() {
     exec "$@"' _ "$app" "$PROC" "$SETTINGS_UNIT" "$@"
 }
 
-# settings_describe: accountd's settings module schema (JSON), read as the Settings app.
-settings_describe() {
-  as_app org.quire.Settings busctl --address="$BUS" --json=short call org.quire.Accounts1 /org/quire/Accounts1/settings \
+# settings_describe_at BUS PATH / settings_get_at BUS PATH KEY: a daemon's settings module (org.quire.SettingsModule1), read
+# as the Settings app. Three daemons serve one: accountd (identities, /org/quire/Accounts1/settings), inferd (AI keys and
+# permits, /org/quire/Inference1/settings) and syncd (sync accounts, /org/quire/Sync1/settings).
+settings_describe_at() {
+  as_app org.quire.Settings busctl --address="$BUS" --json=short call "$1" "$2" \
     org.quire.SettingsModule1 Describe | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["data"][0])'
 }
-# settings_get KEY: a key's current value as the bus prints it (`--json=short`: {"type":"v","data":[...]}), data only.
-settings_get() {
-  as_app org.quire.Settings busctl --address="$BUS" --json=short call org.quire.Accounts1 /org/quire/Accounts1/settings \
-    org.quire.SettingsModule1 Get s "$1" | python3 -I -c '
+settings_get_at() {
+  as_app org.quire.Settings busctl --address="$BUS" --json=short call "$1" "$2" \
+    org.quire.SettingsModule1 Get s "$3" | python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)["data"][0]
 while isinstance(d, dict) and "data" in d: d = d["data"]
 print(d)'
+}
+# settings_press_at BUS PATH KEY: presses an action row (Set with a false value), as the Settings app.
+settings_press_at() {
+  as_app org.quire.Settings busctl --address="$BUS" --json=short call "$1" "$2" \
+    org.quire.SettingsModule1 Set sv "$3" b false >/dev/null
+}
+ACC_SET=/org/quire/Accounts1/settings
+AI_SET=/org/quire/Inference1/settings
+SYNC_SET=/org/quire/Sync1/settings
+settings_describe() { settings_describe_at org.quire.Accounts1 $ACC_SET; }
+settings_get() { settings_get_at org.quire.Accounts1 $ACC_SET "$1"; }
+ai_describe() { settings_describe_at org.quire.Inference1 $AI_SET; }
+ai_get() { settings_get_at org.quire.Inference1 $AI_SET "$1"; }
+sync_describe() { settings_describe_at org.quire.Sync1 $SYNC_SET; }
+sync_get() { settings_get_at org.quire.Sync1 $SYNC_SET "$1"; }
+sync_press() { settings_press_at org.quire.Sync1 $SYNC_SET "$1"; }
+
+# ai_has_account ID / has_key MODULE ID: the module lists an `accounts.<id>.` row.
+has_row_of() { # DESCRIBE-FN ID
+  "$1" 2>/dev/null | python3 -I -c 'import json,sys; sys.exit(0 if any(k["path"].startswith("accounts.'"$2"'.") for k in json.load(sys.stdin)["key"]) else 1)'
+}
+ai_has_account() { has_row_of ai_describe "$1"; }
+sync_has_account() { has_row_of sync_describe "$1"; }
+# ai_grant_path APP: the path of APP's permit row on the AI keys (`accounts.<id>.grant.<grant>`), or nothing. The row's label
+# starts with the app's name ("org.quire.Always can use Language model").
+ai_grant_path() {
+  ai_describe 2>/dev/null | python3 -I -c '
+import json, re, sys
+for k in json.load(sys.stdin)["key"]:
+    p = k["path"]
+    if ".grant." in p and not re.search(r"\.(since|scope)$", p) and str(k.get("label", "")).startswith(sys.argv[1] + " "):
+        print(p); break' "$1"
+}
+# ai_grant_field APP scope|decision: the permit's `scope` (once, always, session), or its decision (allow, deny); `none` when APP has none.
+ai_grant_field() {
+  local path; path=$(ai_grant_path "$1")
+  [ -n "$path" ] || { echo none; return; }
+  case "$2" in
+    scope) ai_get "$path.scope" ;;
+    decision) ai_describe | python3 -I -c '
+import json, sys
+for k in json.load(sys.stdin)["key"]:
+    if k["path"] == sys.argv[1]: print("deny" if " can'"'"'t " in str(k.get("label", "")) else "allow")' "$path" ;;
+  esac
 }
 
 # --- the generic mail account of scenarios 1, 4 and 9 -------------------------------------------------------
@@ -428,14 +501,69 @@ sheet_add_microsoft() {
   sheet_gone
 }
 
-# sheet_grant APP NEED CLASS LOG: the app asks (request-grant) and the person answers Always Allow.
-sheet_grant() {
-  rigc_bg "$OUT_DIR/$4.log" "$1" request-grant "$2" --class "$3"
-  sheet_await || { cat "$OUT_DIR/$4.log" >&2; return 1; }
-  sleep 1; sheet_key Tab; sheet_key Enter
-  acc_wait 20 grep -q '"result"' "$OUT_DIR/$4.log" || { echo "request-grant never answered" >&2; return 1; }
-  grep -q '"result":"granted"' "$OUT_DIR/$4.log" || { cat "$OUT_DIR/$4.log" >&2; return 1; }
+# ai_add_start APP [PROVIDER]: inferd's add-a-key sheet as that app (porter-rig-client ai-keys add), in the background; the
+# answer lands in $OUT_DIR/add.log as acc_add_start's does.
+ai_add_start() {
+  : >"$OUT_DIR/add.log"
+  rigc_bg "$OUT_DIR/add.log" "$1" ai-keys add ${2:+"$2"}
+  ADD_PID=$ACC_LAST
+}
+
+# sheet_add_openai: the whole add flow of an OpenAI key through the sheet (inferd draws it for ai-keys add; the key goes
+# sheet -> inferd -> Secret Service and the rig's LLM API fake checks it with its models list). Needs the rig started with
+# --llm-api, acc_provider_openai_on_rig, inferd and sill. Sets ACCOUNT to the new account.
+sheet_add_openai() {
+  ai_add_start org.quire.Companion
+  sheet_await || return 1; sheet_settled; sleep 1
+  sheet_type OpenAI; sleep 0.5; sheet_key Enter; sleep 1
+  sheet_type "$(rigj llm_api.api_key)"; sleep 0.5
+  sheet_key Enter; sleep 3
+  sheet_key Enter
+  local response
+  response=$(acc_add_response 30) || { echo "ai-keys add never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
+  acc_added "$response" || { echo "ai-keys add answered $response" >&2; return 1; }
   sheet_gone
+}
+
+# sheet_enter_until SECONDS CMD...: presses Return on whatever the sheet shows every 2 s until CMD succeeds (a sign-in's
+# last cards: a review, a "Done"); fails when CMD still has not by then.
+sheet_enter_until() {
+  local until=$(( SECONDS + $1 )); shift
+  while (( SECONDS < until )); do
+    "$@" >/dev/null 2>&1 && return 0
+    sheet_shown && sheet_key Enter
+    sleep 2
+  done
+  "$@" >/dev/null 2>&1
+}
+
+# ai_request_start APP LOG: the app asks inferd for a permit to use the person's AI keys (porter-rig-client ai-keys request),
+# in the background; its one result line lands in LOG: {"result":"granted","permit":..} or {"result":"refused","refusal":..}.
+ai_request_start() { rigc_bg "$OUT_DIR/$2.log" "$1" ai-keys request --class "${3:-files}"; }
+
+# sheet_grant APP LOG: the app asks for a permit and the person answers Always Allow (Allow Once is first).
+sheet_grant() {
+  ai_request_start "$1" "$2"
+  sheet_await || { cat "$OUT_DIR/$2.log" >&2; return 1; }
+  sleep 1; sheet_key Tab; sheet_key Enter
+  acc_wait 20 grep -q '"result"' "$OUT_DIR/$2.log" || { echo "ai-keys request never answered" >&2; return 1; }
+  grep -q '"result":"granted"' "$OUT_DIR/$2.log" || { cat "$OUT_DIR/$2.log" >&2; return 1; }
+  sheet_gone
+}
+
+# identity_of_account ID: the Identities1 id of an accountd account, as `identities list` prints it (the account's id when
+# the list names none).
+identity_of_account() {
+  rigc "${2:-org.quire.Mail}" identities list 2>/dev/null | python3 -I -c '
+import json, sys
+want = sys.argv[1]
+for line in sys.stdin:
+    try: m = json.loads(line)
+    except ValueError: continue
+    for i in m.get("identities", []):
+        if str(i.get("id", "")) == want or want in json.dumps(i):
+            print(i.get("id", want)); sys.exit(0)
+print(want)' "$1"
 }
 
 # detent_start: detent (the Settings app, built at its pin) on casement, on the private bus, named org.quire.Settings

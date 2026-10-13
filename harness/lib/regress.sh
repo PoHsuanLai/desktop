@@ -46,24 +46,26 @@ card_top() { local x0 y0 x1; read -r x0 y0 x1 _ < <(sheet_card "$1") || return 1
 # same_shot A B [BOX]: two captures draw the same pixels (in the box).
 same_shot() { px same "$OUT_DIR/$1.png" "$OUT_DIR/$2.png" ${3:+--box "$3"} >/dev/null; }
 
-# ask APP LOG: an app asks for Mail (request-grant) in the background; the answer lands in LOG.
-ask() { rigc_bg "$OUT_DIR/$2.log" "$1" request-grant mail --class mail; }
+# ask APP LOG: an app asks for a permit to use the person's AI keys (ai-keys request: inferd's consent sheet) in the
+# background; the answer lands in LOG.
+ask() { ai_request_start "$1" "$2"; }
 
 # provider_copy ID LABEL FROM: a provider file like FROM (a brand file in $PROV) under another id and label.
 provider_copy() {
   sed -e "s/^id = .*/id = \"$1\"/" -e "s/^label = .*/label = \"$2\"/" "$PROV/$3.toml" >"$PROV/$1.toml"
 }
 
-# regress_boot: casement, the recorded bus, the rig (mail, and Graph for Microsoft), Secret Service, accountd, sill.
+# regress_boot: casement, the recorded bus, the rig (mail, Graph for Microsoft, the LLM API for an AI key), Secret Service, the
+# provider files. The scenario starts the daemons itself.
 regress_boot() {
   start_compositor || return 1
   scratch_new; acc_dirs
   build || return 1
   [ -z "${REGRESS_THEME:-}" ] || printf '[appearance]\ntheme = "%s"\n' "$REGRESS_THEME" >"$CONFIG/quire/appearance.toml"
   scan_begin
-  rig_start --graph --imap --smtp --tls implicit || return 1
+  rig_start --graph --imap --smtp --tls implicit --llm-api || return 1
   secrets_start || return 1
-  acc_config; acc_fake_mail_provider
+  acc_config; acc_fake_mail_provider; acc_provider_openai_on_rig
 }
 
 # accounts_now: the account ids in accountd's settings module, space separated.
