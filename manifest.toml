@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "0d7beb6e3151dfd904f4923cb5f7468ac658ecce"
+rev = "ef28cab9418e925536b14bc94839cf54ec0c266b"
 branch = "master"
 gate = "lane"
 
@@ -109,7 +109,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "a97faf5d52e0c6949e57d96b62b8dc2ccd4d3d7d"
+rev = "17c852ffd55ea3c1ef8aee910bee2efaf5f21827"
 branch = "master"
 gate = "none"
 
