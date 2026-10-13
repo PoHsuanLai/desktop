@@ -218,6 +218,10 @@ inferd_write_config() {
 
 INFERD_PID=
 inferd_start() { # needs $CONFIG/quire/inferd.toml (inferd_write_config)
+  # The model catalog at the manifest's stoker pin, where inferd reads it ($XDG_DATA_HOME/stoker/catalog): without
+  # it no hosted model is known, so a turn on an AI key is refused before the key is ever read.
+  mkdir -p "$DATA/stoker/catalog"
+  cp "$SCEN_BUILD"/pin/stoker/catalog/*.toml "$DATA/stoker/catalog/"
   local ca; ca=$(acc_ca_env)
   acc_ship_providers
   acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" ${ca:+"$ca"} "$ARIG/inferd"
