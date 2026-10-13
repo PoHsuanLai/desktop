@@ -192,6 +192,10 @@ syncd_stop() { [ -z "$SYNCD_PID" ] || acc_kill "$SYNCD_PID"; SYNCD_PID=; }
 
 INFERD_PID=
 inferd_start() { # [extra inferd.toml text on stdin was written by the caller to $CONFIG/quire/inferd.toml]
+  # The model catalog at the manifest's stoker pin, where inferd reads it ($XDG_DATA_HOME/stoker/catalog): without
+  # it no hosted model is known, so a turn on an AI key is refused before the key is ever read.
+  mkdir -p "$DATA/stoker/catalog"
+  cp "$SCEN_BUILD"/pin/stoker/catalog/*.toml "$DATA/stoker/catalog/"
   acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" "$ARIG/inferd"
   INFERD_PID=$ACC_LAST
   acc_identity inferd.service "$INFERD_PID"
