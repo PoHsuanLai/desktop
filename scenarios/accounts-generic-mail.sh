@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Scenario `accounts-generic-mail` (accounts PLAN §8, design 31 §7.1): a password mail account is added through
-# accountd's sheet as sill draws it, against fake IMAP and SMTP servers, and an app reaches the IMAP server through
-# the daemon's authenticated relay. Real accountd, real sill on casement, the rig's fakes (porter-rig-servers) and
-# its fake Secret Service; no network (harness/lib/accounts.sh says how each is set up).
+# accountd's sheet as sill draws it, against fake IMAP and SMTP servers, and an app continues as that identity. Since
+# porter's accounts split (Phase B) accountd holds identities only: it no longer relays an app to the IMAP server, so the
+# app's side is "Continue as" (Identities1.Offer, a sheet) and "I use this identity" (RegisterUse), and Settings lists the app
+# under the identity. Real accountd, real sill on casement, the rig's fakes (porter-rig-servers) and its fake Secret
+# Service; no network (harness/lib/accounts.sh says how each is set up).
 #
 #   boot      casement, a recorded private bus, the fakes (IMAP and SMTP over implicit TLS, a scratch CA that accountd
 #             trusts through SSL_CERT_FILE), the fake Secret Service, accountd, sill; sill is the sheet host
@@ -10,10 +12,10 @@
 #   sign-in   "Fake" filters the list, Return picks it; the address and the password are typed (through the
 #             compositor), Return sends them, the review step shows Mail, Return is Done: the add-account answers `added`
 #   listed    accountd's settings module says the account is `ok` and labelled with the address
-#   relay     an app (porter-rig-client) asks for Mail, the consent sheet is drawn (capture), Always Allow; the app's
-#             open-authenticated gets a `* PREAUTH` greeting from the IMAP fake and the fake's attempts lever (GET
-#             /imap/attempts) lists one accepted login as the account's user: the relay logged in, the app held no
-#             password, and the audit file says proxy_opened without a value
+#   identity  an app (porter-rig-client) lists the identities (the account is there), asks "Continue as" (the sheet is drawn,
+#             capture; Return picks the first) and gets the account's address back, says it uses the identity, and the
+#             identity's `used_by` row in accountd's settings module names the app. The IMAP login the app makes itself
+#             with the password Identities1 hands it (TakePassword) is not driven: the rig's client has no command for it
 #   scan      no planted secret outside the places the design lets it through (harness/lib/secret-scan.py)
 #
 # The provider is a brand file ("Fake Mail", discovery fixed) and not "Other..." (generic-imap): that provider
@@ -79,27 +81,29 @@ step_listed() {
   [ "$(settings_get "accounts.$ACCOUNT.label")" = "$(rigj imap.user)" ] || { echo "label is $(settings_get "accounts.$ACCOUNT.label")" >&2; return 1; }
 }
 
-step_relay() {
-  rigc_bg "$OUT_DIR/grant.log" org.quire.Mail request-grant mail --class mail
-  sheet_await || { cat "$OUT_DIR/grant.log" >&2; return 1; }
-  sleep 1; sheet_shot 5-consent
-  sheet_key Tab; sheet_key Enter            # Allow Once is first: Tab to Always Allow
-  acc_wait 20 grep -q '"result"' "$OUT_DIR/grant.log" || { echo "request-grant never answered" >&2; return 1; }
-  grep -q '"result":"granted"' "$OUT_DIR/grant.log" || { cat "$OUT_DIR/grant.log" >&2; return 1; }
+step_identity() {
+  local listed id
+  listed=$(rigc org.quire.Mail identities list 2>&1) || { echo "identities list failed: $listed" >&2; return 1; }
+  grep -q "$(rigj imap.user)" <<<"$listed" || { echo "the identity is not listed to the app: $listed" >&2; return 1; }
+  rigc_bg "$OUT_DIR/offer.log" org.quire.Mail identities offer
+  sheet_await || { cat "$OUT_DIR/offer.log" >&2; return 1; }
+  sleep 1; sheet_shot 5-continue-as
+  sheet_key Enter                              # Continue is the default, the first account is picked
+  acc_wait 20 grep -q '"result"' "$OUT_DIR/offer.log" || { echo "identities offer never answered" >&2; return 1; }
+  grep -q '"result":"picked"' "$OUT_DIR/offer.log" || { cat "$OUT_DIR/offer.log" >&2; return 1; }
+  grep -q "\"address\":\"$(rigj imap.user)\"" "$OUT_DIR/offer.log" || { echo "the app was offered another address: $(cat "$OUT_DIR/offer.log")" >&2; return 1; }
   sheet_gone || return 1
-  rigc org.quire.Mail open-authenticated mail --class mail --family imap >"$OUT_DIR/relay.log" 2>&1 || { cat "$OUT_DIR/relay.log" >&2; return 1; }
-  grep -q '"greeting":"\* PREAUTH' "$OUT_DIR/relay.log" || { echo "no PREAUTH greeting: $(cat "$OUT_DIR/relay.log")" >&2; return 1; }
-  rigctl GET /imap/attempts | grep -q "\"outcome\":\"accepted\"" || { echo "the IMAP fake saw no accepted login from the relay: $(rigctl GET /imap/attempts)" >&2; return 1; }
-  rigctl GET /imap/attempts | grep -q "\"user\":\"$(rigj imap.user)\"" || { echo "the login was not as $(rigj imap.user): $(rigctl GET /imap/attempts)" >&2; return 1; }
-  grep -q proxy_opened "$STATE/quire/accountd/audit.jsonl" || { echo "no proxy_opened in the audit file:" >&2; cat "$STATE/quire/accountd/audit.jsonl" >&2; return 1; }
-  echo "relay: $(cat "$OUT_DIR/relay.log")" >&2
+  id=$(python3 -I -c 'import json,sys; print(json.loads(sys.stdin.readline())["identity"])' <"$OUT_DIR/offer.log")
+  rigc org.quire.Mail identities register-use "$id" >"$OUT_DIR/use.log" 2>&1 || { echo "register-use refused: $(cat "$OUT_DIR/use.log")" >&2; return 1; }
+  [ -n "$(settings_get "accounts.$ACCOUNT.used_by.0")" ] || { echo "the identity names no app after RegisterUse" >&2; return 1; }
+  echo "identity: $(cat "$OUT_DIR/offer.log")" >&2
 }
 
 step_scan() { scan_end; }
 
-run_steps step_boot step_list step_sign_in step_listed step_relay step_scan
+run_steps step_boot step_list step_sign_in step_listed step_identity step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd daemon rig-servers secrets add grant relay; do
+  for f in accountd daemon rig-servers secrets add offer use; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi
