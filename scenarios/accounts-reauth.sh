@@ -80,20 +80,35 @@ step_boot() {
 }
 
 # SyncNow on syncd's dataset, as Settings makes it (detent's "Sync now"): a cycle runs at once instead of at the next look
-# (idle datasets are looked at less and less often, so waiting for one may take hours).
+# (idle datasets are looked at less and less often). busctl's exit code and output go to sync-now.log, so a refusal is on
+# record (an empty log with exit 0 is a SyncNow that was taken).
 sync_now() {
+  local code
   as_app org.quire.Settings busctl --address="$BUS" call org.quire.Sync1 /org/quire/Sync1 org.quire.Sync1 SyncNow s \
     "${SYNC_ACCOUNT//[-.]/_}/storage_app_folder" >>"$OUT_DIR/sync-now.log" 2>&1
+  code=$?
+  echo "SyncNow exit $code at ${SECONDS}s" >>"$OUT_DIR/sync-now.log"
 }
 refused_after_sync_now() { sync_now; sleep 4; account_needs_reauth; }
+sync_files_on() { [ "$(sync_get "accounts.$SYNC_ACCOUNT.sync.files")" = on ]; }
+dataset_listed() { rigc org.quire.Files datasets 2>/dev/null | grep -q "${SYNC_ACCOUNT//[-.]/_}/storage_app_folder"; }
 
 step_refusal() {
+  # The dataset (and so a token use) exists only while the files switch is on; the "no AppFolder grant" line in syncd's log is
+  # from its start, before any account. Continue as turns the switch on by itself; if it is off, turn it on as Settings does.
+  sync_files_on || {
+    echo "the files switch is '$(sync_get "accounts.$SYNC_ACCOUNT.sync.files")' after Continue as; turning it on as Settings does" >&2
+    as_app org.quire.Settings busctl --address="$BUS" --json=short call org.quire.Sync1 $SYNC_SET org.quire.SettingsModule1 Set sv \
+      "accounts.$SYNC_ACCOUNT.sync.files" s on >"$OUT_DIR/switch-on.log" 2>&1
+    acc_wait 15 sync_files_on || { echo "the files switch would not turn on: $(cat "$OUT_DIR/switch-on.log")" >&2; return 1; }
+  }
+  acc_wait 40 dataset_listed || { echo "syncd lists no storage_app_folder dataset with the files switch on: $(rigc org.quire.Files datasets)" >&2; tail -5 "$OUT_DIR/syncd.log" >&2; return 1; }
   rigctl POST "/issuer/refuse-refreshes?n=1000" >/dev/null
   # The rig's access tokens last 4 s; a cycle after that finds the token spent and the refresh refused (invalid_grant), which
   # syncd's account service turns into NeedsReauth (porter-service flight.rs / token.rs).
   sleep 6
   acc_wait 120 refused_after_sync_now || {
-    echo "the issuer refuses refreshes but syncd's account is still '$(sync_state)' after SyncNow cycles; SyncNow said: $(tail -3 "$OUT_DIR/sync-now.log"); syncd said:" >&2; tail -10 "$OUT_DIR/syncd.log" >&2
+    echo "the issuer refuses refreshes but syncd's account is still '$(sync_state)' after SyncNow cycles on a listed dataset; sync-now.log: $(tail -3 "$OUT_DIR/sync-now.log" | tr '\n' ' '); Graph saw: $(rigctl GET /graph/hits | tail -c 400); syncd said:" >&2; tail -10 "$OUT_DIR/syncd.log" >&2
     return 1
   }
 }
