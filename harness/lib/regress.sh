@@ -15,8 +15,8 @@ must() {
   local what=$1; shift
   if "$@"; then echo "ok   $what" >&2; else echo "FAIL $what" >&2; REG_FAILS=$(( REG_FAILS + 1 )); return 1; fi
 }
-# reg_verdict: the step's code: 1 when any check failed so far.
-reg_verdict() { [ "$REG_FAILS" = 0 ]; }
+# reg_verdict: the step's code: 1 when any check of this step failed (the count starts again for the next step).
+reg_verdict() { local f=$REG_FAILS; REG_FAILS=0; [ "$f" = 0 ]; }
 # not CMD...: the negation, for must.
 not() { ! "$@"; }
 

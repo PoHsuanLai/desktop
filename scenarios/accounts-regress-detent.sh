@@ -11,8 +11,8 @@
 #             "Remove account <account>", never the bare word [probe listing]
 #   D2        the sidebar search "acc" keeps Accounts and drops Dock [probe listing]
 #   D3        Sign in again's line follows the account's `sign_in` row: the browser account's line is longer than the
-#             password account's (the plain line was one for both before) [accountd's sign_in key, and the ink width of
-#             the line under the row in the capture; the text itself is not read]
+#             password account's (the plain line was one for both before) [accountd's sign_in key, and the width of the help card
+#             the row's info button opens, measured against the capture without it; the text itself is not read]
 #   D4        the remove question's answer "Remove account" is legible: WCAG contrast of its text on its fill is at least
 #             4.5, in the light theme and in the dark [pixels of the capture, the button's box from the probe]
 #
@@ -105,18 +105,29 @@ step_d1_names() {
   reg_verdict
 }
 
-# The line under Sign in again, in the output: left of the row's button, in the row's lower half.
-help_box() {
-  local box x0 y0 x1 y1
-  box=$(box_of group "Sign in again") || return 1
-  IFS=, read -r x0 y0 x1 y1 <<<"$box"
-  echo "$((x0 + 12)),$((y0 + 24)),$((x1 - 130)),$((y1 - 3))"
-}
-help_width() { # NTH: the ink width of the line on the NTHth account's page
+# The line under Sign in again is behind an info button now (quire's help on request: "About Sign in again" opens a popover
+# card with the label and the help). The card's width follows its text, so the card is measured: the output with the card
+# open against the output with it closed, in the detent window, and the width of what differs (the popover and its shadow).
+help_width() { # NTH: the width of the help card on the NTHth account's page
+  local fx fy fw fh
   if detent_centre button Accounts >/dev/null; then detent_press button Accounts; sleep 1.5; fi
   detent_press button "Manage …" "$1"; sleep 1.5
+  acc_shot "d3-closed-$1"
+  detent_press button "About Sign in again"; sleep 1.2
   acc_shot "d3-account-$1"
-  px inkwidth "$OUT_DIR/d3-account-$1.png" --box "$(help_box)"
+  read -r fx fy fw fh < <(detent_frame)
+  python3 -I - "$OUT_DIR/d3-closed-$1.png" "$OUT_DIR/d3-account-$1.png" "$fx" "$fy" "$fw" "$fh" <<'PY'
+import sys
+import numpy as np
+from PIL import Image
+a = np.asarray(Image.open(sys.argv[1]).convert("RGB")).astype(int)
+b = np.asarray(Image.open(sys.argv[2]).convert("RGB")).astype(int)
+fx, fy, fw, fh = (int(v) for v in sys.argv[3:7])
+d = (abs(a - b).sum(axis=2) > 40)[fy + 28:fy + fh, fx:fx + fw]
+xs = np.where(d.any(axis=0))[0]
+print(int(xs.max() - xs.min() + 1) if len(xs) else 0)
+PY
+  dkey Escape; sleep 0.8
 }
 step_d3_reauth() {
   local w1 w2 s1 s2
@@ -124,11 +135,11 @@ step_d3_reauth() {
   w1=$(help_width 1); w2=$(help_width 2)
   echo "sign_in rows: ${ACCOUNTS[0]}=$s1 ${ACCOUNTS[1]}=$s2; help line widths: $w1 $w2" >&2
   must "D3 one account signs in by password and the other by browser ($s1, $s2)" [ "$s1 $s2" = "password browser" ] || [ "$s1 $s2" = "browser password" ]
-  must "D3 the lines differ: the browser account's is the longer ($w1 px, $w2 px)" python3 -I -c '
+  must "D3 the help cards differ: the browser account's is the wider ($w1 px, $w2 px)" python3 -I -c '
 import sys
 w1, w2, s1 = float(sys.argv[1]), float(sys.argv[2]), sys.argv[3]
 browser, password = (w1, w2) if s1 == "browser" else (w2, w1)
-sys.exit(0 if browser > password * 1.3 else 1)' "$w1" "$w2" "$s1"
+sys.exit(0 if password > 0 and browser > password * 1.15 else 1)' "$w1" "$w2" "$s1"
   reg_verdict
 }
 

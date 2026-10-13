@@ -79,11 +79,21 @@ step_boot() {
   account_ok || { echo "syncd's account is $(sync_state), not ok" >&2; return 1; }
 }
 
+# SyncNow on syncd's dataset, as Settings makes it (detent's "Sync now"): a cycle runs at once instead of at the next look
+# (idle datasets are looked at less and less often, so waiting for one may take hours).
+sync_now() {
+  as_app org.quire.Settings busctl --address="$BUS" call org.quire.Sync1 /org/quire/Sync1 org.quire.Sync1 SyncNow s \
+    "${SYNC_ACCOUNT//[-.]/_}/storage_app_folder" >>"$OUT_DIR/sync-now.log" 2>&1
+}
+refused_after_sync_now() { sync_now; sleep 4; account_needs_reauth; }
+
 step_refusal() {
   rigctl POST "/issuer/refuse-refreshes?n=1000" >/dev/null
-  # syncd's next cycle (the poll is 60 s, with jitter) finds its access token spent and the refresh refused.
-  acc_wait 180 account_needs_reauth || {
-    echo "the issuer refuses refreshes but syncd's account is still '$(sync_state)'; syncd said:" >&2; tail -10 "$OUT_DIR/syncd.log" >&2
+  # The rig's access tokens last 4 s; a cycle after that finds the token spent and the refresh refused (invalid_grant), which
+  # syncd's account service turns into NeedsReauth (porter-service flight.rs / token.rs).
+  sleep 6
+  acc_wait 120 refused_after_sync_now || {
+    echo "the issuer refuses refreshes but syncd's account is still '$(sync_state)' after SyncNow cycles; SyncNow said: $(tail -3 "$OUT_DIR/sync-now.log"); syncd said:" >&2; tail -10 "$OUT_DIR/syncd.log" >&2
     return 1
   }
 }
