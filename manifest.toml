@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "35b44bc6f1e8ad675e1eb61a58748c9fea91b451"
+rev = "f7128dac2dee4c1dd67028b878bd9514db7d5a6e"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -103,7 +103,7 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "195790a5efa0010463e66c1e25f1484de7699eac"
+rev = "93ac6ab9b716ef87a7f610f959568a30bf66e39b"
 branch = "master"
 gate = "none"
 
@@ -115,7 +115,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "a7f1599d8032657872910c57182b92de8f800c87"
+rev = "6acc7cc95e60ecd59e2951c20d46101565ae27ba"
 branch = "main"
 gate = "none"
 
