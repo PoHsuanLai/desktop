@@ -7,9 +7,10 @@
 #             a refresh token in a log, an API key in a state file and a password in the registry each fail it; the
 #             flows the design allows (Secret Service, the sheet's Input, an access token in IssueToken's reply,
 #             the test's typing) pass. A scan that cannot fail proves nothing.
-#   boot      casement, recorded bus, the rig with its LLM API fake (a bearer key), Secret Service, accountd, sill
-#   api-key   an AI company's account is added through the sheet with the planted API key (openai.toml pointed at the
-#             fake): the key goes sheet -> accountd -> Secret Service and the fake accepted it (models list)
+#   boot      casement, recorded bus, the rig with its LLM API fake (a bearer key), Secret Service, accountd, inferd, sill
+#   api-key   an AI company's account is added through inferd's sheet (ai-keys add) with the planted API key
+#             (openai.toml pointed at the fake): the key goes sheet -> inferd -> Secret Service and the fake accepted
+#             it (models list). Since porter's accounts split (Phase B) the AI keys are inferd's, not accountd's
 #   scan      the real record of this run is clean, and the scan SAW the key where the design lets it be (the sheet's
 #             Input and the Secret Service), so it can see
 #
@@ -84,11 +85,13 @@ step_boot() {
   secrets_start || return 1
   acc_config; acc_provider_openai_on_rig
   accountd_start || return 1
+  inferd_write_config </dev/null
+  inferd_start || return 1
   sill_start || return 1
 }
 
 step_api_key() {
-  acc_add_start org.quire.Companion
+  ai_add_start org.quire.Companion
   sheet_await || return 1; sheet_settled; sleep 1
   sheet_type OpenAI; sleep 0.5; sheet_key Enter; sleep 1
   sheet_shot 1-api-key-form
@@ -96,9 +99,10 @@ step_api_key() {
   sheet_key Enter; sleep 3; sheet_shot 3-review
   sheet_key Enter
   local response
-  response=$(acc_add_response 30) || { echo "AddAccount never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
-  acc_added "$response" || { echo "AddAccount answered $response" >&2; return 1; }
+  response=$(acc_add_response 30) || { echo "ai-keys add never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
+  acc_added "$response" || { echo "ai-keys add answered $response" >&2; return 1; }
   sheet_gone || return 1
+  ai_has_account "$ACCOUNT" || { echo "inferd's settings module lists no account $ACCOUNT after the add" >&2; return 1; }
 }
 
 step_scan() {
@@ -109,7 +113,7 @@ step_scan() {
 
 run_steps step_control step_boot step_api_key step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd daemon rig-servers secrets add; do
+  for f in accountd inferd daemon rig-servers secrets add; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi
