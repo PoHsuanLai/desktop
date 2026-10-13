@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # Scenario `accounts-sync` (design 31 §6, porter 5fdeafa Sync1.Resolve): syncd mirrors a OneDrive app folder from the
-# rig's fake Graph through accountd's relay, a two-sided edit makes a Conflict signal with its number, and the owning
-# app settles it with Sync1.Resolve keep_remote: the next cycle takes the remote.
-# Real accountd and syncd (syncd runs Storage over Graph), the rig's issuer and Graph, sill as sheet host for the sign-in.
-# No network.
+# rig's fake Graph, a two-sided edit makes a Conflict signal with its number, and the owning app settles it with
+# Sync1.Resolve keep_remote: the next cycle takes the remote. Since porter's accounts split (Phase B) syncd signs in for
+# itself ("Continue as" an identity accountd holds) and keeps its own account, its own tokens and its own sync switches;
+# accountd only lists the identity. Real accountd and syncd (syncd runs Storage over Graph), sill as sheet host for the
+# sign-ins, detent for the Sync row. No network.
 #
-#   boot      as accounts-oauth-browser: a Microsoft-shaped account added through the browser sign-in
-#   grant     Settings makes syncd's Files grant: detent starts, Accounts > Manage on the account, and the Sync group's
-#             "Keep this account's files on this computer" switch is clicked in the real window (coordinates, as
-#             accounts-settings; detent exposes no tree the harness can query); accountd's `sync.files` row says "on"
-#             (capture 6-sync-on). The grant is for the app accountd names syncd (callers.toml: org.quire.Sync,
-#             unit syncd.service)
-#   mirror    syncd starts with SYNCD_RESCAN_S=2 (it reads grants again that often; the default is 600 s); the dataset
+#   boot      as accounts-oauth-browser: a Microsoft-shaped identity added through the browser sign-in; syncd runs before
+#             detent opens (detent never starts a daemon)
+#   grant     Settings makes syncd's Files grant: detent starts, Accounts, the Sync row's Add Account button is clicked in the
+#             real window (coordinates, as accounts-settings; detent exposes no tree the harness can query): the sheet asks
+#             which identity (Return), syncd signs in as it (the browser sign-in again) and its first switch turns itself on
+#             (`accounts.<id>.sync.files` is "on" in syncd's settings module, capture 6-sync-on); then the account's own
+#             switch "Keep this account's files on this computer" is turned off and on again in the real window: off takes
+#             the permit back, on makes it again
+#   mirror    syncd reads grants again every 2 s (SYNCD_RESCAN_S=2; the default is 600 s); the dataset
 #             `<account segment>/storage_app_folder` is listed to its owner (org.quire.Files); a file the rig puts on the drive
 #             (the remote edit lever /graph/put) shows in $XDG_DATA_HOME/porter/storage/<account>/
 #   conflict  the owner's watch joins syncd, then both sides edit the file within a moment; the next cycle (the poll is
@@ -39,14 +42,25 @@ SYNC_FILES_LABEL="Keep this account's files on this computer"
 cleanup() { acc_stop_all; stop_daemon; stop_compositor; scratch_drop; }
 trap cleanup EXIT
 
-# Syncd names an account by its object-path segment (underscores) in a dataset name and on disk.
-segment() { echo "${ACCOUNT//[-.]/_}"; }
+# Syncd names an account by its object-path segment (underscores) in a dataset name and on disk. The account is syncd's own
+# (SYNC_ACCOUNT, read from its settings module once it signed in), not accountd's identity.
+SYNC_ACCOUNT=
+segment() { echo "${SYNC_ACCOUNT//[-.]/_}"; }
 folder() { echo "$DATA/porter/storage/$(segment)"; }
 local_is() { [ "$(cat "$(folder)/$1" 2>/dev/null)" = "$2" ]; }
 remote_is() { [ "$(rigctl GET "/graph/file?path=$1")" = "$2" ]; }
 detent_mapped() { [ -n "$(detent_frame 2>/dev/null)" ]; }
-sync_files() { settings_get "accounts.$ACCOUNT.sync.files"; }
+sync_files() { sync_get "accounts.$SYNC_ACCOUNT.sync.files"; }
+sync_account() { # the id of syncd's first account, or nothing
+  sync_describe 2>/dev/null | python3 -I -c '
+import json, sys
+for k in json.load(sys.stdin)["key"]:
+    p = k["path"]
+    if p.startswith("accounts.") and p.endswith(".state"): print(p[len("accounts."):-len(".state")]); break'
+}
+sync_has_account_now() { [ -n "$(sync_account)" ]; }
 sync_on() { [ "$(sync_files)" = on ]; }
+sync_off() { [ "$(sync_files)" = off ]; }
 dataset_listed() { rigc $OWNER datasets 2>/dev/null | grep -q "$(segment)/storage_app_folder"; }
 
 step_boot() {
@@ -59,25 +73,39 @@ step_boot() {
   acc_config; acc_clients_for_issuer; acc_provider_microsoft_on_rig
   accountd_start || return 1
   sill_start || return 1
+  syncd_start || return 1
   sheet_add_microsoft || return 1
 }
 
 step_grant() {
+  rigctl POST "/graph/put?path=a.txt" "remote one" >/dev/null
   detent_start
   acc_wait 30 detent_mapped || { echo "detent never mapped" >&2; tail -5 "$OUT_DIR/detent.log" >&2; return 1; }
   sleep 4
   detent_focus
   detent_press option Accounts; sleep 1; acc_shot 1-accounts-list
-  detent_press button "Manage …"; sleep 1; acc_shot 2-account
-  [ "$(sync_files)" = off ] || echo "before the click accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2
-  detent_press switch "$SYNC_FILES_LABEL"; sleep 1
-  acc_wait 15 sync_on || { acc_shot 5-sync-not-on; echo "the switch did not make the grant: accounts.$ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
+  : >"$RIG_DIR/opened.log"
+  # The Sync row's button (the foot's plus is "Add Account…", the sync row's action is the module's own word).
+  detent_press button "Add Account"; sleep 1
+  sheet_await || { echo "Add Account on the Sync row drew no sheet: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
+  sheet_settled; sheet_shot 2-continue-as
+  sheet_key Enter                                  # Continue, the first identity is picked
+  acc_wait 30 test -s "$RIG_DIR/opened.log" || { echo "syncd's sign-in opened no browser: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
+  sheet_enter_until 90 sync_has_account_now || { echo "syncd holds no account after its sign-in: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
+  SYNC_ACCOUNT=$(sync_account)
+  echo "syncd's account: $SYNC_ACCOUNT" >&2
+  sheet_enter_until 30 sheet_hidden || { echo "the sheet did not go after syncd signed in" >&2; return 1; }
+  acc_wait 30 sync_on || { acc_shot 5-sync-not-on; echo "continuing as the identity did not switch the files on: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
   acc_shot 6-sync-on
+  # The account's own switch, in the real window: it is the last account of the list (the Sync group comes last).
+  sleep 2; detent_press button "Manage …" -1; sleep 1; acc_shot 7-sync-account
+  detent_press switch "$SYNC_FILES_LABEL"; sleep 1
+  acc_wait 15 sync_off || { echo "the switch did not take the permit back: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
+  detent_press switch "$SYNC_FILES_LABEL"; sleep 1
+  acc_wait 15 sync_on || { echo "the switch did not make the permit: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
 }
 
 step_mirror() {
-  rigctl POST "/graph/put?path=a.txt" "remote one" >/dev/null
-  syncd_start || return 1
   acc_wait 40 dataset_listed || { echo "syncd does not list $(segment)/storage_app_folder to $OWNER: $(rigc $OWNER datasets)" >&2; tail -10 "$OUT_DIR/syncd.log" >&2; return 1; }
   acc_wait 90 local_is a.txt "remote one" || { echo "a.txt never reached $(folder): $(ls -la "$(folder)" 2>&1)" >&2; tail -10 "$OUT_DIR/syncd.log" >&2; return 1; }
 }
@@ -116,7 +144,7 @@ step_scan() { scan_end; }
 
 run_steps step_boot step_grant step_mirror step_conflict step_resolve step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd syncd rig-servers secrets add watch resolve; do
+  for f in accountd syncd detent rig-servers secrets add watch resolve; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi
