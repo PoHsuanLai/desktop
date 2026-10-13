@@ -102,9 +102,10 @@ step_once() {
   # Used once: spent, and a second use is not let through.
   [ "$(grant_field $app scope)" = none ] || { echo "a once-permit is still there after its key was read (scope $(grant_field $app scope)): it opens sessions again and again" >&2; return 1; }
   rigc $app open llm --class files --prompt again >"$OUT_DIR/once-again.log" 2>&1
-  if grep -q '"result":"opened"' "$OUT_DIR/once-again.log"; then
-    echo "a second session opened on a spent once-permit: $(cat "$OUT_DIR/once-again.log")" >&2; return 1
-  fi
+  # A session may open, but its turn must be refused for want of a permit (the key is not read again).
+  grep -q '"needs_grant"' "$OUT_DIR/once-again.log" || {
+    echo "a turn after the once-permit was spent was not refused for want of a permit: $(cat "$OUT_DIR/once-again.log")" >&2; return 1
+  }
 }
 
 step_deny() {
