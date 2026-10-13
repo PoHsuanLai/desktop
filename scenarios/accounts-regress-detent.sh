@@ -4,7 +4,9 @@
 # name; what is only text (the line under a row) is measured in the capture. Real accountd, sill (the sheet host), detent at
 # its pin, the rig's fake mail and Graph.
 #
-#   boot      a password account (Fake Mail) and a browser account (Microsoft) added through the sheet, a grant for an app
+#   boot      a password account (Fake Mail) and a browser account (Microsoft) added through accountd's sheet, an OpenAI key
+#             added through inferd's, a permit for an app on the key (since porter's accounts split the permits and their
+#             Revoke are the AI keys', inferd's); the Accounts pane reads accountd, inferd and (if it runs) syncd
 #   D1        every row button names what it acts on: "Manage <account>", "Revoke <app> ...", "Sign in again <account>",
 #             "Remove account <account>", never the bare word [probe listing]
 #   D2        the sidebar search "acc" keeps Accounts and drops Dock [probe listing]
@@ -53,10 +55,14 @@ step_boot() {
   regress_boot || return 1
   acc_clients_for_issuer; acc_provider_microsoft_on_rig
   accountd_start || return 1
+  inferd_write_config </dev/null
+  inferd_start || return 1
   sill_start || return 1
   sheet_add_fake_mail || return 1
   sheet_add_microsoft || return 1
-  sheet_grant org.quire.Mail mail mail grant || return 1
+  sheet_add_openai || return 1
+  AI_ACCOUNT=$ACCOUNT
+  sheet_grant org.quire.Companion grant || return 1
   detent_start
   acc_wait 30 detent_mapped || { echo "detent never mapped" >&2; tail -5 "$OUT_DIR/detent.log" >&2; return 1; }
   sleep 4
@@ -86,11 +92,16 @@ step_d1_names() {
   acc_shot d1-account
   names=$(buttons)
   must "D1 Sign in again names the account" lists "$names" "Sign in again ada@rig.test"
-  must "D1 Revoke names the app" starts_with "$names" "Revoke org.quire.Mail"
   must "D1 Remove account names the account" lists "$names" "Remove account ada@rig.test"
-  must "D1 no bare Revoke" not lists "$names" Revoke
   must "D1 no bare Sign in again" not lists "$names" "Sign in again"
   must "D1 no bare Remove account on the page" not lists "$names" "Remove account"
+  # The AI key is the third account of the list (Internet accounts first, then Intelligence): its permit's Revoke names the app.
+  detent_press button "Accounts"; sleep 1.5
+  detent_press button "Manage …" 3; sleep 1.5
+  acc_shot d1-ai-account
+  names=$(buttons)
+  must "D1 Revoke names the app" starts_with "$names" "Revoke org.quire.Companion"
+  must "D1 no bare Revoke" not lists "$names" Revoke
   reg_verdict
 }
 
@@ -143,7 +154,7 @@ step_scan() { scan_end; }
 
 run_steps step_boot step_d2_search step_d1_names step_d3_reauth step_d4_remove_legible step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd daemon detent rig-servers secrets add; do
+  for f in accountd inferd daemon detent rig-servers secrets add; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi
