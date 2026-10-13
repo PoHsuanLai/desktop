@@ -139,7 +139,7 @@ step_d3_reauth() {
 import sys
 w1, w2, s1 = float(sys.argv[1]), float(sys.argv[2]), sys.argv[3]
 browser, password = (w1, w2) if s1 == "browser" else (w2, w1)
-sys.exit(0 if password > 0 and browser > password * 1.15 else 1)' "$w1" "$w2" "$s1"
+sys.exit(0 if password > 0 and browser >= password + 24 else 1)' "$w1" "$w2" "$s1"
   reg_verdict
 }
 
