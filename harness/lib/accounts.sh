@@ -62,9 +62,13 @@ acc_stop_all() {
 
 # acc_wait SECONDS CMD...: polls CMD (every 0.1 s) until it succeeds.
 acc_wait() {
-  local secs=$1; shift
-  for _ in $(seq $(( secs * 10 ))); do "$@" >/dev/null 2>&1 && return 0; sleep 0.1; done
-  return 1
+  # By the clock, not by tries: a check that itself takes seconds (a SyncNow cycle) must not stretch the wait.
+  local end=$(( SECONDS + $1 )); shift
+  while :; do
+    "$@" >/dev/null 2>&1 && return 0
+    [ "$SECONDS" -lt "$end" ] || return 1
+    sleep 0.1
+  done
 }
 
 # bus_has_owner NAME: the name has an owner on the private bus.
