@@ -104,8 +104,12 @@ step_service() {
   grep -q '"result":"refused"' "$OUT_DIR/off.log" || { echo "with the switch off the app is still offered the key: $(cat "$OUT_DIR/off.log")" >&2; return 1; }
   press_llm_switch; sleep 1
   [ "$(service_llm)" = "$before" ] || { echo "turned on again, service.llm is $(service_llm), not $before" >&2; return 1; }
-  ai_request_start org.quire.Companion on; acc_wait 20 grep -q '"result"' "$OUT_DIR/on.log"
-  grep -q '"result":"granted"' "$OUT_DIR/on.log" || { echo "with the switch on again the app is not offered the key: $(cat "$OUT_DIR/on.log")" >&2; return 1; }
+  # RequestKey asks every time (it never reads the permit), so "offered again" is the consent sheet being drawn, not a refusal.
+  ai_request_start org.quire.Companion on
+  acc_wait 20 eval 'grep -q "\"result\"" "$OUT_DIR/on.log" || sheet_shown'
+  if grep -q '"result":"refused"' "$OUT_DIR/on.log"; then echo "with the switch on again the app is still refused the key: $(cat "$OUT_DIR/on.log")" >&2; return 1; fi
+  sheet_shown || { echo "with the switch on again the key is not offered (no consent sheet, no answer): $(cat "$OUT_DIR/on.log")" >&2; return 1; }
+  sheet_shot 3b-offered-again; sheet_key Escape; sheet_gone 8 || return 1
 }
 
 step_revoke() {

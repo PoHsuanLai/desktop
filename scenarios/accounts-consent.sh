@@ -37,6 +37,12 @@ ask() { ai_request_start "$1" "$2"; ASKED=$ACC_LAST; }
 # answered LOG: waits for the client's one result line; prints it.
 answered() { acc_wait 20 grep -q '"result"' "$OUT_DIR/$1.log" || { echo "no answer in $1.log: $(cat "$OUT_DIR/$1.log")" >&2; return 1; }; head -n 1 "$OUT_DIR/$1.log"; }
 grant_field() { ai_grant_field "$1" "$2"; }
+# asked_nothing LOG WHAT: the request was answered, or at least did not draw a sheet, within 8 s; a sheet that was drawn is
+# closed (Escape) so the next step starts clean, and the step fails with WHAT.
+asked_nothing() {
+  acc_wait 8 eval 'grep -q "\"result\"" "$OUT_DIR/$1.log" || sheet_shown' || true
+  if sheet_shown; then sheet_stray_escape; echo "$2" >&2; return 1; fi
+}
 
 step_boot() {
   start_compositor || return 1
@@ -69,6 +75,7 @@ step_always() {
   sheet_gone || return 1
   [ "$(grant_field $app scope)" = always ] || { echo "the permit is $(grant_field $app scope), not always" >&2; return 1; }
   ask $app always2
+  asked_nothing always2 "the second request after Always Allow drew the consent sheet again: inferd's RequestKey (porter-service choose.rs: ask_for builds a sheet from the fitting accounts and never reads the grants) asks every time" || return 1
   out=$(answered always2) || return 1
   case "$out" in *'"result":"granted"'*) ;; *) echo "the second request was not answered from the permit: $out" >&2; return 1 ;; esac
   sheet_hidden || { echo "a sheet was drawn for the second request" >&2; return 1; }
@@ -98,6 +105,7 @@ step_deny() {
   case "$out" in *'"result":"refused"'*) ;; *) echo "not refused: $out" >&2; return 1 ;; esac
   sheet_gone || return 1
   ask $app deny2
+  asked_nothing deny2 "the request after Don't Allow drew the consent sheet again: RequestKey never reads the stored refusal" || return 1
   out=$(answered deny2) || return 1
   case "$out" in *'"result":"refused"'*) ;; *) echo "the second request after Don't Allow was: $out" >&2; return 1 ;; esac
   sheet_hidden || { echo "a sheet was drawn after Don't Allow" >&2; return 1; }

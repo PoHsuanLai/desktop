@@ -92,8 +92,8 @@ step_graph() {
   : >"$RIG_DIR/opened.log"
   sync_press accounts.sync.add
   sheet_await || { echo "syncd's Continue as drew no sheet: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
-  sleep 1; sheet_settled; sheet_shot 3-continue-as
-  sheet_key Enter                                # Continue, the first identity is picked
+  sheet_settled; sheet_shot 3-continue-as
+  sync_continue_keys || { echo "syncd's second sheet (the provider list) never showed" >&2; return 1; }
   acc_wait 30 test -s "$RIG_DIR/opened.log" || { echo "syncd's sign-in opened no browser: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
   sheet_enter_until 90 sync_has_account_now || { echo "syncd holds no account after its sign-in: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
   acc_wait 90 graph_bearer || { echo "Graph saw no request with the issuer's token from syncd: $(rigctl GET /graph/hits)" >&2; tail -10 "$OUT_DIR/syncd.log" >&2; return 1; }

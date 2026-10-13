@@ -77,19 +77,26 @@ step_boot() {
   sheet_add_microsoft || return 1
 }
 
-step_grant() {
+# The Sync row's button must be on the page: detent reads syncd's `accounts.sync.add` row (as `sync.add`, see the note in the
+# report: detent's SYNC_ADD is the bare path, syncd's rows are all under `accounts.`). This step checks the button; the next one
+# goes on with the same press made as Settings makes it (Set on the row), so syncd's own behaviour is still checked.
+step_row() {
   rigctl POST "/graph/put?path=a.txt" "remote one" >/dev/null
   detent_start
   acc_wait 30 detent_mapped || { echo "detent never mapped" >&2; tail -5 "$OUT_DIR/detent.log" >&2; return 1; }
   sleep 4
   detent_focus
   detent_press option Accounts; sleep 1; acc_shot 1-accounts-list
+  detent_centre button "Add Account" >/dev/null || { echo "the Sync row has no Add Account button (syncd serves accounts.sync.add; it shows:)" >&2; detent_listing >&2; return 1; }
+}
+
+step_grant() {
   : >"$RIG_DIR/opened.log"
-  # The Sync row's button (the foot's plus is "Add Account…", the sync row's action is the module's own word).
-  detent_press button "Add Account"; sleep 1
-  sheet_await || { echo "Add Account on the Sync row drew no sheet: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
-  sheet_settled; sheet_shot 2-continue-as
-  sheet_key Enter                                  # Continue, the first identity is picked
+  if detent_centre button "Add Account" >/dev/null 2>&1; then detent_press button "Add Account"; else sync_press accounts.sync.add; fi
+  sleep 1
+  sheet_await || { echo "Continue as drew no sheet: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
+  sheet_shot 2-continue-as
+  sync_continue_keys || { echo "syncd's second sheet (the provider list) never showed" >&2; return 1; }
   acc_wait 30 test -s "$RIG_DIR/opened.log" || { echo "syncd's sign-in opened no browser: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
   sheet_enter_until 90 sync_has_account_now || { echo "syncd holds no account after its sign-in: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
   SYNC_ACCOUNT=$(sync_account)
@@ -142,7 +149,7 @@ step_resolve() {
 
 step_scan() { scan_end; }
 
-run_steps step_boot step_grant step_mirror step_conflict step_resolve step_scan
+run_steps step_boot step_row step_grant step_mirror step_conflict step_resolve step_scan
 if [ "$STATUS" != 0 ]; then
   for f in accountd syncd detent rig-servers secrets add watch resolve; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }

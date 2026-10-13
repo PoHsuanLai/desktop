@@ -537,6 +537,20 @@ sheet_enter_until() {
   "$@" >/dev/null 2>&1
 }
 
+# sync_continue_keys: the keys of syncd's "Continue as" once its first sheet is up (sync_press accounts.sync.add, or the Sync
+# row's button): Return picks the identity (accountd's sheet), then syncd's own sign-in sheet lists the providers (syncd
+# gets the address only, not the provider: porter-service SignInAs) and "Micro" Return picks Microsoft. The browser step and
+# the cards after it are for sheet_enter_until.
+sync_continue_keys() {
+  sheet_settled; sleep 1
+  sheet_key Enter
+  sleep 3; sheet_await || return 1; sheet_settled; sleep 1
+  sheet_type Micro; sleep 0.5; sheet_key Enter
+}
+
+# sheet_stray_escape: a sheet nobody expected is closed (so one failed check does not leave its sheet to take the next step's keys).
+sheet_stray_escape() { sheet_shown && { sheet_key Escape; sheet_gone 8; }; }
+
 # ai_request_start APP LOG: the app asks inferd for a permit to use the person's AI keys (porter-rig-client ai-keys request),
 # in the background; its one result line lands in LOG: {"result":"granted","permit":..} or {"result":"refused","refusal":..}.
 ai_request_start() { rigc_bg "$OUT_DIR/$2.log" "$1" ai-keys request --class "${3:-files}"; }

@@ -71,8 +71,7 @@ step_boot() {
   : >"$RIG_DIR/opened.log"
   sync_press accounts.sync.add
   sheet_await || { echo "syncd's Continue as drew no sheet: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
-  sleep 1; sheet_settled
-  sheet_key Enter                                  # Continue, the first identity is picked
+  sync_continue_keys || { echo "syncd's second sheet (the provider list) never showed" >&2; return 1; }
   acc_wait 30 test -s "$RIG_DIR/opened.log" || { echo "syncd's sign-in opened no browser: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
   sheet_enter_until 90 sync_has_account_now || { echo "syncd holds no account after its sign-in: $(tail -5 "$OUT_DIR/syncd.log")" >&2; return 1; }
   SYNC_ACCOUNT=$(sync_account)
