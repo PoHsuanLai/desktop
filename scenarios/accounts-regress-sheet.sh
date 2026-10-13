@@ -4,7 +4,8 @@
 # sill drawing the sheets, the rig's fake mail and Graph; no probe of sill's surfaces exists (see harness/lib/regress.sh),
 # so a check reads the bus record (what accountd shows the sheet, what the keys made it send) or compares captures.
 #
-#   boot      casement, recorded bus, rig, accountd with 6 filler providers (24 rows) and an alias of Fake Mail, sill
+#   boot      casement, recorded bus, rig, accountd with 14 filler providers (24 rows: since porter's accounts split the
+#             add list is the Internet providers only, 10 with the alias and Fake Mail) and an alias of Fake Mail, inferd, sill
 #   S4        24 provider rows: the card stays inside the surface, and a click at Cancel's place (relative to the card)
 #             sends Dismiss and closes the sheet [pixels + bus]
 #   S2        "Google" + Return picks `google`, not `google-ai` [bus: Input pick]
@@ -13,7 +14,7 @@
 #             the same title, one with another label draws another [capture of the card's title band]
 #   S6        Microsoft with no client id (the client goes between the list and the pick: porter 1c9a8e8 leaves a clientless provider off the list): the failure is `needs_client_id`; Return (Done, the default) dismisses; Tab
 #             twice then Return still dismisses, so there is no Try Again between Back and Done [bus: Input]
-#   add       one Fake Mail account added through the sheet, for the consent window
+#   add       one OpenAI key added through inferd's sheet, for the consent window (the consent question is inferd's)
 #   S5        an agent's app id is shown as written: `org.example.Agent.Zq-Bx` and its lowercase twin draw different
 #             headings [captures of the consent window]
 #   S3        a long app id: two ids that agree on their first 28 characters draw the same window (cut with an
@@ -47,8 +48,12 @@ step_boot() {
   local n
   regress_boot || return 1
   provider_copy alias-mail "Fake Mail" fake-mail
-  for n in 1 2 3 4 5 6; do provider_copy "filler-$n" "Filler $n" fake-mail; done
+  # The add list is accountd's Internet providers: the shipped ones that can sign in (7 without a client), Tailscale, Fake
+  # Mail and its alias make 10; 14 fillers make 24. Lettered, so "Filler A" matches one provider only.
+  for n in a b c d e f g h i j k l m n; do provider_copy "filler-$n" "Filler ${n^^}" fake-mail; done
   accountd_start || return 1
+  inferd_write_config </dev/null
+  inferd_start || return 1
   sill_start || return 1
 }
 
@@ -111,7 +116,7 @@ step_s5_titles() {
   n=$(bus_count); sheet_type "Fake Mail"; sleep 0.5; sheet_key ArrowDown; sheet_key ArrowDown; sheet_key Enter; sleep 1.5; sheet_shot s5-title-b; b=$(last_pick "$n")
   close_sheet
   open_sheet || return 1
-  sheet_type "Filler 1"; sleep 0.5; sheet_key Enter; sleep 1.5; sheet_shot s5-title-other
+  sheet_type "Filler A"; sleep 0.5; sheet_key Enter; sleep 1.5; sheet_shot s5-title-other
   close_sheet
   must "S5 the two providers differ only in their id ($a, $b)" [ -n "$a" ] && [ -n "$b" ] && [ "$a" != "$b" ]
   must "S5 their titles are the same: the label is shown, not the id" same_shot s5-title-a s5-title-b "$(card_top s5-title-a)"
@@ -146,7 +151,7 @@ step_s6_no_client() {
   reg_verdict
 }
 
-step_add() { sheet_add_fake_mail; }
+step_add() { sheet_add_openai; }
 
 step_s5_agent_id() {
   ask org.example.Agent.Zq-Bx a1; sheet_await || return 1; sleep 1.5; sheet_shot s5-agent-id
@@ -196,7 +201,7 @@ step_scan() { scan_end; }
 run_steps step_boot step_s4_cancel_stays step_s2_google step_s1_other step_s5_titles step_s6_no_client step_add \
   step_s5_agent_id step_s3_long_id step_s7_browser_wait step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd daemon rig-servers secrets add; do
+  for f in accountd inferd daemon rig-servers secrets add; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi
