@@ -9,7 +9,11 @@
 #               does not exit
 #   ends        with a stand-in that always panics, the --safe run's quick exit ends the session with
 #               status 1 and a guard log line (Plasma is a separate login entry)
-#   components  none run (DESKTOP_SESSION_NESTED=1: no systemd, no sill, no portal)
+#   components  none run by default (DESKTOP_SESSION_NESTED=1: no systemd, no sill, no portal); with
+#               DESKTOP_SESSION_STUBS the session starts its components from stand-in programs: sill in
+#               the sill-shell scope (and again after it exits), the portal, the power-key inhibitor,
+#               the wallet (pam_kwallet_init, then ksecretd when nothing owns the Secret Service) and
+#               detent --first-run; all are gone when the session ends
 # This is the direct-child path (DESKTOP_SESSION_NESTED=1); the real session runs casement as casement.service
 # (needs a systemd user manager, first-login check) with the same guard decisions.
 # Nothing outside the jail's scratch is read or written; the session is ended by its PID.
@@ -145,7 +149,43 @@ safe_failing_ends_the_session() {
   grep -q 'the crash guard ends the session' "$STATE/guard.log"
 }
 
-for name in step_bus guard_reaches_safe safe_stays_up_on_one_output safe_failing_ends_the_session; do
+# stub_components: stand-in programs that log each call to $OUT_DIR/stubs.log. sill exits at once the
+# first time (the session must start it again); the rest stay up.
+stub_components() {
+  local d="$OUT_DIR/stubs" n
+  rm -rf "$d" "$OUT_DIR/stubs.log" "$OUT_DIR/sill-ran"; mkdir -p "$d"
+  for n in xdg-desktop-portal-wlr ksecretd pam_kwallet_init detent; do
+    printf '#!/bin/sh\necho "%s $*" >>"%s"\n[ "%s" = pam_kwallet_init ] || [ "%s" = detent ] || exec sleep 300\n' \
+      "$n" "$OUT_DIR/stubs.log" "$n" "$n" >"$d/$n"
+  done
+  printf '#!/bin/sh\necho "sill $*" >>"%s"\nif [ ! -e "%s/sill-ran" ]; then : >"%s/sill-ran"; exit 1; fi\nexec sleep 300\n' \
+    "$OUT_DIR/stubs.log" "$OUT_DIR" "$OUT_DIR" >"$d/sill"
+  printf '#!/bin/sh\necho "systemd-inhibit $*" >>"%s"\nexec sleep 300\n' "$OUT_DIR/stubs.log" >"$d/systemd-inhibit"
+  printf '#!/bin/sh\necho "systemd-run $*" >>"%s"\nwhile [ "$1" != -- ]; do shift; done; shift; exec "$@"\n' "$OUT_DIR/stubs.log" >"$d/systemd-run"
+  printf '#!/bin/sh\necho not-found\n' >"$d/systemctl"
+  printf '#!/bin/sh\nexit 1\n' >"$d/busctl"
+  chmod +x "$d"/*
+}
+
+components_start_and_end_with_the_session() {
+  local d="$OUT_DIR/stubs" log="$OUT_DIR/stubs.log" want
+  stub_components
+  start_session comps PAM_KWALLET5_LOGIN=1 DESKTOP_SESSION_STUBS="$d" DESKTOP_SESSION_FIRST_RUN_DELAY=1 \
+    DESKTOP_SESSION_CASEMENT_CMD="$SCEN_TOOLS/bin/casement"
+  wait_for 300 grep -q 'detent --first-run' "$log" || { echo "no first run:" >&2; cat "$log" >&2; return 1; }
+  [ "$(count '^sill run' "$log")" -ge 2 ] || { sleep 3; [ "$(count '^sill run' "$log")" -ge 2 ]; } \
+    || { echo "sill was not started again after it exited:" >&2; cat "$log" >&2; return 1; }
+  for want in 'systemd-run --user --scope --unit=sill-shell' 'systemd-inhibit --what=handle-power-key --who=desktop-session' \
+    '^xdg-desktop-portal-wlr' '^pam_kwallet_init' '^ksecretd'; do
+    grep -q -- "$want" "$log" || { echo "missing: $want" >&2; cat "$log" >&2; return 1; }
+  done
+  stop_session
+  sleep 1
+  ! pgrep -f "$d/" >/dev/null || { echo "components outlived the session:" >&2; pgrep -af "$d/" >&2; return 1; }
+}
+
+for name in step_bus guard_reaches_safe safe_stays_up_on_one_output safe_failing_ends_the_session \
+  components_start_and_end_with_the_session; do
   STEP_BUDGET=60 step "$name" "$name" || true
 done
 if [ "$STEP_WORST" != 0 ]; then

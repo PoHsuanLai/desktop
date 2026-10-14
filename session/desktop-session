@@ -18,11 +18,22 @@
 # That log file is where the socket name is read from ("casement: listening on wayland-1"), the same
 # file as on the direct-child path. The drop-in is removed when the session ends.
 # What runs beside it, once casement's socket exists, and why each:
-#   sill run                      bar, dock, launcher, control centre, notifications, lock, polkit
+#   sill run                      bar, dock, launcher, control centre, notifications, lock, polkit; in its
+#                                 own scope, sill-shell.scope: the companion's daemons (memoryd, intentd)
+#                                 admit the shell by that unit through porter's caller identity. If the
+#                                 name is still held, sill starts outside it and says so
 #   xdg-desktop-portal-wlr        the interim ScreenCast/Screenshot portal (the casement portal
 #                                 replaces it at P2); quire-portals.conf routes to it for quire
-# Both are children of this script, ended by PID when casement ends and started again with the
-# next casement. Nothing is looked up or killed by name.
+#   the wallet                    pam_kwallet_init when PAM_KWALLET5_LOGIN is set (the login password
+#                                 reaches ksecretd, the Secret Service); if nothing then owns
+#                                 org.freedesktop.secrets, ksecretd itself
+#   systemd-inhibit               holds logind's handle-power-key, so the power key opens sill's
+#                                 power menu instead of powering off
+#   detent --first-run            the welcome window of Settings, 5 s in, once per login (it exits at
+#                                 once when it has run); not respawned
+# sill, the portal, ksecretd and the inhibitor are restarted when they exit (five exits within ten
+# seconds each, then given up). All are children of this script, ended by PID when casement ends and
+# started again with the next casement. Nothing is looked up or killed by name.
 #
 # The crash-loop guard. A casement run that lasts less than QUICK seconds (default 20) is a quick
 # exit; a longer run clears the count. Three quick exits in a row switch the session to
@@ -37,6 +48,10 @@
 #   DESKTOP_SESSION_BACKEND_ARGS   its arguments before --safe (default: --backend tty)
 #   DESKTOP_SESSION_QUICK_SECS     the quick-exit limit (default 20)
 #   DESKTOP_SESSION_STATE          where guard.log and casement.log go (default $XDG_RUNTIME_DIR/desktop-session)
+#   DESKTOP_SESSION_STUBS          a directory of stand-in programs (sill, xdg-desktop-portal-wlr, pam_kwallet_init,
+#                                  busctl, ksecretd, systemd-inhibit, systemd-run, systemctl, detent) that, with
+#                                  DESKTOP_SESSION_NESTED=1, makes the components start from there (tests)
+#   DESKTOP_SESSION_FIRST_RUN_DELAY  seconds before detent --first-run (default 5)
 #   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill, no portal (tests)
 #   DESKTOP_SESSION_UNIT           the casement unit (default casement.service)
 set -euo pipefail
@@ -58,6 +73,8 @@ fi
 
 nested="${DESKTOP_SESSION_NESTED:-}"
 quick_secs="${DESKTOP_SESSION_QUICK_SECS:-20}"
+stubs="${DESKTOP_SESSION_STUBS:-}"
+first_run_delay="${DESKTOP_SESSION_FIRST_RUN_DELAY:-5}"
 state="${DESKTOP_SESSION_STATE:-${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/desktop-session}"
 read -r -a casement_cmd <<<"${DESKTOP_SESSION_CASEMENT_CMD:-casement}"
 read -r -a backend_args <<<"${DESKTOP_SESSION_BACKEND_ARGS---backend tty}"
@@ -119,13 +136,84 @@ MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS"
     systemctl --user start desktop-session.target || log "desktop-session.target did not start"
 }
 
+# The program NAME: the stand-in in $stubs when there is one, else the default path or name $2.
+bin() { if [ -n "$stubs" ]; then echo "$stubs/$1"; else echo "${2:-$1}"; fi; }
+have() { if [ -n "$stubs" ]; then [ -x "$stubs/$1" ]; else command -v "${2:-$1}" >/dev/null; fi; }
+
+# Run "$@" until the session ends, in this (background) shell: restart it when it exits, and give up
+# after five exits within ten seconds each, so a component that cannot start does not spin. A TERM
+# ends the child and the loop.
+respawn_loop() {
+    local name=$1 quick=0 started child=
+    shift
+    trap '[ -z "$child" ] || { pkill -P "$child" 2>/dev/null; kill "$child" 2>/dev/null; }; exit 0' TERM
+    while [ "$quick" -lt 5 ]; do
+        started=$(date +%s)
+        "$@" & child=$!
+        wait "$child" || log "$name exited with $?"
+        child=
+        if [ $(($(date +%s) - started)) -lt 10 ]; then quick=$((quick + 1)); else quick=0; fi
+        sleep 1
+    done
+    log "$name keeps exiting; not restarting it"
+}
+
+# A component kept running: respawn_loop in the background, its PID among the components.
+keep_running() {
+    respawn_loop "$@" &
+    component_pids+=("$!")
+}
+
+# The wallet. KWallet 6 has no daemon that unlocks itself: pam-kwallet's session module starts ksecretd,
+# which holds the wallet (the Secret Service that libsecret clients use) and waits for the login password
+# on a socket; the Plasma session sends it with pam_kwallet_init (an autostart entry marked
+# X-systemd-skip), so no other session does it. If nothing owns org.freedesktop.secrets afterwards, start
+# ksecretd ourselves (the wallet then asks for its password on first use).
+wallet() {
+    local init try
+    init=$(bin pam_kwallet_init /usr/libexec/pam_kwallet_init)
+    if [ -n "${PAM_KWALLET5_LOGIN:-}" ] && [ -x "$init" ]; then
+        "$init" || log "pam_kwallet_init failed"
+    fi
+    for try in 1 2 3 4 5 6 7 8 9 10; do
+        "$(bin busctl)" --user status org.freedesktop.secrets >/dev/null 2>&1 && return 0
+        sleep 0.5
+    done
+    have ksecretd || return 0
+    respawn_loop ksecretd "$(bin ksecretd)"
+}
+
+# sill in its own named scope, sill-shell.scope (the companion's daemons admit the shell by that unit).
+# If the scope name is still held (a sill that has not finished exiting, or another process of this
+# user), sill starts outside it and says so; the session never waits on the identity. systemd-run
+# --scope runs sill as the same process, so the loop's PID is sill's.
+sill_shell() {
+    local sill
+    sill=$(bin sill)
+    if have systemd-run && [ "$("$(bin systemctl)" --user show -p LoadState --value sill-shell.scope 2>/dev/null)" = not-found ]; then
+        "$(bin systemd-run)" --user --scope --unit=sill-shell --collect --quiet -- "$sill" run
+    else
+        log "sill-shell.scope unavailable; sill runs without its unit identity"
+        "$sill" run
+    fi
+}
+
+first_run() {
+    sleep "$first_run_delay"
+    "$(bin detent)" --first-run || log "detent --first-run exited with $?"
+}
+
 # Start the components against the casement whose socket is $1 (a name in XDG_RUNTIME_DIR).
 start_components() {
     export WAYLAND_DISPLAY="$1"
     publish_environment
-    [ -z "$nested" ] || return 0
-    /usr/libexec/xdg-desktop-portal-wlr & component_pids+=("$!")
-    sill run & component_pids+=("$!")
+    [ -z "$nested" ] || [ -n "$stubs" ] || return 0
+    wallet & component_pids+=("$!")
+    keep_running power-key "$(bin systemd-inhibit)" --what=handle-power-key --who=desktop-session \
+        --why="the power key opens sill's power menu" --mode=block sleep infinity
+    keep_running portal "$(bin xdg-desktop-portal-wlr /usr/libexec/xdg-desktop-portal-wlr)"
+    keep_running sill sill_shell
+    if have detent; then first_run & component_pids+=("$!"); fi
 }
 
 # --- casement as the unit casement.service (the real session) ---------------------------------------
