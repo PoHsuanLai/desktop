@@ -9,7 +9,7 @@
 #   (flags: see install/lib.sh)
 #
 # Not installed here: casement, sill and xdg-desktop-portal-wlr themselves (their own installers
-# and packages), the COSMIC session (left untouched: it is the crash guard's last fallback), and
+# and packages), other sessions (left untouched), and
 # anything under $HOME. install/uninstall.sh removes exactly the files listed below.
 set -euo pipefail
 ORIG_ARGS=("$@")
@@ -25,7 +25,6 @@ for tool in casement sill; do
 done
 [ -f "$casement_unit" ] || note "WARNING: no casement unit at $casement_unit (build the casement repo's dist/casement.service, or set CASEMENT_UNIT_FILE); the session needs casement.service and will not start casement without it"
 [ -x /usr/libexec/xdg-desktop-portal-wlr ] || note "WARNING: /usr/libexec/xdg-desktop-portal-wlr is missing (dnf install xdg-desktop-portal-wlr)"
-[ -e /usr/share/wayland-sessions/cosmic.desktop ] || note "note: no COSMIC session installed; the crash guard's last fallback would end the session instead"
 
 step "2/3 the files"
 dests=()

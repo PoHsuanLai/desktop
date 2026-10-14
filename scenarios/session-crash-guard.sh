@@ -6,10 +6,9 @@
 # `casementctl debug fault panic-after-frames 1` so it panics at once. The session must then:
 #   guard       start casement three times, each ending in a quick exit, then start `casement --safe`
 #   safe        the --safe casement stays up on one output (pixman, no effects) and the session
-#               does not exit or fall back
-#   fallback    with a stand-in that always panics, the --safe run's quick exit hands over to the COSMIC
-#               fallback command (a marker script here, never cosmic-comp) when a COSMIC entry exists,
-#               and ends the session with status 1 when none does
+#               does not exit
+#   ends        with a stand-in that always panics, the --safe run's quick exit ends the session with
+#               status 1 and a guard log line (Plasma is a separate login entry)
 #   components  none run (DESKTOP_SESSION_NESTED=1: no systemd, no sill, no portal)
 # This is the direct-child path (DESKTOP_SESSION_NESTED=1); the real session runs casement as casement.service
 # (needs a systemd user manager, first-login check) with the same guard decisions.
@@ -131,40 +130,22 @@ safe_stays_up_on_one_output() {
     || { echo "--safe has more than one output: $outputs" >&2; return 1; }
   sleep 3
   kill -0 "$SESSION_PID" 2>/dev/null || { echo "the session ended" >&2; return 1; }
-  ! grep -q 'falling back\|session ends' "$STATE/guard.log" || { echo "the guard fell back although --safe was up" >&2; return 1; }
+  ! grep -q 'ends the session' "$STATE/guard.log" || { echo "the guard ended the session although --safe was up" >&2; return 1; }
   stop_session
 }
 
-fallback_marker() {
-  # a COSMIC entry and a fallback command that only records that it ran
-  printf '#!/bin/sh\necho ran "$XDG_CURRENT_DESKTOP" >"%s/fallback-ran"\n' "$OUT_DIR" >"$OUT_DIR/fake-cosmic"
-  chmod +x "$OUT_DIR/fake-cosmic"
-  : >"$OUT_DIR/cosmic.desktop"
-}
-
-safe_failing_falls_back_to_cosmic() {
-  fallback_marker
-  rm -f "$OUT_DIR/fallback-ran"
-  start_session cosmic FAKE_CASEMENT_ALWAYS_PANIC=1 DESKTOP_SESSION_FALLBACK_CMD="$OUT_DIR/fake-cosmic" \
-    DESKTOP_SESSION_COSMIC_ENTRY="$OUT_DIR/cosmic.desktop"
-  wait_for 600 test -e "$OUT_DIR/fallback-ran" || { echo "the COSMIC fallback never ran:" >&2; cat "$STATE/guard.log" >&2; return 1; }
-  [ "$(cat "$OUT_DIR/fallback-ran")" = "ran COSMIC" ] || return 1
-  grep -q 'casement --safe exited quickly' "$STATE/guard.log"
-}
-
-safe_failing_without_cosmic_ends_the_session() {
+safe_failing_ends_the_session() {
   local rc=0
-  start_session nocosmic FAKE_CASEMENT_ALWAYS_PANIC=1 DESKTOP_SESSION_FALLBACK_CMD="$OUT_DIR/fake-cosmic" \
-    DESKTOP_SESSION_COSMIC_ENTRY="$OUT_DIR/no-such-entry"
+  start_session ends FAKE_CASEMENT_ALWAYS_PANIC=1
   wait_for 600 bash -c "! kill -0 $SESSION_PID" || { echo "the session did not end" >&2; return 1; }
   wait "$SESSION_PID" || rc=$?
   SESSION_PID=
   [ "$rc" = 1 ] || { echo "exit $rc, expected 1" >&2; return 1; }
-  grep -q 'the session ends' "$STATE/guard.log"
+  grep -q 'casement --safe exited quickly' "$STATE/guard.log" || return 1
+  grep -q 'the crash guard ends the session' "$STATE/guard.log"
 }
 
-for name in step_bus guard_reaches_safe safe_stays_up_on_one_output \
-  safe_failing_falls_back_to_cosmic safe_failing_without_cosmic_ends_the_session; do
+for name in step_bus guard_reaches_safe safe_stays_up_on_one_output safe_failing_ends_the_session; do
   STEP_BUDGET=60 step "$name" "$name" || true
 done
 if [ "$STEP_WORST" != 0 ]; then

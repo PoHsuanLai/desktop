@@ -27,9 +27,8 @@
 # The crash-loop guard. A casement run that lasts less than QUICK seconds (default 20) is a quick
 # exit; a longer run clears the count. Three quick exits in a row switch the session to
 # `casement --safe` (pixman, no effects, one output). A quick exit of the safe run, or a safe
-# casement that cannot start, falls back to the stock COSMIC session when it is installed
-# (cosmic-session, else cosmic-comp; one function, fall_back_to_cosmic, to be deleted when COSMIC is
-# dropped), and otherwise ends the session with status 1 and a notice.
+# casement that cannot start, ends the session with status 1 and a notice in the guard log; the
+# Plasma login stays available as a separate entry on the login screen.
 # Every decision is appended to $STATE/guard.log.
 #
 # Settings a person may change: ~/.config/desktop-session/session.env (sh syntax, read first), for
@@ -38,8 +37,6 @@
 #   DESKTOP_SESSION_BACKEND_ARGS   its arguments before --safe (default: --backend tty)
 #   DESKTOP_SESSION_QUICK_SECS     the quick-exit limit (default 20)
 #   DESKTOP_SESSION_STATE          where guard.log and casement.log go (default $XDG_RUNTIME_DIR/desktop-session)
-#   DESKTOP_SESSION_FALLBACK_CMD   the COSMIC fallback command (default: cosmic-session, else cosmic-comp)
-#   DESKTOP_SESSION_COSMIC_ENTRY   the COSMIC session entry that proves it is installed
 #   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill, no portal (tests)
 #   DESKTOP_SESSION_UNIT           the casement unit (default casement.service)
 set -euo pipefail
@@ -226,26 +223,6 @@ run_casement() {
     cat "$state/casement.log" >&2
 }
 
-# --- COSMIC fallback: to be dropped with COSMIC. Delete this block and the one call below. ------------
-fall_back_to_cosmic() {
-    local -a cmd
-    local cosmic_entry="${DESKTOP_SESSION_COSMIC_ENTRY:-/usr/share/wayland-sessions/cosmic.desktop}"
-    if [ -n "${DESKTOP_SESSION_FALLBACK_CMD:-}" ]; then
-        read -r -a cmd <<<"$DESKTOP_SESSION_FALLBACK_CMD"
-    elif command -v cosmic-session >/dev/null; then
-        cmd=(cosmic-session)
-    elif command -v cosmic-comp >/dev/null; then
-        cmd=(cosmic-comp)
-    else
-        return 1
-    fi
-    [ -e "$cosmic_entry" ] || return 1
-    guard "falling back to the stock COSMIC session: ${cmd[*]}"
-    export XDG_CURRENT_DESKTOP=COSMIC XDG_SESSION_DESKTOP=COSMIC
-    [ -n "$nested" ] || stop_unit
-    exec "${cmd[@]}"
-}
-
 quick=0
 mode=normal
 while :; do
@@ -268,7 +245,9 @@ while :; do
     fi
     if [ "$mode" = safe ]; then
         guard "casement --safe exited quickly too"
-        fall_back_to_cosmic || { guard "no COSMIC session to fall back to: the session ends"; [ -n "$nested" ] || stop_unit; exit 1; }
+        guard "casement --safe failed too: the crash guard ends the session (the Plasma login is a separate entry)"
+        [ -n "$nested" ] || stop_unit
+        exit 1
     fi
     quick=$((quick + 1))
     if [ "$quick" -ge 3 ]; then
