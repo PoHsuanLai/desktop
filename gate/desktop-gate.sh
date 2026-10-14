@@ -184,7 +184,7 @@ step "selftest (jail, 2 fabricated GPUs)" "$JAIL" --fabricate-gpus 2 -- "$ROOT/h
 step "selftest negative (outside the jail)" "$ROOT/harness/selftest.sh" --negative || true
 step "manifest shape" "$HERE/manifest-check.sh" --syntax || true
 step "installer (dry run and stubs)" "$HERE/installer-check.sh" || true
-step "cosmic-free check (fixtures)" "$HERE/cosmic-free-selftest.sh" || true
+step "legacy-free check (generated trees)" "$HERE/legacy-free-selftest.sh" || true
 step "expected-skips resolve" skip_entries_resolve || true
 # The scenarios' artefacts are built outside the jail (plan A7); DESKTOP_GATE_NO_BUILD=1 skips it.
 if [ -z "${DESKTOP_GATE_NO_BUILD:-}" ]; then step "scenario artefacts (built outside the jail)" "$ROOT/harness/scenario-build.sh" || true; fi
@@ -194,7 +194,7 @@ done
 
 if [ "$tier" != self ]; then
   step "check out manifest revs" checkout_repos || true
-  step "no COSMIC in any manifest repo" "$HERE/check-cosmic-free.sh" "$LANE_DIR" || true
+  step "no removed-compositor traces in any manifest repo" "$HERE/check-legacy-free.sh" "$LANE_DIR" || true
   if [ -d "$LANE_DIR/sill" ]; then   # the checkouts exist: every lane gate runs, whatever failed before
     for r in $(manifest_repos); do
       [ "$(manifest_repo_get "$r" gate)" = lane ] || continue
