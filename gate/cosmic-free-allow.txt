@@ -8,6 +8,7 @@ quire:deny.toml  # ban that keeps cosmic crates out of the build
 sill:dist/uninstall.sh  # legacy-path cleanup list for old installs
 quire:design/archive/*  # historical design notes
 desktop:gate/check-cosmic-free.sh  # this check
+desktop:gate/desktop-gate.sh  # runs this check
 desktop:gate/cosmic-free-allow.txt  # this list
 desktop:gate/cosmic-free-selftest.sh  # this check's self-test
 desktop:gate/fixtures/cosmic-free/*  # the self-test's offending fixture
