@@ -175,6 +175,8 @@ components_start_and_end_with_the_session() {
   wait_for 300 grep -q 'detent --first-run' "$log" || { echo "no first run:" >&2; cat "$log" >&2; return 1; }
   [ "$(count '^sill run' "$log")" -ge 2 ] || { sleep 3; [ "$(count '^sill run' "$log")" -ge 2 ]; } \
     || { echo "sill was not started again after it exited:" >&2; cat "$log" >&2; return 1; }
+  # ksecretd starts only after the wallet has waited 5 s for an owner of the Secret Service.
+  wait_for 100 grep -q '^ksecretd' "$log" || true
   for want in 'systemd-run --user --scope --unit=sill-shell' 'systemd-inhibit --what=handle-power-key --who=desktop-session' \
     '^xdg-desktop-portal-wlr' '^pam_kwallet_init' '^ksecretd'; do
     grep -q -- "$want" "$log" || { echo "missing: $want" >&2; cat "$log" >&2; return 1; }
