@@ -3,6 +3,11 @@
 # `closes` is P<n> or earlier is still listed, so the list is empty at each phase's exit.
 # FINDINGS ids are placeholders until the merge applies the rows (S0-D report).
 
+# shell-host-on-kwin (FD-07) still skips after P2 closed: the reason is unchanged (shell-host's
+# kwin-virtual.sh writes into its checkout and starts a user scope, which the jail does not give), so the
+# scenario cannot run. Its own header says KWin leaves the harness at P2, "when this row and file go":
+# `desktop-gate.sh --phase P2` fails on this row until the owner deletes the row and
+# scenarios/shell-host-on-kwin.sh (and the reference in shell-host-on-casement-and-kwin.sh).
 [[skip]]
 scenario = "shell-host-on-kwin"
 finding = "FD-07"

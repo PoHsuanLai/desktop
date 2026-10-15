@@ -28,6 +28,7 @@ STUB
 stub porter/scripts/install.sh porter
 stub detent/scripts/install.sh detent
 stub sill/dist/install.sh sill
+stub transom/scripts/install.sh transom
 stub keycap/install.sh keycap
 stub anyview/dist/install.sh anyview
 stub mailo/dist/install.sh mailo
@@ -44,7 +45,7 @@ inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR "$INSTALL" --siblings "$sib" "$@
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "porter detent sill keycap anyview mailo palmrest " ] || fail "plan order is: $order"
+[ "$order" = "porter detent sill transom keycap anyview mailo palmrest " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
 printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
 
@@ -56,6 +57,7 @@ printf '%s\n' "$plan" | grep -q 'porter .*yourself (needs root' || fail "a syste
 inst --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "staged run failed"; }
 grep -q "^porter/scripts/install.sh --prefix /opt/d --sysconfdir /etc --destdir $dest" "$log" || fail "porter did not get the prefix and destdir: $(cat "$log")"
 grep -q "^detent/scripts/install.sh  PREFIX=/opt/d DESTDIR=$dest" "$log" || fail "detent did not get PREFIX and DESTDIR"
+grep -q "^transom/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "transom did not get the prefix and destdir"
 grep -q "MAILO_PREFIX=$dest/opt/d" "$log" || fail "mailo did not get its prefix"
 grep -q "^keycap/install.sh" "$log" || fail "no component ran"
 ! grep -q sudo "$log" || fail "sudo was called"

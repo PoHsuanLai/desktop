@@ -8,10 +8,10 @@
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
 #   --sysconfdir   where porter's caller table goes (default $SYSCONFDIR, else /etc)
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES   just these components (comma separated: porter, detent, sill, keycap, anyview, mailo, palmrest)
+#   --only NAMES   just these components (comma separated: porter, detent, sill, transom, keycap, anyview, mailo, palmrest)
 #
 # Order: porter (the account daemons and the caller table), detent (Settings), sill (the session),
-# keycap, anyview, mailo, palmrest. Each component's installer is its own: this script passes the prefix
+# transom (the portal backend: screen sharing, screenshots; scripts/install.sh builds it), keycap, anyview, mailo, palmrest. Each component's installer is its own: this script passes the prefix
 # and the staging root through and nothing else, and stops at the first one that fails.
 #
 # Root. This script never runs sudo and never writes under ~/.config or /etc itself. A component runs
@@ -24,7 +24,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ORDER=(porter detent sill keycap anyview mailo palmrest)
+ORDER=(porter detent sill transom keycap anyview mailo palmrest)
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -78,6 +78,11 @@ describe() {
     sill)
       script=dist/install.sh
       yourself="its installer has fixed destinations (/usr/local, /etc, /usr/share) and asks for sudo" ;;
+    transom)
+      script=scripts/install.sh
+      args=(--prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix") ;;
     keycap)
       script=install.sh
       envs=("DESTDIR=$destdir")

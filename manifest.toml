@@ -119,6 +119,14 @@ rev = "55bf6c8b9a98c6e631e936767c0e2c5ef74ebe25"
 branch = "main"
 gate = "none"
 
+[repo.transom]
+# The portal backend (xdg-desktop-portal implementation "quire"): screen sharing, screenshots, remote desktop,
+# settings and the keep-awake inhibit; replaces the interim xdg-desktop-portal-wlr. Builds against libpipewire.
+url = "https://github.com/PoHsuanLai/transom.git"
+rev = "9b05d6b428780cce260c408a1e0c1b696166ff3b"
+branch = "master"
+gate = "lane"
+
 [repo.mpv]
 # mpv-wgpu, checked out as ~/mpv: anyview's dist/install.sh --with-plugin mpv builds its C plugin
 # from ../mpv (MPV_WGPU_DIR); nothing links it.
