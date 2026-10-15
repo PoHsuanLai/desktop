@@ -54,12 +54,18 @@ step_routing() {
   return "$bad"
 }
 
-step_boot() { start_compositor; }
+# casement's env file is plain NAME=value and transom's chain sources it without exporting, so the
+# chain gets a copy that exports every name (the bus and the display reach transom and the portal).
+step_boot() {
+  start_compositor || return 1
+  CHAIN_ENV="$OUT_DIR/chain.env"
+  { echo 'set -a'; cat "$CASEMENT_ENV"; echo 'set +a'; } >"$CHAIN_ENV"
+}
 
 # accept NAME: transom's acceptance script NAME against this casement; its output is kept.
 accept() {
   local rc
-  TRANSOM_BIN="$TRANSOM_BIN" TRANSOM_DESKTOP="$SCEN_ROOT" TRANSOM_COMPOSITOR_ENV="$CASEMENT_ENV" \
+  TRANSOM_BIN="$TRANSOM_BIN" TRANSOM_DESKTOP="$SCEN_ROOT" TRANSOM_COMPOSITOR_ENV="$CHAIN_ENV" \
     TRANSOM_OUTPUT=HEADLESS-1 TRANSOM_OUTPUT_SIZE="$SIZE" TRANSOM_STATE="$OUT_DIR/chain-$1" \
     bash "$TRANSOM_DIR/dev/accept/$1.sh" >"$OUT_DIR/$1.log" 2>&1
   rc=$?
