@@ -76,10 +76,10 @@ step_screenshot() { accept screenshot; }
 step_screencast() { accept screencast-output; }
 step_settings() { accept settings; }
 
-# step_screenshot and step_screencast wait for transom to answer org.freedesktop.impl.portal.Access
-# itself: xdg-desktop-portal offers Screenshot only with an Access backend, and the private bus
-# cannot start gtk's (cas-wave-2026-10-15.md follow-ups).
-run_steps step_routing step_boot step_settings
+# transom answers org.freedesktop.impl.portal.Access itself (xdg-desktop-portal offers Screenshot only
+# with an Access backend, and the private bus cannot start gtk's), so the screenshot and screen sharing
+# steps run against it.
+run_steps step_routing step_boot step_settings step_screenshot step_screencast
 if [ "$STATUS" != 0 ]; then
   for f in "$OUT_DIR"/chain-*/transom.log "$OUT_DIR"/chain-*/portal.log; do
     [ -f "$f" ] || continue
