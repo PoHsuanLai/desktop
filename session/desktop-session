@@ -18,10 +18,11 @@
 # That log file is where the socket name is read from ("casement: listening on wayland-1"), the same
 # file as on the direct-child path. The drop-in is removed when the session ends.
 # What runs beside it, once casement's socket exists, and why each:
-#   sill run                      bar, dock, launcher, control centre, notifications, lock, polkit; in its
-#                                 own scope, sill-shell.scope: the companion's daemons (memoryd, intentd)
-#                                 admit the shell by that unit through porter's caller identity. If the
-#                                 name is still held, sill starts outside it and says so
+#   sill run                      bar, dock, launcher, control centre, notifications, lock, polkit; as the
+#                                 transient user service sill.service (systemd-run, Type=exec): porter's
+#                                 accountd, the companion's daemons (memoryd, intentd) and casement admit
+#                                 the shell only as that unit's main process. A stale sill.service is
+#                                 stopped first; if it cannot start, the session stays up without a shell
 #   xdg-desktop-portal-wlr        the interim ScreenCast/Screenshot portal (the casement portal
 #                                 replaces it at P2); quire-portals.conf routes to it for quire
 #   the wallet                    pam_kwallet_init when PAM_KWALLET5_LOGIN is set (the login password
@@ -32,8 +33,10 @@
 #   detent --first-run            the welcome window of Settings, 5 s in, once per login (it exits at
 #                                 once when it has run); not respawned
 # sill, the portal, ksecretd and the inhibitor are restarted when they exit (five exits within ten
-# seconds each, then given up). All are children of this script, ended by PID when casement ends and
-# started again with the next casement. Nothing is looked up or killed by name.
+# seconds each, then given up). The portal, ksecretd and the inhibitor are children of this script,
+# ended by PID when casement ends; sill is watched as its unit (restarted by the same guard) and ended
+# with `systemctl --user stop sill.service`, our own transient unit. All start again with the next
+# casement. Nothing is looked up or killed by name.
 #
 # The crash-loop guard. A casement run that lasts less than QUICK seconds (default 20) is a quick
 # exit; a longer run clears the count. Three quick exits in a row switch the session to
@@ -107,6 +110,7 @@ stop_components() {
         wait "$pid" 2>/dev/null || true
     done
     component_pids=()
+    stop_shell
 }
 
 on_term() {
@@ -183,19 +187,45 @@ wallet() {
     respawn_loop ksecretd "$(bin ksecretd)"
 }
 
-# sill in its own named scope, sill-shell.scope (the companion's daemons admit the shell by that unit).
-# If the scope name is still held (a sill that has not finished exiting, or another process of this
-# user), sill starts outside it and says so; the session never waits on the identity. systemd-run
-# --scope runs sill as the same process, so the loop's PID is sill's.
+# sill as the transient user service sill.service (systemd-run, Type=exec, so it has a real main
+# process). Porter's accountd and the companion's daemons (memoryd, intentd) admit the shell, and
+# casement gives it the Shell role, only as the main process of that unit; a scope has no main process
+# to check, so it could not be proved. A sill.service left over from a crashed session is stopped first;
+# if the unit cannot be started that is logged and the session carries on without a shell: sill never
+# runs without its unit identity. The environment: the user manager already holds the session variables
+# (import_unit_environment, publish_environment); WAYLAND_DISPLAY and PATH are passed again with -E
+# because a systemd-run service does not inherit this script's environment. This function runs as the
+# respawn loop's child: it returns when the unit ends (the loop restarts it with its exit guard), and
+# a TERM stops the unit.
+sill_unit=sill.service
+sill_ctl() { "$(bin systemctl)" --user "$@"; }
+sill_state() { sill_ctl show -p ActiveState --value "$sill_unit" 2>/dev/null || true; }
+stop_shell() {
+    [ -z "$nested" ] || [ -n "$stubs" ] || return 0
+    have systemd-run || return 0
+    sill_ctl stop "$sill_unit" 2>/dev/null || true
+}
 sill_shell() {
     local sill
     sill=$(bin sill)
-    if have systemd-run && [ "$("$(bin systemctl)" --user show -p LoadState --value sill-shell.scope 2>/dev/null)" = not-found ]; then
-        "$(bin systemd-run)" --user --scope --unit=sill-shell --collect --quiet -- "$sill" run
-    else
-        log "sill-shell.scope unavailable; sill runs without its unit identity"
-        "$sill" run
+    case "$(sill_state)" in
+        "" | inactive) ;;
+        *)
+            log "$sill_unit is still there from an earlier session; stopping it"
+            sill_ctl stop "$sill_unit" 2>/dev/null || true
+            sill_ctl reset-failed "$sill_unit" 2>/dev/null || true
+            ;;
+    esac
+    if ! "$(bin systemd-run)" --user --unit="${sill_unit%.service}" --slice=app.slice --collect --quiet -p Type=exec \
+        -E "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" -E "PATH=$PATH" -- "$sill" run; then
+        log "could not start $sill_unit; the session stays up without a shell"
+        return 0
     fi
+    trap 'stop_shell; exit 0' TERM
+    until case "$(sill_state)" in active | activating | deactivating) false ;; *) true ;; esac; do
+        sleep 0.5 & wait $!
+    done
+    log "$sill_unit ended"
 }
 
 first_run() {
@@ -212,7 +242,11 @@ start_components() {
     keep_running power-key "$(bin systemd-inhibit)" --what=handle-power-key --who=desktop-session \
         --why="the power key opens sill's power menu" --mode=block sleep infinity
     keep_running portal "$(bin xdg-desktop-portal-wlr /usr/libexec/xdg-desktop-portal-wlr)"
-    keep_running sill sill_shell
+    if have systemd-run; then
+        keep_running sill sill_shell
+    else
+        keep_running sill "$(bin sill)" run
+    fi
     if have detent; then first_run & component_pids+=("$!"); fi
 }
 
