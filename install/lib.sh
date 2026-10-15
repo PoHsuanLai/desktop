@@ -9,12 +9,15 @@
 #   --sessions-dir DIR the display manager's wayland-sessions directory (default /usr/share/wayland-sessions)
 #
 # Never runs sudo and never writes to $HOME: a destination you cannot write is printed with the
-# command to run as root, and the script stops there.
+# command to run as root (through sudo, doas or pkexec, whichever this machine has), and the script stops there.
+# casement's own unit is not installed here: casement's installer (scripts/install.sh, which ../install.sh runs)
+# puts casement.service under its prefix.
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../session" && pwd)"
-# casement's own user unit, shipped in the casement repo's dist/ (a sibling checkout); override with
-# CASEMENT_UNIT_FILE. Installed only when the file is there.
-casement_unit=${CASEMENT_UNIT_FILE:-$SRC/../../casement/dist/casement.service}
+# shellcheck source=distro.sh
+source "$(dirname "${BASH_SOURCE[0]}")/distro.sh"
+# shellcheck source=packages.sh
+source "$(dirname "${BASH_SOURCE[0]}")/packages.sh"
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
 sysconfdir=${SYSCONFDIR:-/etc}
@@ -52,7 +55,6 @@ files() {
   echo "644 $SRC/quire-portals.conf $prefix/share/xdg-desktop-portal/quire-portals.conf"
   echo "644 $SRC/desktop-session.target $sysconfdir/systemd/user/desktop-session.target"
   echo "644 $SRC/sill-casement.desktop $sessions_dir/sill-casement.desktop"
-  [ ! -f "$casement_unit" ] || echo "644 $casement_unit $sysconfdir/systemd/user/casement.service"
 }
 
 # content SOURCE: what is installed from SOURCE (the entry gets its Exec path).
@@ -80,6 +82,6 @@ need_write() {
     writable_for "$destdir$dest" || { note "not writable by you: $destdir$dest"; bad=1; }
   done
   if [ "$bad" = 0 ] || [ "$dry" = 1 ]; then return 0; fi
-  echo "run it with the privileges those places need, for example: sudo $0 ${ORIG_ARGS[*]}" >&2
+  echo "run it with the privileges those places need, for example: $(as_root_hint "$0" "${ORIG_ARGS[@]}")" >&2
   exit 1
 }
