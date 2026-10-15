@@ -2,12 +2,16 @@
 # Install the desktop: runs each component repo's own installer, in dependency order.
 #
 #   ./install.sh [--dry-run] [--prefix DIR] [--destdir DIR] [--sysconfdir DIR] [--siblings DIR] [--only NAME[,NAME]]
+#   ./install.sh --check [--runtime-only]
 #
 #   --dry-run      print the plan (what runs, in which order, what is left to you), run nothing, build nothing
 #   --prefix DIR   where the software goes (default $PREFIX, else /usr/local)
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
 #   --sysconfdir   where porter's caller table goes (default $SYSCONFDIR, else /etc)
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
+#   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
+#                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
+#                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
 #   --only NAMES   just these components (comma separated: porter, detent, casement, sill, keycap, anyview, mailo, palmrest)
 #
 # Order: porter (the account daemons and the caller table), detent (Settings), casement (the compositor and
@@ -38,6 +42,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/install/distro.sh"
 # shellcheck source=install/linker.sh
 source "$HERE/install/linker.sh"
+# shellcheck source=install/packages.sh
+source "$HERE/install/packages.sh"
+# shellcheck source=install/check.sh
+source "$HERE/install/check.sh"
 ORDER=(porter detent casement sill keycap anyview mailo palmrest)
 
 # Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
@@ -51,6 +59,8 @@ sysconfdir=${SYSCONFDIR:-/etc}
 siblings="$(dirname "$HERE")"
 only=""
 dry=0
+check=0
+check_args=()
 
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
 die() { echo "install.sh: $*" >&2; exit "${2:-2}"; }
@@ -58,6 +68,8 @@ die() { echo "install.sh: $*" >&2; exit "${2:-2}"; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) dry=1 ;;
+    --check) check=1 ;;
+    --runtime-only) check_args+=(--runtime-only) ;;
     --prefix) prefix=${2:?--prefix needs a directory}; shift ;;
     --prefix=*) prefix=${1#--prefix=} ;;
     --destdir) destdir=${2:?--destdir needs a directory}; shift ;;
@@ -73,6 +85,11 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+if [ "$check" = 1 ]; then
+  run_check "${check_args[@]}"
+  exit $?
+fi
+[ "${#check_args[@]}" = 0 ] || die "--runtime-only goes with --check"
 case "$prefix" in /*) ;; *) die "--prefix must be an absolute path" ;; esac
 destdir=${destdir%/}
 prefix=${prefix%/}
@@ -218,6 +235,7 @@ done
 case " ${selected[*]} " in *" porter "*)
   [ "$prefix" = "$PORTER_PREFIX" ] || echo "note: porter goes to $PORTER_PREFIX, not $prefix: its daemons read what they ship only from $PORTER_PREFIX/share" ;;
 esac
+command -v rustup >/dev/null || echo "note: rustup was not found. Building from source needs it (the repos pin Rust 1.98.1): $RUSTUP_LINE"
 plain_linker_notice
 if [ "${#left[@]}" -gt 0 ] && ! faster_linker_present && [ "$(host_arch)" = x86_64 ]; then
   echo "for the ones left to you, build with the system linker too: export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=cc RUSTFLAGS="
