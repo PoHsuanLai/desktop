@@ -80,6 +80,10 @@ tdir() { printf '%s/%s/release' "${CARGO_TARGET_ROOT:-$out/target}" "$1"; }
 
 # put MODE SRC REL: install SRC at $root/REL.
 put() { install -Dm"$1" "$2" "$root/$3"; }
+# put_system MODE SRC DEST: a file slipway-apply copies (as root) to the absolute DEST on the computer. It
+# travels in the bundle at system/DEST and pack.sh lists it; DEST must sit directly in one of the system
+# folders release.py (and slipway) allow: a mistake here is refused when the release is packed.
+put_system() { put "$1" "$2" "system$3"; }
 # retarget FILE FROM: the unit's path to its program becomes the installed one.
 retarget() { sed -i "s|^ExecStart=$2|ExecStart=$P/bin/$(basename "$2")|" "$1"; grep -q "^ExecStart=$P/bin/" "$1" || die "$1: no ExecStart to retarget"; }
 
@@ -97,8 +101,8 @@ build_sill() {
   local d; d=$(repo_dir sill)
   cargo_in "$d" sill -p sill
   # INTERIM: dist/install.sh has fixed destinations and sudo. Same files, under the prefix; the PAM
-  # service and the keycap layer have no exportable home, so they sit under share/sill for the updater's
-  # system step (FINDINGS.md).
+  # service is a system file (slipway-apply places it), and the keycap layer sits under share/sill
+  # (FINDINGS.md).
   put 755 "$(tdir sill)/sill" bin/sill
   put 644 "$d/dist/intents/org.quire.Shell.toml" share/quire/intents/org.quire.Shell.toml
   (cd "$d/dist/skills" && find . -type f | sort) | while IFS= read -r f; do
@@ -108,7 +112,7 @@ build_sill() {
   "$(tdir sill)/sill" --write-schema "$schema" >/dev/null
   put 644 "$schema/sill.settings.toml" share/quire/settings/sill.settings.toml
   rm -rf "$schema"
-  put 644 "$d/dist/pam.d/sill" share/sill/pam.d/sill
+  put_system 644 "$d/dist/pam.d/sill" /etc/pam.d/sill
   put 644 "$d/dist/keycap/keycap.toml" share/sill/keycap.toml
 }
 
@@ -123,9 +127,10 @@ build_session() {
 build_porter() {
   local d; d=$(repo_dir porter)
   cargo_in "$d" porter -p accountd -p syncd -p inferd
-  # --sysconfdir under the prefix: the caller table lands at etc/porter/callers.toml (FINDINGS.md: where it is read).
+  # --sysconfdir under the bundle's system tree: the caller table lands at system/etc/porter/callers.toml, a
+  # system file slipway-apply places at /etc/porter/callers.toml (where porter reads it).
   (cd "$d" && CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/porter" \
-    ./scripts/install.sh --no-build --prefix "$P" --destdir "$stage" --sysconfdir "$P/etc")
+    ./scripts/install.sh --no-build --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
 }
 
 build_detent() {
@@ -162,13 +167,19 @@ build_mailo() {
 build_keycap() {
   local d; d=$(repo_dir keycap)
   cargo_in "$d" keycap
-  # INTERIM: install.sh stages under DESTDIR but at /etc and /usr/local, outside the prefix. System files
-  # (unit, udev, polkit rules) sit under share/keycap for the updater's system step.
+  # INTERIM: install.sh stages under DESTDIR but at /etc and /usr/local, outside the prefix. The unit, the
+  # udev rule, the polkit rule and the module list are system files (slipway-apply places them); the unit
+  # goes to /usr/lib/systemd/system (the vendor folder; /etc stays the administrator's). keycap ships no
+  # modules-load file (distro audit lane 12 asks for one): the line is written here.
   put 755 "$(tdir keycap)/keycap" bin/keycap
-  put 644 "$d/dist/keycap.service" share/keycap/keycap.service
-  retarget "$root/share/keycap/keycap.service" /usr/local/bin/keycap
-  put 644 "$d/dist/70-keycap.rules" share/keycap/70-keycap.rules
-  put 644 "$d/dist/keycap.polkit.rules" share/keycap/keycap.polkit.rules
+  put_system 644 "$d/dist/keycap.service" /usr/lib/systemd/system/keycap.service
+  retarget "$root/system/usr/lib/systemd/system/keycap.service" /usr/local/bin/keycap
+  put_system 644 "$d/dist/70-keycap.rules" /etc/udev/rules.d/70-keycap.rules
+  put_system 644 "$d/dist/keycap.polkit.rules" /etc/polkit-1/rules.d/keycap.polkit.rules
+  local modules; modules=$(mktemp)
+  printf '# keycap writes its virtual keyboard through /dev/uinput.\nuinput\n' >"$modules"
+  put_system 644 "$modules" /etc/modules-load.d/keycap.conf
+  rm -f "$modules"
   put 644 "$d/dist/keycap.plasma.toml" share/keycap/keycap.plasma.toml
 }
 
@@ -179,8 +190,8 @@ build_palmrest() {
   put 755 "$(tdir palmrest)/palmrest" bin/palmrest
   put 644 "$d/dist/palmrest.service" lib/systemd/user/palmrest.service
   retarget "$root/lib/systemd/user/palmrest.service" '%h/.local/bin/palmrest'
-  put 644 "$d/dist/70-palmrest.rules" share/palmrest/70-palmrest.rules
-  put 644 "$d/dist/99-palmrest.conf" share/palmrest/99-palmrest.conf
+  put_system 644 "$d/dist/70-palmrest.rules" /etc/udev/rules.d/70-palmrest.rules
+  put_system 644 "$d/dist/99-palmrest.conf" /etc/modprobe.d/99-palmrest.conf
 }
 
 build_slipway() {

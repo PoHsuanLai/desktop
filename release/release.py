@@ -5,7 +5,9 @@ library only (tomllib, tarfile, hashlib), plus the zstd and minisign programs.
 Format 1: see release/README.md. The rules below are the whole contract:
   - the bundle holds regular files and directories only, relative clean paths, owner 0;
   - release.toml lists every regular file with its sha256 and mode, sorted by path;
-  - exports are system links, each under one of EXPORT_ROOTS, each to a file in the bundle.
+  - exports are system links, each under one of EXPORT_ROOTS, each to a file in the bundle;
+  - system files are copies slipway-apply places as root: each bundle file under system/ is listed in
+    release.toml as [[system]] with its absolute destination, directly inside one of SYSTEM_DIRS.
 """
 import base64
 import datetime
@@ -33,15 +35,25 @@ MAX_NOTES = 16 * 1024
 MAX_RELEASE_TOML = 24 << 20
 MAX_TOTAL = 16 << 30
 PART = re.compile(r"^[A-Za-z0-9._+@=,~-]+$")
+# Must be the same list as slipway-core's ALLOWED_LINK_DIRS (release/export.rs).
 EXPORT_ROOTS = (
     "/usr/share/wayland-sessions", "/usr/share/xdg-desktop-portal", "/usr/share/dbus-1/services",
     "/usr/lib/systemd/user", "/usr/share/applications", "/usr/share/polkit-1/actions", "/usr/local/bin",
+    "/usr/share/quire", "/usr/share/porter", "/usr/share/stoker", "/usr/share/fonts",
 )
 # A staged directory that maps to the same path under /usr, with no listing needed.
 AUTO_EXPORT_DIRS = (
     "share/wayland-sessions", "share/xdg-desktop-portal", "share/dbus-1/services", "lib/systemd/user",
-    "share/applications", "share/polkit-1/actions",
+    "share/applications", "share/polkit-1/actions", "share/quire", "share/porter", "share/stoker", "share/fonts",
 )
+# The tree of files slipway-apply copies (not links) to a system folder, and the only folders it may name.
+# Must be the same list as slipway-core's ALLOWED_SYSTEM_DIRS (release/system.rs); a file goes directly in one.
+SYSTEM_TREE = "system"
+SYSTEM_DIRS = (
+    "/etc/udev/rules.d", "/etc/modules-load.d", "/etc/modprobe.d", "/usr/lib/systemd/system", "/etc/pam.d",
+    "/etc/polkit-1/rules.d", "/etc/porter", "/etc/quire",
+)
+SYSTEM_NAME = re.compile(r"^[A-Za-z0-9+@_-][A-Za-z0-9._+@-]*$")
 
 
 class Refused(Exception):
@@ -76,6 +88,18 @@ def export_ok(link):
         raise Refused(f"export link {link!r}: not a clean path")
     if not any(link.startswith(root + "/") for root in EXPORT_ROOTS):
         raise Refused(f"export link {link!r}: not under an allowed directory")
+
+
+def system_ok(dest):
+    """A system file's destination: absolute, directly inside one of SYSTEM_DIRS, a plain name."""
+    folder, _, name = dest.rpartition("/") if isinstance(dest, str) else ("", "", "")
+    if folder not in SYSTEM_DIRS or not SYSTEM_NAME.match(name) or len(name) > 255:
+        raise Refused(f"system file {dest!r}: not directly inside an allowed system folder")
+
+
+def system_dest(rel):
+    """The destination a bundle file under system/ stands for, or None for any other file."""
+    return rel[len(SYSTEM_TREE):] if rel.startswith(SYSTEM_TREE + "/") else None
 
 
 def toml_str(text):
@@ -157,6 +181,17 @@ def derive_exports(files, exports_file):
     return dict(sorted(out.items()))
 
 
+def derive_system(files):
+    """The destinations of the bundle files under system/ (refusing a folder that is not allowed)."""
+    out = []
+    for rel in sorted(files):
+        dest = system_dest(rel)
+        if dest is not None:
+            system_ok(dest)
+            out.append(dest)
+    return out
+
+
 def read_components(manifest, extra):
     with open(manifest, "rb") as f:
         comps = {name: repo["rev"] for name, repo in tomllib.load(f).get("repo", {}).items()}
@@ -186,7 +221,7 @@ def make_bundle(stage, files, dirs, out):
     os.remove(raw)
 
 
-def release_text(version, date, notes, bundle_path, comps, files, stage_top, exports):
+def release_text(version, date, notes, bundle_path, comps, files, stage_top, exports, system=()):
     lines = ["format = 1", f"version = {toml_str(version)}", f"date = {toml_str(date)}", f"notes = {toml_str(notes)}",
              f'bundle = {{ name = "{BUNDLE}", sha256 = "{sha256_file(bundle_path)}", size = {os.path.getsize(bundle_path)} }}',
              "", "[components]"]
@@ -195,6 +230,8 @@ def release_text(version, date, notes, bundle_path, comps, files, stage_top, exp
         lines += ["", "[[file]]", f"path = {toml_str(rel)}", f'sha256 = "{sha256_file(os.path.join(stage_top, rel))}"', f"mode = 0o{mode:o}"]
     for link, target in exports.items():
         lines += ["", "[[export]]", f"link = {toml_str(link)}", f"target = {toml_str(target)}"]
+    for dest in system:
+        lines += ["", "[[system]]", f"path = {toml_str(dest)}"]
     return "\n".join(lines) + "\n"
 
 
@@ -215,6 +252,7 @@ def pack(a):
     files, dirs = walk_stage(a["stage"])
     top = os.path.join(a["stage"], *PREFIX.split("/"))
     exports = derive_exports(files, a["exports"])
+    system = derive_system(files)
     comps = read_components(a["manifest"], a["components"])
     notes = open(a["notes"], encoding="utf-8").read().strip()
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0")) or None
@@ -222,14 +260,14 @@ def pack(a):
     real_date(now.strftime("%Y-%m-%dT%H:%M:%SZ"))
     os.makedirs(a["out"], exist_ok=True)
     make_bundle(a["stage"], files, dirs, a["out"])
-    text = release_text(a["version"], now.strftime("%Y-%m-%dT%H:%M:%SZ"), notes, os.path.join(a["out"], BUNDLE), comps, files, top, exports)
+    text = release_text(a["version"], now.strftime("%Y-%m-%dT%H:%M:%SZ"), notes, os.path.join(a["out"], BUNDLE), comps, files, top, exports, system)
     path = os.path.join(a["out"], "release.toml")
     total = sum(os.path.getsize(os.path.join(top, r)) for r in files)
     check_limits(os.path.getsize(os.path.join(a["out"], BUNDLE)), len(files), notes, len(text.encode("utf-8")), total)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     sign(path)
-    print(f"packed {a['version']}: {len(files)} files, {len(exports)} exports, bundle {os.path.getsize(os.path.join(a['out'], BUNDLE))} bytes")
+    print(f"packed {a['version']}: {len(files)} files, {len(exports)} exports, {len(system)} system files, bundle {os.path.getsize(os.path.join(a['out'], BUNDLE))} bytes")
 
 
 # ------------------------------------------------------------------------------------------- verify
@@ -300,6 +338,19 @@ def check_manifest(doc):
         links.add(e["link"])
         if clean_path(e.get("target"), "export target") not in files:
             raise Refused(f"export {e['link']}: target {e['target']} is not a bundle file")
+    listed = []
+    for entry in doc.get("system", []):
+        dest = entry.get("path")
+        system_ok(dest)
+        if dest in listed:
+            raise Refused(f"system file {dest} listed twice")
+        listed.append(dest)
+        if SYSTEM_TREE + dest not in files:
+            raise Refused(f"system file {dest}: no contents at {SYSTEM_TREE}{dest} in the bundle")
+    for path in files:
+        dest = system_dest(path)
+        if dest is not None and dest not in listed:
+            raise Refused(f"{path}: in the system folder of the bundle but not listed as a system file")
     return b, files
 
 
@@ -362,7 +413,30 @@ def verify(directory, pubkey):
     if os.path.getsize(path) != bundle["size"] or sha256_file(path) != bundle["sha256"]:
         raise Refused("bundle: size or digest differs from release.toml")
     n = check_bundle(path, files)
-    print(f"verified {doc['version']}: {n} files, {len(doc.get('export', []))} exports")
+    print(f"verified {doc['version']}: {n} files, {len(doc.get('export', []))} exports, {len(doc.get('system', []))} system files")
+
+
+def check_installed(directory, root, base="/"):
+    """After slipway-apply: `current` names the release, every export is a link to a file in it, and every
+    system file is a real file with the bundle's contents. `base` is what the absolute paths are under."""
+    with open(os.path.join(directory, "release.toml"), "rb") as f:
+        doc = tomllib.load(f)
+    current = os.path.join(root, "current")
+    if os.path.basename(os.path.realpath(current)) != doc["version"]:
+        raise Refused(f"{current} does not name version {doc['version']}")
+    for e in doc.get("export", []):
+        link, want = os.path.join(base, e["link"].lstrip("/")), os.path.join(current, e["target"])
+        if not os.path.islink(link) or os.readlink(link) != want:
+            raise Refused(f"{e['link']} is not a link to {want}")
+        if not os.path.isfile(link):
+            raise Refused(f"{e['link']} does not lead to a file")
+    for s in doc.get("system", []):
+        dest, source = os.path.join(base, s["path"].lstrip("/")), os.path.join(current, SYSTEM_TREE + s["path"])
+        if os.path.islink(dest) or not os.path.isfile(dest):
+            raise Refused(f"{s['path']} is not a regular file")
+        if sha256_file(dest) != sha256_file(source):
+            raise Refused(f"{s['path']} differs from the release's copy")
+    print(f"installed {doc['version']}: {len(doc.get('export', []))} exports and {len(doc.get('system', []))} system files in place")
 
 
 def main(argv):
@@ -373,6 +447,8 @@ def main(argv):
             pack(dict(zip(keys, rest + [""] * (len(keys) - len(rest)))))
         elif cmd == "verify":
             verify(rest[0], rest[1])
+        elif cmd == "installed":
+            check_installed(*rest)
         else:
             raise Refused(f"unknown command {cmd}")
     except Refused as e:
