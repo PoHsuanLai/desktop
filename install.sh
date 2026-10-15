@@ -12,11 +12,12 @@
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: porter, detent, casement, sill, keycap, anyview, mailo,
-#                  palmrest, session, fonts)
+#   --only NAMES   just these components (comma separated: porter, detent, casement, sill, transom, keycap, anyview,
+#                  mailo, palmrest, session, fonts)
 #
 # Order: porter (the account daemons and the caller table), detent (Settings), casement (the compositor and
-# its user unit), sill (the shell), keycap, anyview, mailo, palmrest, and last the session itself (this repo's
+# its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
+# scripts/install.sh builds it), keycap, anyview, mailo, palmrest, and last the session itself (this repo's
 # install/install.sh: the desktop-session script, the user target and the login entry "sill (casement)"). Each
 # component's installer is its
 # own: this script passes the prefix and the staging root through and nothing else, and stops at the first
@@ -55,7 +56,7 @@ source "$HERE/install/packages.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(porter detent casement sill keycap anyview mailo palmrest session)
+ORDER=(porter detent casement sill transom keycap anyview mailo palmrest session)
 
 # Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
 # catalog only under /usr/share (finding B1). Remove this, and the --prefix /usr below, once porter searches
@@ -129,6 +130,11 @@ describe() {
     sill)
       script=dist/install.sh
       yourself="its installer has fixed destinations (/usr/local, /etc, /usr/share) and asks for sudo" ;;
+    transom)
+      script=scripts/install.sh
+      args=(--prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix") ;;
     keycap)
       script=install.sh
       envs=("DESTDIR=$destdir")

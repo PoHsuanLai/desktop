@@ -23,10 +23,10 @@
 #                                 accountd, the companion's daemons (memoryd, intentd) and casement admit
 #                                 the shell only as that unit's main process. A stale sill.service is
 #                                 stopped first; if it cannot start, the session stays up without a shell
-#   xdg-desktop-portal-wlr        the interim ScreenCast/Screenshot portal (the casement portal
-#                                 replaces it at P2); quire-portals.conf routes to it for quire. Started as
-#                                 the distro's user unit xdg-desktop-portal-wlr.service when there is one,
-#                                 else the program from /usr/libexec, /usr/lib or the multiarch lib dir
+#   (no portal process: xdg-desktop-portal and transom, the quire desktop's portal backend, are
+#                                 started by D-Bus activation on the first portal call, as transom.service;
+#                                 quire-portals.conf routes ScreenCast, Screenshot, Settings, RemoteDesktop
+#                                 and Inhibit to it for XDG_CURRENT_DESKTOP=quire)
 #   the wallet                    the place saved passwords live (the Secret Service). pam_kwallet_init when
 #                                 PAM_KWALLET5_LOGIN is set (the login password reaches ksecretd). Then, in
 #                                 order, stopping at the first that works: a provider D-Bus can start on
@@ -38,8 +38,8 @@
 #                                 power menu instead of powering off
 #   detent --first-run            the welcome window of Settings, 5 s in, once per login (it exits at
 #                                 once when it has run); not respawned
-# sill, the portal program, ksecretd, ibus and the inhibitor are restarted when they exit (five exits within ten
-# seconds each, then given up). The portal, ksecretd and the inhibitor are children of this script,
+# sill, ksecretd, ibus and the inhibitor are restarted when they exit (five exits within ten
+# seconds each, then given up). ksecretd, ibus and the inhibitor are children of this script,
 # ended by PID when casement ends; sill is watched as its unit (restarted by the same guard) and ended
 # with `systemctl --user stop sill.service`, our own transient unit. All start again with the next
 # casement. Nothing is looked up or killed by name.
@@ -57,12 +57,12 @@
 #   DESKTOP_SESSION_BACKEND_ARGS   its arguments before --safe (default: --backend tty)
 #   DESKTOP_SESSION_QUICK_SECS     the quick-exit limit (default 20)
 #   DESKTOP_SESSION_STATE          where guard.log and casement.log go (default $XDG_RUNTIME_DIR/desktop-session)
-#   DESKTOP_SESSION_STUBS          a directory of stand-in programs (sill, xdg-desktop-portal-wlr, pam_kwallet_init,
+#   DESKTOP_SESSION_STUBS          a directory of stand-in programs (sill, pam_kwallet_init,
 #                                  busctl, ksecretd, gnome-keyring-daemon, ibus-daemon, systemd-inhibit, systemd-run,
 #                                  systemctl, detent) that, with
 #                                  DESKTOP_SESSION_NESTED=1, makes the components start from there (tests)
 #   DESKTOP_SESSION_FIRST_RUN_DELAY  seconds before detent --first-run (default 5)
-#   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill, no portal (tests)
+#   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill (tests)
 #   DESKTOP_SESSION_UNIT           the casement unit (default casement.service)
 #   DESKTOP_SESSION_OS_RELEASE     the os-release file read for the wallet hint (default /etc/os-release; tests)
 #
@@ -144,8 +144,6 @@ fi
 
 component_pids=()
 casement_pid=
-portal_unit=xdg-desktop-portal-wlr.service
-portal_unit_started=
 
 stop_components() {
     local pid
@@ -157,10 +155,6 @@ stop_components() {
     done
     component_pids=()
     stop_shell
-    if [ -n "$portal_unit_started" ]; then
-        systemctl --user stop "$portal_unit" 2>/dev/null || true
-        portal_unit_started=
-    fi
 }
 
 on_term() {
@@ -339,32 +333,6 @@ sill_shell() {
     log "$sill_unit ended"
 }
 
-# The wlr portal: the distro's user unit when it ships one (Ubuntu, Arch and Fedora do), so the path to the program
-# is the distro's business; else the program from the first place it is installed (/usr/libexec on Fedora and
-# Ubuntu, /usr/lib on Arch).
-start_portal() {
-    local program listed=
-    if [ -z "$stubs" ]; then
-        listed=$(systemctl --user list-unit-files "$portal_unit" --no-legend 2>/dev/null) || listed=
-        if [ -n "$listed" ]; then
-            if systemctl --user start "$portal_unit"; then
-                portal_unit_started=1
-                return 0
-            fi
-            log "could not start $portal_unit; trying the program itself"
-        fi
-        program=$(first_executable /usr/libexec/xdg-desktop-portal-wlr /usr/lib/xdg-desktop-portal-wlr \
-            /usr/lib/x86_64-linux-gnu/xdg-desktop-portal-wlr)
-    else
-        program="$stubs/xdg-desktop-portal-wlr"
-    fi
-    if [ -z "$program" ]; then
-        log "xdg-desktop-portal-wlr is not installed: screenshots and screen sharing will not work"
-        return 0
-    fi
-    keep_running portal "$program"
-}
-
 first_run() {
     sleep "$first_run_delay"
     "$(bin detent)" --first-run || log "detent --first-run exited with $?"
@@ -378,7 +346,6 @@ start_components() {
     wallet & component_pids+=("$!")
     keep_running power-key "$(bin systemd-inhibit)" --what=handle-power-key --who=desktop-session \
         --why="the power key opens sill's power menu" --mode=block sleep infinity
-    start_portal
     if [ -n "$ibus_daemon" ] && have ibus-daemon; then keep_running ibus "$(bin ibus-daemon)" --xim --replace; fi
     if have systemd-run; then
         keep_running sill sill_shell

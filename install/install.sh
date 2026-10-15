@@ -8,7 +8,8 @@
 #   (flags: see install/lib.sh)
 #
 # Not installed here: casement (and its casement.service, which casement's own installer puts under its prefix),
-# sill and xdg-desktop-portal-wlr themselves (their own installers and packages), other sessions (left untouched), and
+# sill and transom (the portal backend) themselves (their own installers and packages), other sessions (left
+# untouched), and
 # anything under $HOME. install/uninstall.sh removes exactly the files listed below.
 set -euo pipefail
 ORIG_ARGS=("$@")
@@ -30,11 +31,12 @@ done
 if [ -f "$destdir$sysconfdir/systemd/user/casement.service" ]; then
   note "WARNING: $sysconfdir/systemd/user/casement.service is an older copy and hides the one casement's installer puts under $prefix/lib/systemd/user; remove it: $(as_root_hint rm -f "$sysconfdir/systemd/user/casement.service")"
 fi
+[ -x "$prefix/libexec/transom" ] || [ -x /usr/libexec/transom ] || note "WARNING: transom is not installed (the repo's scripts/install.sh, or the top-level ./install.sh --only transom); screen sharing and screenshots need it"
 portal_found=0
-for portal in /usr/libexec/xdg-desktop-portal-wlr /usr/lib/xdg-desktop-portal-wlr /usr/lib/*/xdg-desktop-portal-wlr; do
+for portal in /usr/libexec/xdg-desktop-portal /usr/lib/xdg-desktop-portal /usr/lib/*/xdg-desktop-portal; do
   [ ! -x "$portal" ] || portal_found=1
 done
-[ "$portal_found" = 1 ] || note "WARNING: xdg-desktop-portal-wlr is missing (screenshots and screen sharing need it): $(install_hint portal-wlr | tr '\n' ' ')"
+[ "$portal_found" = 1 ] || note "WARNING: xdg-desktop-portal is missing (screenshots and screen sharing need it): $(install_hint portal | tr '\n' ' ')"
 
 step "2/3 the files"
 dests=()
@@ -59,5 +61,5 @@ fi
 
 step "done"
 note "Pick \"sill (casement)\" at the login screen. First-login checks (not testable without a login):"
-note "  the guard's real tty path, sill and the wlr portal against the real casement, the target, casement.service"
-note "  the activation environment, a screen share through the wlr portal, logout through sill's power menu."
+note "  the guard's real tty path, sill and transom against the real casement, the target, casement.service"
+note "  the activation environment, a screen share through transom (a browser, OBS), logout through sill's power menu."

@@ -6,17 +6,17 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | Path | What |
 |---|---|
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
-| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, detent, casement, sill, keycap, anyview, mailo, palmrest, session) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
+| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, detent, casement, sill, transom, keycap, anyview, mailo, palmrest, session) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
 | `docs/distros.md` | Ubuntu 24.04+, Fedora and Arch: what is checked, the install lines, picking the session at login, the Ubuntu AppArmor note |
 | `install/` (helpers) | `distro.sh` (family from os-release, sudo/doas/pkexec), `packages.sh` (the one package table), `check.sh`, `linker.sh` (system linker when clang or mold is missing), `fonts.sh` |
 | `fonts/` | `Noto-COLRv1.ttf` (OFL) with its source and sha256: Ubuntu and Arch ship a bitmap emoji font our renderer cannot draw |
 | `gate/distro-check.sh` | the family detection, package table, escalation, linker fallback and `--check` against made-up machines |
 | `harness/jail.sh` | the one jail: a bubblewrap namespace with no input devices, no GPU, no session, no network |
 | `harness/lib/` | `require_jail`, step timing and exit codes, budgets, run ids, a private dbus-daemon |
-| `harness/scenario-build.sh` | outside the jail: builds what the scenarios run (casement tools, foot, sill, shell-host's demos, detent at its pin) into the git-ignored `build/`; the gate runs it first |
+| `harness/scenario-build.sh` | outside the jail: builds what the scenarios run (casement tools, foot, sill, shell-host's demos, detent at its pin, transom) into the git-ignored `build/`; the gate runs it first |
 | `harness/selftest.sh` | proves the jail holds (`--all` also runs the negative check outside) |
 | `gate/desktop-gate.sh` | `--self`, `--merge`, `--phase P<n>`: prints `DESKTOP GATE GREEN (<tier>)` |
-| `session/` | the "sill (casement)" login: `desktop-session` (casement as the session's compositor child, with sill and xdg-desktop-portal-wlr beside it, `XDG_CURRENT_DESKTOP=quire`, and the crash-loop guard: three quick exits, then `casement --safe`, then the session ends with a guard log line; your other session stays available at the login screen), the wayland-sessions entry, `quire-portals.conf`, `desktop-session.target` |
+| `session/` | the "sill (casement)" login: `desktop-session` (casement as the session's compositor child, with sill beside it; the portal is transom, started by D-Bus activation, `XDG_CURRENT_DESKTOP=quire`, and the crash-loop guard: three quick exits, then `casement --safe`, then the session ends with a guard log line; your other session stays available at the login screen), the wayland-sessions entry, `quire-portals.conf`, `desktop-session.target` |
 | `install/` | `install.sh` and `uninstall.sh` for `session/` (`--dry-run`, `--prefix`, `--destdir`, `--sysconfdir`, `--sessions-dir`); never sudo, never `$HOME`; the uninstall removes exactly the files the install wrote, and only while they are unchanged |
 | `gate/installer-check.sh` | `install.sh` against stub installers in a scratch dir: the dry-run plan and order, PREFIX/DESTDIR passed through, stop at the first failure, no sudo, nothing written to the home |
 | `gate/manifest-check.sh` | every Cargo.lock agrees with the manifest, and resolves `--locked` against the pinned siblings |
@@ -31,7 +31,8 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 `./install.sh [--dry-run] [--prefix DIR] [--destdir DIR] [--sysconfdir DIR] [--siblings DIR] [--only NAME,...]`
 runs each component's own installer, siblings checked out side by side, in this order: porter
 (`scripts/install.sh`: the daemons and the caller table), detent (`scripts/install.sh`: Settings, which
-porter's caller table knows as the unit `org.quire.Settings.service`), sill (`dist/install.sh`), keycap,
+porter's caller table knows as the unit `org.quire.Settings.service`), sill (`dist/install.sh`), transom
+(`scripts/install.sh`: the portal backend for screen sharing and screenshots, started by D-Bus activation), keycap,
 anyview, mailo, palmrest, then the session itself (`install/install.sh`: `desktop-session`, the user target, the login entry; it never runs sudo and prints the root command when a place is not writable) (casement, with its unit, goes between detent and sill; it is skipped with a message until casement's `scripts/install.sh` exists). porter always goes to `/usr`, whatever `--prefix` says. `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
 installer takes; the first failure stops the run and names the component and what was installed before it.
 `--dry-run` prints the plan and runs and builds nothing.

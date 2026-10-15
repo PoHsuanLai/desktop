@@ -171,7 +171,7 @@ for tool in pkexec bwrap curl xdg-open Xwayland gnome-keyring-daemon; do printf 
 printf '#!/bin/sh\nexit 0\n' >"$bin/dpkg"; chmod +x "$bin/dpkg"
 printf '#!/bin/sh\nprintf "\\tlibvulkan.so.1 (libc6,x86-64) => /usr/lib/libvulkan.so.1\\n"\n' >"$tmp/ldconfig"; chmod +x "$tmp/ldconfig"
 mkdir -p "$root/usr/libexec" "$root/usr/share/vulkan/icd.d"
-for portal in xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-wlr; do : >"$root/usr/libexec/$portal"; done
+for portal in xdg-desktop-portal xdg-desktop-portal-gtk; do : >"$root/usr/libexec/$portal"; done
 : >"$root/usr/share/vulkan/icd.d/lvp_icd.json"
 machine_rc=0
 machine_out=$(PATH=$bin DESKTOP_OS_RELEASE=$(osr machine-os 'ID=ubuntu

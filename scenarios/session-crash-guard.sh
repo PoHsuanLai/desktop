@@ -9,9 +9,9 @@
 #               does not exit
 #   ends        with a stand-in that always panics, the --safe run's quick exit ends the session with
 #               status 1 and a guard log line (the other login entry stays available)
-#   components  none run by default (DESKTOP_SESSION_NESTED=1: no systemd, no sill, no portal); with
+#   components  none run by default (DESKTOP_SESSION_NESTED=1: no systemd, no sill); with
 #               DESKTOP_SESSION_STUBS the session starts its components from stand-in programs: sill as
-#               the unit sill.service (and again after it exits), the portal, the power-key inhibitor,
+#               the unit sill.service (and again after it exits), the power-key inhibitor,
 #               the wallet (pam_kwallet_init, then ksecretd when nothing owns the Secret Service) and
 #               detent --first-run; all are gone when the session ends
 # This is the direct-child path (DESKTOP_SESSION_NESTED=1); the real session runs casement as casement.service
@@ -154,7 +154,7 @@ safe_failing_ends_the_session() {
 stub_components() {
   local d="$OUT_DIR/stubs" n
   rm -rf "$d" "$OUT_DIR/stubs.log" "$OUT_DIR/sill-ran" "$OUT_DIR/unit.pid"; mkdir -p "$d"
-  for n in xdg-desktop-portal-wlr ksecretd pam_kwallet_init detent; do
+  for n in ksecretd pam_kwallet_init detent; do
     printf '#!/bin/sh\necho "%s $*" >>"%s"\n[ "%s" = pam_kwallet_init ] || [ "%s" = detent ] || exec sleep 300\n' \
       "$n" "$OUT_DIR/stubs.log" "$n" "$n" >"$d/$n"
   done
@@ -182,7 +182,7 @@ components_start_and_end_with_the_session() {
   # ksecretd starts only after the wallet has waited 5 s for an owner of the Secret Service.
   wait_for 100 grep -q '^ksecretd' "$log" || true
   for want in 'systemd-run --user --unit=sill --slice=app.slice --collect --quiet -p Type=exec' 'systemd-inhibit --what=handle-power-key --who=desktop-session' \
-    '^xdg-desktop-portal-wlr' '^pam_kwallet_init' '^ksecretd'; do
+    '^pam_kwallet_init' '^ksecretd'; do
     grep -q -- "$want" "$log" || { echo "missing: $want" >&2; cat "$log" >&2; return 1; }
   done
   stop_session

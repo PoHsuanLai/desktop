@@ -6,6 +6,7 @@
 #   build/tools/bin/{casement,casementctl,casement-probe,fake-logind}   casement's dev/bootstrap.sh --build-only
 #   build/tools/bin/foot                                                 the host's (install foot from your distro), else, on Fedora only, its rpm (dnf download, unpacked)
 #   build/sill-target/debug/sill                                         sill with --features debug (the fake DDC)
+#   build/transom-target/debug/transom                                  transom (the portal backend) from the sibling checkout, for portal-quire; needs libpipewire-devel and clang
 #   build/shell-host-target/debug/examples/demo_*                        shell-host's real-input demos
 #   build/src/{sill,shell-host}                                          private checkouts of the siblings' HEADs the scripts run from
 #   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
@@ -116,6 +117,11 @@ build_sill() {
   (cd "$SCEN_SRC/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" cargo build -p sill --features debug)
 }
 
+# transom from the sibling checkout, --locked (the sibling's Cargo.lock is never changed).
+build_transom() {
+  (cd "$SCEN_SIB/transom" && CARGO_TARGET_DIR="$SCEN_BUILD/transom-target" cargo build -p transom --locked)
+}
+
 # The demos shell-host's accept scripts run, built the way those scripts build them (two cargo
 # invocations: the default features, then --features debug-inject, whose binaries the second set of
 # scripts need). The scripts hard-code ROOT/target/debug/examples, so target is a link to the build dir.
@@ -166,6 +172,7 @@ if [ "$only_accounts" = 0 ]; then
   stage "checkouts of sill and shell-host" checkouts
   stage "sill (--features debug)" build_sill
   stage "shell-host demos" build_shell_host
+  stage "transom" build_transom
 fi
 stage "every repo at its manifest rev" pinned
 stage "detent (at its pin)" build_detent

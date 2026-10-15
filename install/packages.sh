@@ -31,7 +31,6 @@ runtime user-bus          deb:dbus-user-session
 runtime polkit            cmd:pkexec
 runtime portal            file:/usr/libexec/xdg-desktop-portal /usr/lib/xdg-desktop-portal /usr/lib/*/xdg-desktop-portal
 runtime portal-gtk        file:/usr/libexec/xdg-desktop-portal-gtk /usr/lib/xdg-desktop-portal-gtk /usr/lib/*/xdg-desktop-portal-gtk
-runtime portal-wlr        file:/usr/libexec/xdg-desktop-portal-wlr /usr/lib/xdg-desktop-portal-wlr /usr/lib/*/xdg-desktop-portal-wlr
 runtime xwayland          cmd:Xwayland
 runtime secrets           cmd:gnome-keyring-daemon cmd:ksecretd file:/usr/share/dbus-1/services/org.freedesktop.secrets.service
 runtime bwrap             cmd:bwrap
@@ -103,7 +102,6 @@ packages_fedora() {
     polkit) echo polkit ;;
     portal) echo xdg-desktop-portal ;;
     portal-gtk) echo xdg-desktop-portal-gtk ;;
-    portal-wlr) echo xdg-desktop-portal-wlr ;;
     xwayland) echo xorg-x11-server-Xwayland ;;
     secrets) echo gnome-keyring ;;
     bwrap) echo bubblewrap ;;
@@ -169,7 +167,6 @@ packages_debian() {
     polkit) echo polkitd pkexec ;;
     portal) echo xdg-desktop-portal ;;
     portal-gtk) echo xdg-desktop-portal-gtk ;;
-    portal-wlr) echo xdg-desktop-portal-wlr ;;
     xwayland) echo xwayland ;;
     secrets) echo gnome-keyring ;;
     bwrap) echo bubblewrap ;;
@@ -235,7 +232,6 @@ packages_arch() {
     polkit) echo polkit ;;
     portal) echo xdg-desktop-portal ;;
     portal-gtk) echo xdg-desktop-portal-gtk ;;
-    portal-wlr) echo xdg-desktop-portal-wlr ;;
     xwayland) echo xorg-xwayland ;;
     secrets) echo gnome-keyring ;;
     bwrap) echo bubblewrap ;;
