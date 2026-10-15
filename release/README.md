@@ -10,6 +10,7 @@ slipway, the updater, reads it.
 | `pack.sh` | stage -> `release.toml` (digests, modes, components, exports), `bundle.tar.zst` (deterministic), `release.toml.minisig` |
 | `verify.sh` | checks a packed release the way slipway will; the CI runs it before publishing |
 | `selftest.sh` | packs a fake stage with a throwaway key, verifies it, and checks that hostile releases are refused; a SKIP (exit 2) without minisign; run by `gate/desktop-gate.sh --self` |
+| `bootstrap.sh` | first install on a machine: downloads the latest release, verifies it, runs slipway's helper |
 | `checkout.sh` | checks out every manifest repo at its rev, side by side (used by the workflow) |
 | `exports.toml` | exports beyond the ones derived from the staged tree (`/usr/local/bin` links) |
 | `release.pub` | the public key (you commit it once, step 3) |
@@ -73,7 +74,7 @@ under `/usr`, and `exports.toml` adds the rest.
 
 ## Cutting a release
 
-Pin the revs you want in `manifest.toml` (and slipway's ref, below), push, then either:
+Pin the revs you want in `manifest.toml` (slipway included), push, then either:
 
 ```
 gh workflow run release.yml --repo PoHsuanLai/desktop -f version=0.2.0 -f notes="What changed, in plain words."
@@ -85,21 +86,22 @@ ones together), packs and signs, verifies, and creates the release `v0.2.0` in d
 `gh run watch --repo PoHsuanLai/desktop`. A tag that already exists in desktop-releases fails the last step;
 nothing is overwritten.
 
-slipway is not in `manifest.toml` yet; until it is, the workflow builds slipway at the `slipway_ref` input
-(default `master`) and records its rev under `[components]`.
-
 ## First install on a machine
 
-slipway installs the desktop, so slipway comes first. Its installer takes the public key (it ends up at
-`/usr/share/slipway/release.pub`); then slipway does the rest:
+slipway installs the desktop, so slipway's own pieces come first: its `scripts/install.sh` puts the privileged
+helper at `/usr/libexec/slipway-apply`, its polkit action, the user unit and the release key at
+`/usr/share/slipway/release.pub`. Then `release/bootstrap.sh` fetches the latest release from
+desktop-releases, checks it with `verify.sh` against that key, and runs `pkexec /usr/libexec/slipway-apply`
+on it:
 
 ```
-cd slipway && sudo ./dist/install.sh --pubkey /path/to/release.pub
-slipway install
+cd slipway && sudo scripts/install.sh --pubkey /path/to/release.pub
+cd ../desktop && release/bootstrap.sh
 ```
 
-(slipway has no installer at the time of writing; this is the shape the lane agreed on. Match its README
-when it lands.) Later releases arrive through its daily check.
+The helper is not part of any release (a release must not replace a binary that runs as root); later
+releases arrive through slipway's daily check. `release/bootstrap.sh --verify-only` downloads and checks
+without installing.
 
 ## Local trial
 
@@ -114,4 +116,9 @@ when it lands.) Later releases arrive through its daily check.
 - GitHub-hosted runners have about 14 GB of free disk and a 6 hour job limit; casement and sill are the
   heavy builds and each has its own job and its own cache. The repo cache limit is 10 GB: if the cache
   evicts, builds get slower, not wrong.
+- The signing needs minisign 0.11 or later (it signs prehashed by default; `pack.sh` also passes `-H`, and
+  `verify.sh` refuses a legacy signature, which is what slipway does).
+- slipway's limits are checked by `pack.sh` and `verify.sh`: bundle 1 byte to 8 GiB, at most 100000 files, files
+  totalling at most 16 GiB, notes at most 16 KiB, `release.toml` at most 24 MiB; `.slipway/` is a reserved
+  path; modes must be readable by the owner and not writable by group or others; exports point at files.
 - The signature covers `release.toml`; the digests in it cover the bundle and every file.

@@ -16,8 +16,8 @@
 # slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
-# A component whose repo is not beside this one is an error, except slipway (not in the manifest yet) and
-# the mpv-wgpu plugin of anyview, which are left out with a warning.
+# A component whose repo is not beside this one is an error, except the mpv-wgpu plugin of anyview, which is
+# left out with a warning.
 # Exit: 0 staged, 1 a build or install failed, 2 bad usage or a checkout at the wrong rev.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -184,15 +184,12 @@ build_palmrest() {
 }
 
 build_slipway() {
-  if [ ! -d "$sib/slipway" ]; then echo "build.sh: WARNING: no slipway checkout: it is left out of this release" >&2; return 0; fi
   local d; d=$(repo_dir slipway)
   cargo_in "$d" slipway -p slipway
-  # INTERIM: slipway has no installer yet; its dist/ (units, polkit action) is installed by it when it does.
+  # INTERIM: slipway's scripts/install.sh installs the helper, polkit action, unit and bus file on a machine
+  # (first install, release/bootstrap.sh); the release carries only the user program. slipway-apply is not in
+  # the bundle: a release must not replace a binary that runs as root.
   put 755 "$(tdir slipway)/slipway" bin/slipway
-  put 755 "$(tdir slipway)/slipway-apply" libexec/slipway-apply
-  if [ -d "$d/dist" ]; then
-    (cd "$d/dist" && find . -type f | sort) | while IFS= read -r f; do put 644 "$d/dist/$f" "share/slipway/dist/${f#./}"; done
-  fi
 }
 
 for name in "${selected[@]}"; do

@@ -7,6 +7,7 @@ Format 1: see release/README.md. The rules below are the whole contract:
   - release.toml lists every regular file with its sha256 and mode, sorted by path;
   - exports are system links, each under one of EXPORT_ROOTS, each to a file in the bundle.
 """
+import base64
 import datetime
 import hashlib
 import json
@@ -20,9 +21,17 @@ import tomllib
 
 PREFIX = "opt/quire/current"
 BUNDLE = "bundle.tar.zst"
-SEMVER = re.compile(r"^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$")
+# semver.org without build metadata (slipway refuses it, and leading zeros).
+_ID = r"(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
+SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-" + _ID + r"(\." + _ID + r")*)?$")
 DATE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
 SHA = re.compile(r"^[0-9a-f]{64}$")
+# slipway's limits (slipway-core), checked in pack and in verify.
+MAX_BUNDLE = 8 << 30
+MAX_FILES = 100000
+MAX_NOTES = 16 * 1024
+MAX_RELEASE_TOML = 24 << 20
+MAX_TOTAL = 16 << 30
 PART = re.compile(r"^[A-Za-z0-9._+@=,~-]+$")
 EXPORT_ROOTS = (
     "/usr/share/wayland-sessions", "/usr/share/xdg-desktop-portal", "/usr/share/dbus-1/services",
@@ -46,6 +55,8 @@ def clean_path(path, what="path"):
     for part in path.split("/"):
         if part in ("", ".", "..") or not PART.match(part):
             raise Refused(f"{what} {path!r}: not a clean relative path")
+    if path.split("/")[0] == ".slipway":
+        raise Refused(f"{what} {path!r}: .slipway is reserved")
     return path
 
 
@@ -68,7 +79,28 @@ def export_ok(link):
 
 
 def toml_str(text):
-    return json.dumps(text, ensure_ascii=False)
+    # TOML forbids a raw DEL in a basic string; json leaves it.
+    return json.dumps(text, ensure_ascii=False).replace("\x7f", "\\u007f")
+
+
+def real_date(text):
+    try:
+        datetime.datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        raise Refused("date is not a real time")
+
+
+def check_limits(bundle_size, nfiles, notes, release_size, total):
+    if not 0 < bundle_size <= MAX_BUNDLE:
+        raise Refused(f"bundle is {bundle_size} bytes: must be 1 to {MAX_BUNDLE}")
+    if nfiles > MAX_FILES:
+        raise Refused(f"{nfiles} files: at most {MAX_FILES}")
+    if len(notes.encode("utf-8")) > MAX_NOTES:
+        raise Refused(f"notes are over {MAX_NOTES} bytes")
+    if release_size > MAX_RELEASE_TOML:
+        raise Refused(f"release.toml is over {MAX_RELEASE_TOML} bytes")
+    if total > MAX_TOTAL:
+        raise Refused(f"files total over {MAX_TOTAL} bytes")
 
 
 def ancestors(path):
@@ -171,8 +203,10 @@ def sign(path):
     if not key:
         raise Refused("MINISIGN_KEY_FILE is not set")
     password = os.environ.get("MINISIGN_PASSWORD", "")
-    subprocess.run(["minisign", "-S", "-s", key, "-m", path, "-x", path + ".minisig", "-t", "quire desktop release"],
+    # -H: prehashed (the ED kind slipway requires); minisign 0.11 and later do it by default, older ones need the flag.
+    subprocess.run(["minisign", "-S", "-H", "-s", key, "-m", path, "-x", path + ".minisig", "-t", "quire desktop release"],
                    input=(password + "\n").encode(), check=True)
+    check_prehashed(path + ".minisig")
 
 
 def pack(a):
@@ -185,10 +219,13 @@ def pack(a):
     notes = open(a["notes"], encoding="utf-8").read().strip()
     epoch = int(os.environ.get("SOURCE_DATE_EPOCH", "0")) or None
     now = datetime.datetime.fromtimestamp(epoch, datetime.UTC) if epoch else datetime.datetime.now(datetime.UTC)
+    real_date(now.strftime("%Y-%m-%dT%H:%M:%SZ"))
     os.makedirs(a["out"], exist_ok=True)
     make_bundle(a["stage"], files, dirs, a["out"])
     text = release_text(a["version"], now.strftime("%Y-%m-%dT%H:%M:%SZ"), notes, os.path.join(a["out"], BUNDLE), comps, files, top, exports)
     path = os.path.join(a["out"], "release.toml")
+    total = sum(os.path.getsize(os.path.join(top, r)) for r in files)
+    check_limits(os.path.getsize(os.path.join(a["out"], BUNDLE)), len(files), notes, len(text.encode("utf-8")), total)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     sign(path)
@@ -196,6 +233,17 @@ def pack(a):
 
 
 # ------------------------------------------------------------------------------------------- verify
+
+def check_prehashed(sig_path):
+    """The signature line must decode to the prehashed kind 'ED' (a legacy 'Ed' one is refused by slipway)."""
+    try:
+        lines = open(sig_path, encoding="utf-8").read().split("\n")
+        raw = base64.b64decode(lines[1], validate=True)
+    except (OSError, IndexError, ValueError):
+        raise Refused("release.toml.minisig: not a minisign signature file")
+    if not raw.startswith(b"ED"):
+        raise Refused("release.toml.minisig: not a prehashed signature (sign with minisign -S -H, version 0.11 or later)")
+
 
 def check_signature(directory, pubkey):
     try:
@@ -205,6 +253,7 @@ def check_signature(directory, pubkey):
         raise Refused("minisign is not installed")
     if r.returncode != 0:
         raise Refused("release.toml: the signature does not verify")
+    check_prehashed(os.path.join(directory, "release.toml.minisig"))
 
 
 def check_manifest(doc):
@@ -214,6 +263,7 @@ def check_manifest(doc):
         raise Refused("version is not semver")
     if not DATE.match(str(doc.get("date", ""))):
         raise Refused("date is not YYYY-MM-DDTHH:MM:SSZ")
+    real_date(doc["date"])
     if not isinstance(doc.get("notes"), str):
         raise Refused("notes is not text")
     b = doc.get("bundle", {})
@@ -226,7 +276,7 @@ def check_manifest(doc):
     paths = []
     for f in doc.get("file", []):
         path = clean_path(f.get("path"), "file path")
-        if not SHA.match(str(f.get("sha256", ""))) or not isinstance(f.get("mode"), int) or f["mode"] & ~0o777:
+        if not SHA.match(str(f.get("sha256", ""))) or not isinstance(f.get("mode"), int) or f["mode"] & ~0o777 or f["mode"] & 0o022 or not f["mode"] & 0o400:
             raise Refused(f"file {path}: bad digest or mode")
         if path in files:
             raise Refused(f"file {path} listed twice")
@@ -236,6 +286,12 @@ def check_manifest(doc):
         raise Refused("files are not sorted by path")
     if not files:
         raise Refused("no files")
+    if len(files) > MAX_FILES:
+        raise Refused(f"{len(files)} files: at most {MAX_FILES}")
+    if len(doc["notes"].encode("utf-8")) > MAX_NOTES:
+        raise Refused(f"notes are over {MAX_NOTES} bytes")
+    if not 0 < b["size"] <= MAX_BUNDLE:
+        raise Refused(f"bundle is {b['size']} bytes: must be 1 to {MAX_BUNDLE}")
     links = set()
     for e in doc.get("export", []):
         export_ok(e.get("link"))
@@ -248,7 +304,7 @@ def check_manifest(doc):
 
 
 def check_bundle(path, files):
-    seen_files, seen_dirs = set(), set()
+    seen_files, seen_dirs, total = set(), set(), 0
     p = subprocess.Popen(["zstd", "-dc", "-q", path], stdout=subprocess.PIPE)
     try:
         with tarfile.open(fileobj=p.stdout, mode="r|") as tar:
@@ -273,6 +329,9 @@ def check_bundle(path, files):
                     if h.hexdigest() != digest:
                         raise Refused(f"{name}: digest differs from release.toml")
                     seen_files.add(name)
+                    total += m.size
+                    if total > MAX_TOTAL:
+                        raise Refused(f"files total over {MAX_TOTAL} bytes")
                 else:
                     raise Refused(f"{name}: not a regular file or directory (links and devices are refused)")
     except tarfile.TarError as e:
@@ -291,6 +350,8 @@ def check_bundle(path, files):
 
 
 def verify(directory, pubkey):
+    if os.path.getsize(os.path.join(directory, "release.toml")) > MAX_RELEASE_TOML:
+        raise Refused(f"release.toml is over {MAX_RELEASE_TOML} bytes")
     check_signature(directory, pubkey)
     with open(os.path.join(directory, "release.toml"), "rb") as f:
         doc = tomllib.load(f)

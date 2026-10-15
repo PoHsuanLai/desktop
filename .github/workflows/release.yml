@@ -16,11 +16,6 @@ on:
         required: false
         default: ""
         type: string
-      slipway_ref:
-        description: Branch, tag or rev of slipway (it is not in manifest.toml yet)
-        required: false
-        default: master
-        type: string
   push:
     tags: ["v*"]
 
@@ -30,9 +25,6 @@ permissions:
 concurrency:
   group: release
   cancel-in-progress: false
-
-env:
-  SLIPWAY_REF: ${{ inputs.slipway_ref || 'master' }}
 
 jobs:
   # The version and the notes, from the inputs or from the tag.
@@ -95,8 +87,7 @@ jobs:
           RELEASE_READ_TOKEN: ${{ secrets.RELEASE_READ_TOKEN }}
         run: |
           set -euo pipefail
-          desktop/release/checkout.sh --siblings "$GITHUB_WORKSPACE" \
-            --extra "slipway=https://github.com/PoHsuanLai/slipway.git@$SLIPWAY_REF"
+          desktop/release/checkout.sh --siblings "$GITHUB_WORKSPACE"
           export PATH="$HOME/.cargo/bin:$PATH"
           for f in */rust-toolchain.toml; do
             channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$f")

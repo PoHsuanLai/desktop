@@ -2,8 +2,10 @@
 # release/selftest.sh: packs a tiny fake stage in a scratch directory with a throwaway key and verifies it,
 # then checks that verify.sh refuses hostile releases (each signed and otherwise consistent): a file in the
 # bundle that release.toml does not list, a wrong file digest, a wrong bundle size, a symlink, a `..` path,
-# an absolute path, a setuid mode, an export outside the allowed directories, an export to a file that is not
-# in the bundle, and a release.toml changed after signing. Packing the same stage twice gives the same bundle.
+# an absolute path, a setuid or group-writable mode, a `.slipway` path, an export outside the allowed directories,
+# an export to a folder or to a file that is not in the bundle, a bad version (leading zero), a date that is not a
+# real time, notes over 16 KiB, a raw DEL in the notes, a legacy (not prehashed) signature, and a release.toml
+# changed after signing. The bundle and file-count limits are not forged (too big for a test). Packing the same stage twice gives the same bundle.
 #
 #   release/selftest.sh
 # Exit: 0 pass, 1 a check failed, 2 skipped (minisign, zstd or python3 is not installed).
@@ -40,6 +42,11 @@ grep -q 'link = "/usr/lib/systemd/user/tool.service"' "$tmp/a/release.toml" || c
 grep -q 'path = "share/quire/data.txt"' "$tmp/a/release.toml" && grep -q 'mode = 0o644' "$tmp/a/release.toml" || check "modes are not normalised"
 "$HERE/verify.sh" "$tmp/a" --pubkey "$tmp/a/../key.sec" >/dev/null 2>&1 && check "verify accepted a wrong public key"
 
+# Notes with a DEL are escaped, so they still verify.
+printf 'a\177b\n' >"$tmp/notes-del.txt"
+MINISIGN_KEY_FILE="$tmp/key.sec" "$HERE/pack.sh" --stage "$tmp/stage" --version 1.2.3 --notes "$tmp/notes-del.txt" --out "$tmp/d" --exports "$tmp/exports.toml" >/dev/null &&
+  "$HERE/verify.sh" "$tmp/d" --pubkey "$tmp/key.pub" >/dev/null || check "notes with a DEL do not pack and verify"
+
 # The pack itself refuses a symlink in the stage and a file outside opt/quire/current.
 ln -s tool "$top/bin/link"
 pack "$tmp/c" >/dev/null 2>&1 && check "pack accepted a symlink"
@@ -50,10 +57,10 @@ rmdir "$tmp/stage/etc"
 
 # The forger itself is sound: with no fault, its release verifies (so a refusal above is for the fault).
 python3 -I "$HERE/selftest-forge.py" "$tmp/h-good" good "$tmp/key.sec" && "$HERE/verify.sh" "$tmp/h-good" --pubkey "$tmp/key.pub" >/dev/null || check "the forger's fault-free release does not verify"
-for hostile in extra digest size symlink dotdot absolute setuid export export-target tamper; do
+for hostile in extra digest size symlink dotdot absolute setuid export export-dir export-target tamper reserved mode-writable mode-unreadable version-zero version-pre date notes-big notes-del legacy; do
   python3 -I "$HERE/selftest-forge.py" "$tmp/h-$hostile" "$hostile" "$tmp/key.sec" || { check "could not forge $hostile"; continue; }
   if "$HERE/verify.sh" "$tmp/h-$hostile" --pubkey "$tmp/key.pub" >/dev/null 2>&1; then check "verify accepted the hostile release '$hostile'"; fi
 done
 
 [ "$fail" = 0 ] || exit 1
-echo "release selftest: pass (deterministic pack, verify, 10 hostile releases refused)"
+echo "release selftest: pass (deterministic pack, verify, 20 hostile releases refused)"

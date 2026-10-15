@@ -28,10 +28,10 @@ and `--locked` builds, the installed path (never the destdir-prefixed one) insid
 - anyview (`dist/install.sh`): builds the mpv plugin's C plugin and fetches mpv-wgpu without `--locked`
   (build.sh builds it locked and passes `ANYVIEW_MPV_CPLUGIN`); `--mpv PATH` cannot be passed through the
   top-level `install.sh`, so the plugin manifest names the builder's `mpv` or `/usr/bin/mpv`.
-- slipway: no installer yet. build.sh stages `bin/slipway`, `libexec/slipway-apply` and a copy of its `dist/`
-  under `share/slipway/dist`; its units, polkit action and `/usr/share/slipway/release.pub` need an
-  installer with the same flags. It is not in `manifest.toml`, so the workflow builds it at the
-  `slipway_ref` input and `release.toml` records its rev; it should join the manifest.
+- slipway: its `scripts/install.sh` installs the helper, polkit action, unit, bus file and release key on a
+  machine (release/bootstrap.sh runs after it). The bundle carries only `bin/slipway`, built from the
+  manifest pin; `slipway-apply` is deliberately outside the release. build.sh's staging of `bin/slipway`
+  is INTERIM until slipway has a stageable installer for the user program.
 - transom: named in the brief, but no repo beside this one and no entry in `manifest.toml`; not built.
   Add it to `ALL` and a `build_transom` in `release/build.sh` when it exists.
 
@@ -48,3 +48,14 @@ the allowed export set grows (`/etc/pam.d`, `/etc/porter`, `/usr/lib/systemd/sys
 Other choices: file modes are normalised to 0644 or 0755 (executable bit kept) so the bundle does not depend on
 the builder's umask; the date is the packing time (`SOURCE_DATE_EPOCH` overrides it); `release/release.pub`
 is committed by the owner and the CI refuses to publish without it.
+
+## Round 2 (release.py aligned with slipway-core)
+
+Applied from slipway's FINDINGS "Release pipeline": `.slipway` reserved, mode rules (readable by owner, not
+group/other writable), semver.org regex, real date parse, the five size limits in pack and verify (the
+bundle-size and file-count limits are not forged in selftest: too big), DEL escaped in `toml_str`, prehashed
+(`ED`) signatures required (`minisign -S -H`; needs minisign 0.11 or later), exports must be bundle files
+(a folder target is refused by verify; pack derives only file exports). The README path is
+`scripts/install.sh`. slipway is in `manifest.toml` (`[repo.slipway]`, rev e8af08f4); the workflow's
+`slipway_ref` input is gone. polkit's action directory follows a link into /opt on a real machine only if
+polkit does; confirm on a machine.

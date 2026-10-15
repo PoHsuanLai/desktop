@@ -140,3 +140,10 @@ url = "https://github.com/PoHsuanLai/casement.git"
 rev = "e616a792eda28c3747169e4c9ea717f9900c6913"
 branch = "master"
 gate = "lane"
+
+[repo.slipway]
+# The updater: installs and switches signed release bundles (release/ in this repo builds them).
+url = "https://github.com/PoHsuanLai/slipway.git"
+rev = "e8af08f414df53d0ec330cdb8516f8c3604fd6f4"
+branch = "master"
+gate = "none"
