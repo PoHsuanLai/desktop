@@ -1,0 +1,204 @@
+# Builds the signed release bundle of the whole desktop at manifest.toml's pins and publishes it to the
+# public PoHsuanLai/desktop-releases (binaries only; the source repos are private). release/README.md says
+# what the owner sets up once. Secrets: RELEASE_READ_TOKEN (read the private repos), MINISIGN_SECRET_KEY and
+# MINISIGN_PASSWORD (sign), RELEASES_TOKEN (create the release in desktop-releases).
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the v (for example 0.2.0)
+        required: true
+        type: string
+      notes:
+        description: Release notes (plain text)
+        required: false
+        default: ""
+        type: string
+      slipway_ref:
+        description: Branch, tag or rev of slipway (it is not in manifest.toml yet)
+        required: false
+        default: master
+        type: string
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  SLIPWAY_REF: ${{ inputs.slipway_ref || 'master' }}
+
+jobs:
+  # The version and the notes, from the inputs or from the tag.
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: Version
+        id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = push ]; then version=${REF_NAME#v}; else version=$INPUT_VERSION; fi
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "not a semver: $version" >&2; exit 1; }
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    container: fedora:44
+    timeout-minutes: 350
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: casement, only: casement }
+          - { name: sill, only: sill }
+          - { name: anyview, only: anyview }
+          - { name: mailo, only: mailo }
+          - { name: porter, only: porter }
+          - { name: small, only: "session,detent,keycap,palmrest,slipway" }
+    steps:
+      - name: Build tools and development packages
+        run: |
+          dnf -y install --setopt=install_weak_deps=False \
+            git tar zstd gzip findutils which curl ca-certificates python3 perl-core \
+            gcc gcc-c++ clang clang-devel llvm-devel make cmake pkgconf-pkg-config \
+            pipewire-devel libxkbcommon-devel mesa-libgbm-devel mesa-libEGL-devel mesa-libGL-devel \
+            libinput-devel libseat-devel systemd-devel libdrm-devel dbus-devel wayland-devel \
+            wayland-protocols-devel fontconfig-devel freetype-devel alsa-lib-devel libdav1d-devel \
+            openssl-devel vulkan-loader-devel libxcb-devel libX11-devel
+
+      - name: Checkout desktop
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: desktop
+
+      - name: Rust toolchains named by the repos
+        run: |
+          set -euo pipefail
+          curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain none --profile minimal
+          echo "$HOME/.cargo/bin" >>"$GITHUB_PATH"
+
+      - name: Check out the manifest repos beside desktop
+        env:
+          RELEASE_READ_TOKEN: ${{ secrets.RELEASE_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          desktop/release/checkout.sh --siblings "$GITHUB_WORKSPACE" \
+            --extra "slipway=https://github.com/PoHsuanLai/slipway.git@$SLIPWAY_REF"
+          export PATH="$HOME/.cargo/bin:$PATH"
+          for f in */rust-toolchain.toml; do
+            channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$f")
+            [ -z "$channel" ] || rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
+          done
+
+      - name: Cache cargo and the build output
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/build/release/target
+          key: cargo-${{ matrix.name }}-${{ hashFiles('desktop/manifest.toml') }}
+          restore-keys: |
+            cargo-${{ matrix.name }}-
+
+      - name: Build and stage
+        run: |
+          set -euo pipefail
+          desktop/release/build.sh --version "${{ needs.prepare.outputs.version }}" \
+            --out "$GITHUB_WORKSPACE/desktop/build/release" --siblings "$GITHUB_WORKSPACE" --only "${{ matrix.only }}"
+          # An artifact is a zip, which would drop the modes: ship the staged tree as a tar.
+          tar -C desktop/build/release -cf "stage-${{ matrix.name }}.tar" stage components.d
+
+      - name: Upload the staged tree
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stage-${{ matrix.name }}
+          path: stage-${{ matrix.name }}.tar
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    container: fedora:44
+    timeout-minutes: 120
+    steps:
+      - name: Tools
+        run: dnf -y install --setopt=install_weak_deps=False git tar zstd python3 minisign gh
+
+      - name: Checkout desktop
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: desktop
+
+      - name: Download the staged trees
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: stage-*
+          merge-multiple: true
+          path: staged
+
+      - name: Merge them
+        run: |
+          set -euo pipefail
+          mkdir -p desktop/build/release
+          for t in staged/stage-*.tar; do tar -C desktop/build/release -xf "$t"; done
+          cat desktop/build/release/components.d/*.txt >desktop/build/release/components.txt
+
+      - name: Notes
+        env:
+          INPUT_NOTES: ${{ inputs.notes }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_NOTES" ]; then printf '%s\n' "$INPUT_NOTES"
+          elif [ "$EVENT" = push ]; then
+            git -C desktop fetch -q --force origin "+refs/tags/$REF_NAME:refs/tags/$REF_NAME"
+            git -C desktop for-each-ref --format='%(contents)' "refs/tags/$REF_NAME"
+          fi >notes.txt
+          [ -s notes.txt ] || printf 'Release %s\n' "$VERSION" >notes.txt
+
+      - name: Pack and sign
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$MINISIGN_SECRET_KEY" >"$RUNNER_TEMP/release.key"
+          umask 022
+          export MINISIGN_KEY_FILE="$RUNNER_TEMP/release.key"
+          desktop/release/pack.sh --stage desktop/build/release/stage --version "$VERSION" --notes notes.txt \
+            --out out --components desktop/build/release/components.txt
+          rm -f "$RUNNER_TEMP/release.key"
+
+      - name: Verify as slipway will
+        run: |
+          set -euo pipefail
+          [ -f desktop/release/release.pub ] || { echo "release/release.pub is not committed (release/README.md step 3)" >&2; exit 1; }
+          desktop/release/verify.sh out --pubkey desktop/release/release.pub
+
+      - name: Create the release in desktop-releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" out/release.toml out/release.toml.minisig out/bundle.tar.zst \
+            --repo PoHsuanLai/desktop-releases --title "Desktop $VERSION" --notes-file notes.txt

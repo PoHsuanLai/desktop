@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# release/selftest.sh: packs a tiny fake stage in a scratch directory with a throwaway key and verifies it,
+# then checks that verify.sh refuses hostile releases (each signed and otherwise consistent): a file in the
+# bundle that release.toml does not list, a wrong file digest, a wrong bundle size, a symlink, a `..` path,
+# an absolute path, a setuid mode, an export outside the allowed directories, an export to a file that is not
+# in the bundle, and a release.toml changed after signing. Packing the same stage twice gives the same bundle.
+#
+#   release/selftest.sh
+# Exit: 0 pass, 1 a check failed, 2 skipped (minisign, zstd or python3 is not installed).
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for tool in minisign zstd python3; do
+  command -v "$tool" >/dev/null || { echo "release selftest: SKIP, $tool is not installed (dnf install $tool)"; exit 2; }
+done
+tmp=$(mktemp -d)
+trap 'rm -rf -- "${tmp:?}"' EXIT
+fail=0
+check() { echo "FAIL release selftest: $*" >&2; fail=1; }
+
+top="$tmp/stage/opt/quire/current"
+mkdir -p "$top/bin" "$top/share/wayland-sessions" "$top/lib/systemd/user" "$top/share/quire"
+printf '#!/bin/sh\necho hi\n' >"$top/bin/tool"; chmod 755 "$top/bin/tool"
+printf '[Desktop Entry]\nName=Quire\n' >"$top/share/wayland-sessions/quire.desktop"
+printf '[Service]\nExecStart=/opt/quire/current/bin/tool\n' >"$top/lib/systemd/user/tool.service"
+printf 'data\n' >"$top/share/quire/data.txt"; chmod 600 "$top/share/quire/data.txt"
+printf 'A fake release.\n' >"$tmp/notes.txt"
+printf '[[export]]\nlink = "/usr/local/bin/tool"\ntarget = "bin/tool"\n' >"$tmp/exports.toml"
+minisign -G -W -p "$tmp/key.pub" -s "$tmp/key.sec" >/dev/null
+
+pack() { # OUT
+  MINISIGN_KEY_FILE="$tmp/key.sec" MINISIGN_PASSWORD="" SOURCE_DATE_EPOCH=1790000000 \
+    "$HERE/pack.sh" --stage "$tmp/stage" --version 1.2.3 --notes "$tmp/notes.txt" --out "$1" --exports "$tmp/exports.toml"
+}
+pack "$tmp/a" >/dev/null || check "pack failed"
+"$HERE/verify.sh" "$tmp/a" --pubkey "$tmp/key.pub" >/dev/null || check "a good release does not verify"
+pack "$tmp/b" >/dev/null || check "second pack failed"
+cmp -s "$tmp/a/bundle.tar.zst" "$tmp/b/bundle.tar.zst" || check "the bundle is not deterministic"
+grep -q 'link = "/usr/share/wayland-sessions/quire.desktop"' "$tmp/a/release.toml" || check "the session entry is not exported"
+grep -q 'link = "/usr/lib/systemd/user/tool.service"' "$tmp/a/release.toml" || check "the unit is not exported"
+grep -q 'path = "share/quire/data.txt"' "$tmp/a/release.toml" && grep -q 'mode = 0o644' "$tmp/a/release.toml" || check "modes are not normalised"
+"$HERE/verify.sh" "$tmp/a" --pubkey "$tmp/a/../key.sec" >/dev/null 2>&1 && check "verify accepted a wrong public key"
+
+# The pack itself refuses a symlink in the stage and a file outside opt/quire/current.
+ln -s tool "$top/bin/link"
+pack "$tmp/c" >/dev/null 2>&1 && check "pack accepted a symlink"
+rm "$top/bin/link"
+mkdir "$tmp/stage/etc"
+pack "$tmp/c" >/dev/null 2>&1 && check "pack accepted a file outside opt/quire/current"
+rmdir "$tmp/stage/etc"
+
+# The forger itself is sound: with no fault, its release verifies (so a refusal above is for the fault).
+python3 -I "$HERE/selftest-forge.py" "$tmp/h-good" good "$tmp/key.sec" && "$HERE/verify.sh" "$tmp/h-good" --pubkey "$tmp/key.pub" >/dev/null || check "the forger's fault-free release does not verify"
+for hostile in extra digest size symlink dotdot absolute setuid export export-target tamper; do
+  python3 -I "$HERE/selftest-forge.py" "$tmp/h-$hostile" "$hostile" "$tmp/key.sec" || { check "could not forge $hostile"; continue; }
+  if "$HERE/verify.sh" "$tmp/h-$hostile" --pubkey "$tmp/key.pub" >/dev/null 2>&1; then check "verify accepted the hostile release '$hostile'"; fi
+done
+
+[ "$fail" = 0 ] || exit 1
+echo "release selftest: pass (deterministic pack, verify, 10 hostile releases refused)"
