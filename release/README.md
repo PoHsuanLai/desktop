@@ -74,7 +74,7 @@ palmrest's udev rule and module options, sill's PAM service and porter's caller 
 
    - `RELEASE_READ_TOKEN`: resource owner PoHsuanLai, repositories: every private repo in `manifest.toml`
      plus slipway (quire, sill, shell-host, blitz-kit, keycap, palmrest, porter, stoker, almanac, docket,
-     cua, latchkey, bulkhead, bayonet, mailo, detent, anyview, mpv-wgpu, casement-protocols, casement,
+     cua, latchkey, bulkhead, bayonet, mailo, detent, transom, anyview, mpv-wgpu, casement-protocols, casement,
      slipway); permission Contents: Read-only, and nothing else.
    - `RELEASES_TOKEN`: repository PoHsuanLai/desktop-releases only; permission Contents: Read and write.
 

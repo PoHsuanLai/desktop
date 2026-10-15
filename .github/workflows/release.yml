@@ -74,7 +74,7 @@ jobs:
           - { name: anyview, only: anyview }
           - { name: mailo, only: mailo }
           - { name: porter, only: porter }
-          - { name: small, only: "session,detent,keycap,palmrest,slipway" }
+          - { name: small, only: "session,detent,transom,keycap,palmrest,slipway" }
     steps:
       - name: Git and certificates (the checkout needs them)
         run: |

@@ -7,13 +7,13 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter detent keycap palmrest anyview mailo slipway); the
+#   --only NAMES    just these (casement sill session porter detent transom keycap palmrest anyview mailo slipway); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
 # /opt/quire/current under the destdir OUT/stage, through the component's own installer where it can stage
-# (porter, detent, anyview, mailo, and the session in install/). The others (casement, sill, keycap, palmrest,
-# slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
+# (porter, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
+# palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
 # A component whose repo is not beside this one is an error, except the mpv-wgpu plugin of anyview, which is
@@ -23,7 +23,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
-ALL=(casement sill session porter detent keycap palmrest anyview mailo slipway)
+ALL=(casement sill session porter detent transom keycap palmrest anyview mailo slipway)
 
 version="" out="$ROOT/build/release" sib="$(dirname "$ROOT")" only=""
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -162,6 +162,26 @@ build_mailo() {
   # INTERIM: the installer writes the destdir-prefixed path into the D-Bus service file; it must name the
   # installed one (FINDINGS.md).
   sed -i "s|$root|$P|g" "$root/share/dbus-1/services/org.quire.Mail.service"
+}
+
+build_transom() {
+  local d; d=$(repo_dir transom)
+  cargo_in "$d" transom -p transom
+  # The portal backend (screen sharing, screenshots). Same files and places as transom's scripts/install.sh,
+  # under the prefix: the program in libexec, the user unit in lib/systemd/user, the D-Bus activation file
+  # and the portal file in the exported share directories (pack.sh links those under /usr). Both the unit and
+  # the activation file name /usr/libexec/transom; they must name the installed program. The routing file
+  # (quire-portals.conf) is the session's, staged by the session component.
+  put 755 "$(tdir transom)/transom" libexec/transom
+  put 644 "$d/dist/transom.service" lib/systemd/user/transom.service
+  put 644 "$d/dist/org.freedesktop.impl.portal.desktop.quire.service" \
+    share/dbus-1/services/org.freedesktop.impl.portal.desktop.quire.service
+  put 644 "$d/dist/quire.portal" share/xdg-desktop-portal/portals/quire.portal
+  local f
+  for f in lib/systemd/user/transom.service share/dbus-1/services/org.freedesktop.impl.portal.desktop.quire.service; do
+    sed -i "s|/usr/libexec/transom|$P/libexec/transom|g" "$root/$f"
+    grep -q "$P/libexec/transom" "$root/$f" || die "$f: no /usr/libexec/transom to retarget"
+  done
 }
 
 build_keycap() {
