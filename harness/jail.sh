@@ -22,8 +22,15 @@
 # Beyond the plan's command line: `--proc /proc` (so PID 1 of the namespace, bwrap, is visible
 # to require_jail, and the host's processes are not), and PATH, USER, LANG, TERM carried in.
 #
-# Exit codes (plan §6.1): the command's own; 3 = bubblewrap or /dev/udmabuf or a --bind dir missing.
+# Exit codes (plan §6.1): the command's own; 3 = bubblewrap or /dev/udmabuf or a --bind dir missing, or the
+# system forbids the namespace (Ubuntu 24.04's AppArmor rule), or the software Vulkan driver is missing.
 set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../install/distro.sh
+source "$ROOT/install/distro.sh"
+# shellcheck source=../install/packages.sh
+source "$ROOT/install/packages.sh"
 
 binds=() envs=() gpus=0 scratch="" own_scratch=0
 die3() { echo "jail: $1" >&2; echo "jail: fix: $2" >&2; exit 3; }
@@ -44,8 +51,62 @@ done
 case "$gpus" in ''|*[!0-9]*) usage ;; esac
 [ "$gpus" -le 64 ] || usage   # render minors 128..191 (drm crate: minor >> 6 == 2)
 
-command -v bwrap >/dev/null || die3 "bubblewrap (bwrap) not found" "sudo dnf install bubblewrap"
-[ -c /dev/udmabuf ] || die3 "/dev/udmabuf is missing" "log in locally (it needs a uaccess ACL) or run: sudo modprobe udmabuf"
+# hint_line KEY...: the install line(s) for this machine's family, on one line.
+hint_line() { install_hint "$@" | tr '\n' ' '; }
+
+# udmabuf_fix: what to do about a missing /dev/udmabuf. Fedora's logind gives a local login access to it; the
+# other families need the module loaded and, if the device is not yours, a udev rule for the seat's user.
+udmabuf_fix() {
+  local load
+  load=$(as_root_hint modprobe udmabuf)
+  case "$(distro_family)" in
+    fedora) echo "log in locally (it needs a uaccess ACL) or run: $load" ;;
+    *) echo "run: $load ; if the device is then not writable by you, add a udev rule KERNEL==\"udmabuf\", TAG+=\"uaccess\" (and udmabuf to /etc/modules-load.d/ to keep it)" ;;
+  esac
+}
+
+# apparmor_userns_remedy: bubblewrap cannot make a user namespace because Ubuntu 24.04 restricts them.
+apparmor_userns_remedy() {
+  cat >&2 <<REMEDY
+jail: this system lets only programs with an AppArmor profile create user namespaces
+jail: (kernel.apparmor_restrict_unprivileged_userns=1, the Ubuntu 24.04 default), and bwrap has none.
+jail: fix, either turn the restriction off:
+jail:   $(as_root_hint sysctl -w kernel.apparmor_restrict_unprivileged_userns=0)
+jail:   (to keep it after a reboot, put that setting in a file under /etc/sysctl.d/)
+jail: or give bwrap a profile that allows it: save as /etc/apparmor.d/bwrap
+jail:   abi <abi/4.0>,
+jail:   include <tunables/global>
+jail:   profile bwrap /usr/bin/bwrap flags=(unconfined) {
+jail:     userns,
+jail:     include if exists <local/bwrap>
+jail:   }
+jail: and load it with: $(as_root_hint apparmor_parser -r /etc/apparmor.d/bwrap)
+REMEDY
+  exit 3
+}
+
+# lavapipe_icd: the software Vulkan driver's file, the one for this CPU first (its name differs by distro and
+# Mesa version: lvp_icd.x86_64.json, lvp_icd.json ...).
+lavapipe_icd() {
+  local icd first=""
+  for icd in /usr/share/vulkan/icd.d/lvp_icd*.json; do
+    [ -e "$icd" ] || continue
+    [ -n "$first" ] || first=$icd
+    case "$icd" in *"$(uname -m)"*) echo "$icd"; return 0 ;; esac
+  done
+  [ -z "$first" ] || echo "$first"
+}
+
+command -v bwrap >/dev/null || die3 "bubblewrap (bwrap) not found" "$(hint_line bwrap)"
+[ -c /dev/udmabuf ] || die3 "/dev/udmabuf is missing" "$(udmabuf_fix)"
+if ! bwrap --unshare-all --ro-bind / / true 2>/dev/null; then
+  if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || true)" = 1 ]; then
+    apparmor_userns_remedy
+  fi
+  die3 "bubblewrap cannot start a namespace here" "run 'bwrap --unshare-all --ro-bind / / true' to see why (user namespaces off, or a container without them)"
+fi
+vulkan_icd=$(lavapipe_icd)
+[ -n "$vulkan_icd" ] || die3 "the software Vulkan driver (lavapipe) is not installed" "$(hint_line lavapipe)"
 
 uid=$(id -u)
 if [ -z "$scratch" ]; then
@@ -89,7 +150,7 @@ args+=(
   --setenv XDG_CONFIG_HOME "$scratch/config" --setenv XDG_STATE_HOME "$scratch/state"
   --setenv XDG_CACHE_HOME "$scratch/cache"
   --setenv __EGL_VENDOR_LIBRARY_FILENAMES /usr/share/glvnd/egl_vendor.d/50_mesa.json
-  --setenv VK_ICD_FILENAMES /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+  --setenv VK_ICD_FILENAMES "$vulkan_icd"
   --setenv MESA_SHADER_CACHE_DISABLE true --setenv LP_NUM_THREADS 4
   --setenv JAIL_SCRATCH "$scratch" --setenv JAIL_GPUS "$gpus"
 )

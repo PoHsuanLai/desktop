@@ -8,7 +8,7 @@
 #   safe        the --safe casement stays up on one output (pixman, no effects) and the session
 #               does not exit
 #   ends        with a stand-in that always panics, the --safe run's quick exit ends the session with
-#               status 1 and a guard log line (Plasma is a separate login entry)
+#               status 1 and a guard log line (the other login entry stays available)
 #   components  none run by default (DESKTOP_SESSION_NESTED=1: no systemd, no sill); with
 #               DESKTOP_SESSION_STUBS the session starts its components from stand-in programs: sill as
 #               the unit sill.service (and again after it exits), the power-key inhibitor,

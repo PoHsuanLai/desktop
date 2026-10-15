@@ -6,7 +6,7 @@
 #   desktop-gate.sh --phase P<n> [--only REPO] [--keep]
 #
 # --self    the jail's selftest (inside, 2 fabricated GPUs), its negative check (outside), the
-#           manifest's shape, install.sh against stub installers (gate/installer-check.sh), release/selftest.sh (a SKIP, exit 2, when minisign is missing), and every scenario in the jail (an unlisted SKIP fails).
+#           manifest's shape, install.sh against stub installers (gate/installer-check.sh), release/selftest.sh (a SKIP, exit 2, when minisign is missing), the distro helpers (gate/distro-check.sh), and every scenario in the jail (an unlisted SKIP fails).
 # --merge   --self, plus each manifest repo with `gate = "lane"` checked out at its manifest rev
 #           (a detached git worktree under $DESKTOP_GATE_DIR, siblings side by side so path
 #           dependencies resolve at the manifest's revs) and run through
@@ -26,6 +26,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 # shellcheck source=../harness/lib/all.sh
 source "$HERE/../harness/lib/all.sh"
+# shellcheck source=../install/distro.sh
+source "$ROOT/install/distro.sh"
+# shellcheck source=../install/packages.sh
+source "$ROOT/install/packages.sh"
 JAIL="$ROOT/harness/jail.sh"
 LANE_GATE="${GATE_LANE_JAILED:-$HOME/rs-wt/gate-lane-jailed.sh}"
 LANE_DIR="${DESKTOP_GATE_DIR:-$HOME/rs-wt/desktop-gate}"
@@ -46,8 +50,8 @@ label=$tier; [ "$tier" != phase ] || label="phase $phase"
 
 # Preflight: environment incomplete is exit 3 with the fix printed.
 preflight() {
-  command -v bwrap >/dev/null || { echo "missing bubblewrap: sudo dnf install bubblewrap"; return 3; }
-  [ -c /dev/udmabuf ] || { echo "missing /dev/udmabuf: log in locally (uaccess) or sudo modprobe udmabuf"; return 3; }
+  command -v bwrap >/dev/null || { echo "missing bubblewrap: $(install_hint bwrap | tr '\n' ' ')"; return 3; }
+  [ -c /dev/udmabuf ] || { echo "missing /dev/udmabuf: log in locally (uaccess) or $(as_root_hint modprobe udmabuf)"; return 3; }
   if [ "$tier" != self ]; then
     [ -x "$LANE_GATE" ] || { echo "missing $LANE_GATE"; return 3; }
     command -v cargo-nextest >/dev/null || { echo "missing cargo-nextest: cargo install cargo-nextest"; return 3; }
@@ -186,6 +190,7 @@ step "manifest shape" "$HERE/manifest-check.sh" --syntax || true
 step "installer (dry run and stubs)" "$HERE/installer-check.sh" || true
 step "release (pack, verify, hostile releases; SKIP without minisign)" "$ROOT/release/selftest.sh" || true
 step "legacy-free check (generated trees)" "$HERE/legacy-free-selftest.sh" || true
+step "distro helpers (family, package table, check mode)" "$HERE/distro-check.sh" || true
 step "expected-skips resolve" skip_entries_resolve || true
 # The scenarios' artefacts are built outside the jail (plan A7); DESKTOP_GATE_NO_BUILD=1 skips it.
 if [ -z "${DESKTOP_GATE_NO_BUILD:-}" ]; then step "scenario artefacts (built outside the jail)" "$ROOT/harness/scenario-build.sh" || true; fi
