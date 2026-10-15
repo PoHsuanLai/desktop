@@ -11,8 +11,10 @@
 # Exit: 0 pass, 1 a check failed, 2 skipped (minisign, zstd or python3 is not installed).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=release/lib.sh
+. "$HERE/lib.sh"
 for tool in minisign zstd python3; do
-  command -v "$tool" >/dev/null || { echo "release selftest: SKIP, $tool is not installed (dnf install $tool)"; exit 2; }
+  command -v "$tool" >/dev/null || { echo "release selftest: SKIP, $tool is not installed ($(install_hint "$tool"))"; exit 2; }
 done
 tmp=$(mktemp -d)
 trap 'rm -rf -- "${tmp:?}"' EXIT

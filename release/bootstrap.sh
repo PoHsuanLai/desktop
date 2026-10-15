@@ -15,6 +15,8 @@
 # Exit: 0 installed (or verified), 1 a download, the check or the helper failed, 2 bad usage or a tool missing.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=release/lib.sh
+. "$HERE/lib.sh"
 pub=/usr/share/slipway/release.pub
 base=https://github.com/PoHsuanLai/desktop-releases/releases/latest/download
 helper=/usr/libexec/slipway-apply
@@ -31,12 +33,12 @@ while [ $# -gt 0 ]; do
   shift
 done
 for tool in curl python3 zstd minisign; do
-  command -v "$tool" >/dev/null || { echo "bootstrap.sh: $tool is not installed (dnf install $tool)" >&2; exit 2; }
+  command -v "$tool" >/dev/null || { echo "bootstrap.sh: $tool is not installed ($(install_hint "$tool"))" >&2; exit 2; }
 done
 [ -f "$pub" ] || { echo "bootstrap.sh: no key at $pub: run slipway's scripts/install.sh --pubkey FILE first" >&2; exit 2; }
 if [ "$verify_only" = 0 ]; then
   [ -x "$helper" ] || { echo "bootstrap.sh: no $helper: run slipway's scripts/install.sh --pubkey FILE first" >&2; exit 2; }
-  command -v pkexec >/dev/null || { echo "bootstrap.sh: pkexec is not installed (dnf install polkit)" >&2; exit 2; }
+  command -v pkexec >/dev/null || { echo "bootstrap.sh: pkexec is not installed ($(install_hint polkit))" >&2; exit 2; }
 fi
 
 dir=$(mktemp -d)

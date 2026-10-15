@@ -8,6 +8,8 @@
 # Exit: 0 verified, 1 refused, 2 bad usage or a tool missing.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=release/lib.sh
+. "$HERE/lib.sh"
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
 dir="" pub=""
 while [ $# -gt 0 ]; do
@@ -21,6 +23,6 @@ while [ $# -gt 0 ]; do
 done
 [ -d "$dir" ] && [ -f "$pub" ] || { usage >&2; exit 2; }
 for tool in python3 zstd minisign; do
-  command -v "$tool" >/dev/null || { echo "verify.sh: $tool is not installed" >&2; exit 2; }
+  command -v "$tool" >/dev/null || { echo "verify.sh: $tool is not installed ($(install_hint "$tool"))" >&2; exit 2; }
 done
 exec python3 -I "$HERE/release.py" verify "$dir" "$pub"

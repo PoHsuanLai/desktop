@@ -16,6 +16,8 @@
 # Exit: 0 packed, 1 refused or failed, 2 bad usage or a tool missing.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=release/lib.sh
+. "$HERE/lib.sh"
 stage="" version="" notes="" out="" exports="$HERE/exports.toml" comps=""
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
 while [ $# -gt 0 ]; do
@@ -33,6 +35,6 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$stage" ] && [ -n "$version" ] && [ -n "$notes" ] && [ -n "$out" ] || { usage >&2; exit 2; }
 for tool in python3 zstd minisign; do
-  command -v "$tool" >/dev/null || { echo "pack.sh: $tool is not installed" >&2; exit 2; }
+  command -v "$tool" >/dev/null || { echo "pack.sh: $tool is not installed ($(install_hint "$tool"))" >&2; exit 2; }
 done
 exec python3 -I "$HERE/release.py" pack "$stage" "$version" "$notes" "$out" "$HERE/../manifest.toml" "$exports" "$comps"
