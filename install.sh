@@ -8,15 +8,25 @@
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
 #   --sysconfdir   where porter's caller table goes (default $SYSCONFDIR, else /etc)
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES   just these components (comma separated: porter, detent, sill, keycap, anyview, mailo, palmrest)
+#   --only NAMES   just these components (comma separated: porter, detent, casement, sill, keycap, anyview, mailo, palmrest)
 #
-# Order: porter (the account daemons and the caller table), detent (Settings), sill (the session),
-# keycap, anyview, mailo, palmrest. Each component's installer is its own: this script passes the prefix
-# and the staging root through and nothing else, and stops at the first one that fails.
+# Order: porter (the account daemons and the caller table), detent (Settings), casement (the compositor and
+# its user unit), sill (the session), keycap, anyview, mailo, palmrest. Each component's installer is its
+# own: this script passes the prefix and the staging root through and nothing else, and stops at the first
+# one that fails. A component whose installer is not in its checkout yet (casement, until its scripts/install.sh
+# lands) is reported and skipped; the others carry on.
+#
+# porter always goes to /usr, whatever --prefix says: its daemons read the data they ship (providers, the
+# client table, the model catalog) only from /usr/share for now.
+#
+# Builds. The repos pin Rust 1.98.1 and need rustup (a distro's rust package is the wrong version). Some
+# repos' cargo config asks for clang and mold; when either is missing the build uses the system linker
+# instead (install/linker.sh), and says so.
 #
 # Root. This script never runs sudo and never writes under ~/.config or /etc itself. A component runs
 # here only when everything it writes is writable by you (a user prefix, or a --destdir); the others are
-# listed as "yourself" with the exact command, to run with the privileges they need:
+# listed as "yourself" with the exact command, to run with the privileges they need (sudo, doas or
+# pkexec, whichever is installed; $SUDO names another):
 #   - needs root: the destination is not writable by you (a system prefix, /etc/systemd/user, /etc)
 #   - sill, palmrest: installers with fixed destinations that ask for sudo or write your home themselves
 #   - keycap: its system files go to /etc and /usr/local; it stages only under --destdir
@@ -24,7 +34,16 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ORDER=(porter detent sill keycap anyview mailo palmrest)
+# shellcheck source=install/distro.sh
+source "$HERE/install/distro.sh"
+# shellcheck source=install/linker.sh
+source "$HERE/install/linker.sh"
+ORDER=(porter detent casement sill keycap anyview mailo palmrest)
+
+# Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
+# catalog only under /usr/share (finding B1). Remove this, and the --prefix /usr below, once porter searches
+# XDG_DATA_DIRS.
+PORTER_PREFIX=/usr
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -60,20 +79,26 @@ prefix=${prefix%/}
 
 # What a component is: its directory, its installer (relative), the command words after the installer, the
 # environment it takes, the places it writes, and why it is left to you (empty: it can run here).
-dir="" script="" args=() envs=() writes=() yourself=""
+dir="" script="" args=() envs=() writes=() yourself="" optional=0
 
 # describe NAME: fills the variables above for one component.
 describe() {
-  dir="$siblings/$1" args=() envs=() writes=() yourself=""
+  dir="$siblings/$1" args=() envs=() writes=() yourself="" optional=0
   case "$1" in
     porter)
       script=scripts/install.sh
-      args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
+      args=(--prefix "$PORTER_PREFIX" --sysconfdir "$sysconfdir")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
-      writes=("$destdir$prefix" "$destdir$sysconfdir") ;;
+      writes=("$destdir$PORTER_PREFIX" "$destdir$sysconfdir") ;;
     detent)
       script=scripts/install.sh
       envs=("PREFIX=$prefix" "DESTDIR=$destdir")
+      writes=("$destdir$prefix") ;;
+    casement)
+      script=scripts/install.sh
+      optional=1
+      args=(--prefix "$prefix" --locked)
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
       writes=("$destdir$prefix") ;;
     sill)
       script=dist/install.sh
@@ -124,6 +149,17 @@ command_text() {
   printf '%q ' "${words[@]}"
 }
 
+# root_command_text: the same command run as root, through the escalation program this machine has
+# (install/distro.sh); the variables go through env, which sudo, doas and pkexec all take.
+root_command_text() {
+  local words=() e
+  for e in "${envs[@]}"; do
+    case "$e" in *=) ;; *) words+=("$e") ;; esac
+  done
+  words+=("$dir/$script" "${args[@]}")
+  if [ "${#words[@]}" -gt $((1 + ${#args[@]})) ]; then as_root_hint env "${words[@]}"; else as_root_hint "${words[@]}"; fi
+}
+
 # Which components, in order.
 selected=()
 for name in "${ORDER[@]}"; do
@@ -140,10 +176,14 @@ fi
 [ "${#selected[@]}" -gt 0 ] || die "nothing selected"
 
 # Plan: decide each component's fate before anything runs.
-run=() left=() reasons=()
+run=() left=() reasons=() absent=()
 for name in "${selected[@]}"; do
   describe "$name"
-  [ -x "$dir/$script" ] || die "$name: no installer at $dir/$script (--siblings says where the repos are)"
+  if [ ! -x "$dir/$script" ]; then
+    [ "$optional" = 1 ] || die "$name: no installer at $dir/$script (--siblings says where the repos are)"
+    absent+=("$name")
+    continue
+  fi
   if [ -n "$yourself" ]; then
     left+=("$name"); reasons+=("$yourself")
   elif root=$(needs_root) && [ -n "$root" ]; then
@@ -158,14 +198,30 @@ step=0
 for name in "${selected[@]}"; do
   describe "$name"
   step=$((step + 1))
+  case " ${absent[*]:-} " in
+    *" $name "*)
+      printf '%d. %-8s skipped (no installer at %s yet; until it lands, put the program and its unit in place another way)\n' \
+        "$step" "$name" "$dir/$script"
+      continue ;;
+  esac
   case " ${run[*]:-} " in
     *" $name "*) printf '%d. %-8s runs   %s\n' "$step" "$name" "$(command_text)" ;;
     *)
       for i in "${!left[@]}"; do [ "${left[$i]}" = "$name" ] && why=${reasons[$i]}; done
       printf '%d. %-8s yourself (%s)\n' "$step" "$name" "$why"
-      printf '             cd %q && %s\n' "$dir" "$(command_text)" ;;
+      case "$why" in
+        "needs root"*) printf '             cd %q && %s\n' "$dir" "$(root_command_text)" ;;
+        *) printf '             cd %q && %s\n' "$dir" "$(command_text)" ;;
+      esac ;;
   esac
 done
+case " ${selected[*]} " in *" porter "*)
+  [ "$prefix" = "$PORTER_PREFIX" ] || echo "note: porter goes to $PORTER_PREFIX, not $prefix: its daemons read what they ship only from $PORTER_PREFIX/share" ;;
+esac
+plain_linker_notice
+if [ "${#left[@]}" -gt 0 ] && ! faster_linker_present && [ "$(host_arch)" = x86_64 ]; then
+  echo "for the ones left to you, build with the system linker too: export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=cc RUSTFLAGS="
+fi
 [ "$dry" = 0 ] || exit 0
 
 done_list=()
@@ -175,13 +231,14 @@ for name in "${run[@]:-}"; do
   echo "== $name"
   # detent installs a built binary; build it first when it is not there.
   if [ "$name" = detent ] && [ -z "${DETENT_BIN:-}" ] && [ ! -x "$dir/target/release/detent" ]; then
-    (cd "$dir" && cargo build --release --locked) || {
+    (cd "$dir" && { use_plain_linker "$dir" || true; } && cargo build --release --locked) || {
       echo "install.sh: detent failed: its release build. Installed so far: ${done_list[*]:-nothing}. Not run: the rest." >&2
       exit 1
     }
   fi
   status=0
-  (cd "$dir" && env "${envs[@]}" "./$script" "${args[@]}") || status=$?
+  # The component's own build (if it has one) sees the system linker when clang or mold is missing.
+  (cd "$dir" && { use_plain_linker "$dir" || true; } && env "${envs[@]}" "./$script" "${args[@]}") || status=$?
   if [ "$status" != 0 ]; then
     echo "install.sh: $name failed (exit $status): $(command_text)" >&2
     echo "install.sh: installed so far: ${done_list[*]:-nothing}. Not run: everything after $name. Fix it and run this again (installers are safe to repeat)." >&2
@@ -191,6 +248,9 @@ for name in "${run[@]:-}"; do
 done
 
 echo "installed: ${done_list[*]:-nothing}"
+if [ "${#absent[@]}" -gt 0 ]; then
+  echo "not installed (no installer in the checkout yet): ${absent[*]}"
+fi
 if [ "${#left[@]}" -gt 0 ]; then
   echo "left to you (the commands are in the plan above): ${left[*]}"
 fi

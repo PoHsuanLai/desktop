@@ -20,13 +20,14 @@ stub() { # REPO-RELATIVE-SCRIPT FAIL-NAME
   mkdir -p "$(dirname "$f")"
   cat >"$f" <<STUB
 #!/usr/bin/env bash
-echo "$1 \$* PREFIX=\${PREFIX:-} DESTDIR=\${DESTDIR:-} MAILO_PREFIX=\${MAILO_PREFIX:-}" >>"$log"
+echo "$1 \$* PREFIX=\${PREFIX:-} DESTDIR=\${DESTDIR:-} MAILO_PREFIX=\${MAILO_PREFIX:-} LINKER=\${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER:-} FLAGS=\${RUSTFLAGS-unset}" >>"$log"
 [ "\${STUB_FAIL:-}" != "$2" ] || exit 7
 STUB
   chmod +x "$f"
 }
 stub porter/scripts/install.sh porter
 stub detent/scripts/install.sh detent
+stub casement/scripts/install.sh casement
 stub sill/dist/install.sh sill
 stub keycap/install.sh keycap
 stub anyview/dist/install.sh anyview
@@ -38,23 +39,27 @@ printf '#!/bin/sh\necho sudo >>"%s"\nexit 1\n' "$log" >"$tmp/bin/sudo"; chmod +x
 export PATH="$tmp/bin:$PATH" HOME="$home" XDG_CONFIG_HOME="$home/.config"
 
 fail() { echo "installer-check: $*" >&2; exit 1; }
-inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR "$INSTALL" --siblings "$sib" "$@"; }
+inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot DESKTOP_FASTER_LINKER="${STUB_LINKER:-yes}" DESKTOP_HOST_ARCH=x86_64 "$INSTALL" --siblings "$sib" "$@"; }
 
 # 1. dry run: the plan, in order, nothing run.
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "porter detent sill keycap anyview mailo palmrest " ] || fail "plan order is: $order"
+[ "$order" = "porter detent casement sill keycap anyview mailo palmrest " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
 printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
 
 # 2. a system prefix without root is left to the person, not attempted.
 plan=$(inst --dry-run --prefix /usr) || fail "system prefix dry run failed"
 printf '%s\n' "$plan" | grep -q 'porter .*yourself (needs root' || fail "a system prefix was not reported as needing root"
+printf '%s\n' "$plan" | grep -q 'cd .*porter && asroot .*scripts/install.sh --prefix /usr' || fail "the root command does not go through the escalation program: $plan"
 
 # 3. a real run into a staging root passes PREFIX and DESTDIR through, runs the stageable ones, never sudo.
 inst --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "staged run failed"; }
-grep -q "^porter/scripts/install.sh --prefix /opt/d --sysconfdir /etc --destdir $dest" "$log" || fail "porter did not get the prefix and destdir: $(cat "$log")"
+# porter always goes to /usr (its data is read from /usr/share only), whatever the desktop prefix.
+grep -q "^porter/scripts/install.sh --prefix /usr --sysconfdir /etc --destdir $dest" "$log" || fail "porter did not get /usr and the destdir: $(cat "$log")"
+grep -q "^casement/scripts/install.sh --prefix /opt/d --locked --destdir $dest" "$log" || fail "casement did not get the prefix and destdir: $(cat "$log")"
+grep -q 'note: porter goes to /usr, not /opt/d' "$tmp/out.log" || fail "the porter prefix note is missing"
 grep -q "^detent/scripts/install.sh  PREFIX=/opt/d DESTDIR=$dest" "$log" || fail "detent did not get PREFIX and DESTDIR"
 grep -q "MAILO_PREFIX=$dest/opt/d" "$log" || fail "mailo did not get its prefix"
 grep -q "^keycap/install.sh" "$log" || fail "no component ran"
@@ -62,11 +67,23 @@ grep -q "^keycap/install.sh" "$log" || fail "no component ran"
 [ ! -e "$home/.config" ] || fail "something wrote the scratch ~/.config"
 grep -q 'left to you.*sill' "$tmp/out.log" || fail "the summary does not name what is left"
 
+# 3b. the linker: with clang and mold present nothing is overridden; without them the system linker is.
+grep -q 'LINKER= FLAGS=unset' "$log" || fail "the linker was overridden although clang and mold are present: $(cat "$log")"
+: >"$log"
+STUB_LINKER=no inst --destdir "$dest" >"$tmp/out.log" 2>&1 || fail "the run without mold failed"
+grep -q 'LINKER=cc FLAGS= ' "$log" || grep -q 'LINKER=cc FLAGS=$' "$log" || fail "no system linker without mold: $(cat "$log")"
+grep -q 'faster linker (clang and mold) was not found' "$tmp/out.log" || fail "the missing faster linker was not said"
+
 # 4. a failing component stops the run and is named.
 : >"$log"
 if STUB_FAIL=detent inst --destdir "$dest" >"$tmp/out.log" 2>&1; then fail "a failing component did not fail the run"; fi
 grep -q 'detent failed (exit 7)' "$tmp/out.log" || fail "the failure does not name the component: $(cat "$tmp/out.log")"
 ! grep -q anyview "$log" || fail "a component after the failure ran"
+
+# 4b. a component whose installer has not landed (casement) is skipped and said, not an error.
+rm -f -- "$sib/casement/scripts/install.sh"
+plan=$(inst --dry-run --destdir "$dest") || fail "a missing optional installer failed the dry run"
+printf '%s\n' "$plan" | grep -q 'casement .*skipped' || fail "the missing casement installer was not reported: $plan"
 
 # 5. a missing component repo is exit 2 with its path.
 rm -rf -- "${sib:?}/mailo"
