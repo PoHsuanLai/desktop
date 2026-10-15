@@ -24,15 +24,21 @@
 #                                 the shell only as that unit's main process. A stale sill.service is
 #                                 stopped first; if it cannot start, the session stays up without a shell
 #   xdg-desktop-portal-wlr        the interim ScreenCast/Screenshot portal (the casement portal
-#                                 replaces it at P2); quire-portals.conf routes to it for quire
-#   the wallet                    pam_kwallet_init when PAM_KWALLET5_LOGIN is set (the login password
-#                                 reaches ksecretd, the Secret Service); if nothing then owns
-#                                 org.freedesktop.secrets, ksecretd itself
+#                                 replaces it at P2); quire-portals.conf routes to it for quire. Started as
+#                                 the distro's user unit xdg-desktop-portal-wlr.service when there is one,
+#                                 else the program from /usr/libexec, /usr/lib or the multiarch lib dir
+#   the wallet                    the place saved passwords live (the Secret Service). pam_kwallet_init when
+#                                 PAM_KWALLET5_LOGIN is set (the login password reaches ksecretd). Then, in
+#                                 order, stopping at the first that works: a provider D-Bus can start on
+#                                 demand, one already running, gnome-keyring-daemon, ksecretd. With none of
+#                                 them, one line in the log names the package to install for this distro
+#   the input method              fcitx5 when installed (XMODIFIERS only), else ibus-daemon (GTK_IM_MODULE,
+#                                 QT_IM_MODULE and XMODIFIERS set to ibus, and ibus-daemon started)
 #   systemd-inhibit               holds logind's handle-power-key, so the power key opens sill's
 #                                 power menu instead of powering off
 #   detent --first-run            the welcome window of Settings, 5 s in, once per login (it exits at
 #                                 once when it has run); not respawned
-# sill, the portal, ksecretd and the inhibitor are restarted when they exit (five exits within ten
+# sill, the portal program, ksecretd, ibus and the inhibitor are restarted when they exit (five exits within ten
 # seconds each, then given up). The portal, ksecretd and the inhibitor are children of this script,
 # ended by PID when casement ends; sill is watched as its unit (restarted by the same guard) and ended
 # with `systemctl --user stop sill.service`, our own transient unit. All start again with the next
@@ -41,8 +47,8 @@
 # The crash-loop guard. A casement run that lasts less than QUICK seconds (default 20) is a quick
 # exit; a longer run clears the count. Three quick exits in a row switch the session to
 # `casement --safe` (pixman, no effects, one output). A quick exit of the safe run, or a safe
-# casement that cannot start, ends the session with status 1 and a notice in the guard log; the
-# Plasma login stays available as a separate entry on the login screen.
+# casement that cannot start, ends the session with status 1 and a notice in the guard log; your
+# other session stays available at the login screen.
 # Every decision is appended to $STATE/guard.log.
 #
 # Settings a person may change: ~/.config/desktop-session/session.env (sh syntax, read first), for
@@ -52,11 +58,18 @@
 #   DESKTOP_SESSION_QUICK_SECS     the quick-exit limit (default 20)
 #   DESKTOP_SESSION_STATE          where guard.log and casement.log go (default $XDG_RUNTIME_DIR/desktop-session)
 #   DESKTOP_SESSION_STUBS          a directory of stand-in programs (sill, xdg-desktop-portal-wlr, pam_kwallet_init,
-#                                  busctl, ksecretd, systemd-inhibit, systemd-run, systemctl, detent) that, with
+#                                  busctl, ksecretd, gnome-keyring-daemon, ibus-daemon, systemd-inhibit, systemd-run,
+#                                  systemctl, detent) that, with
 #                                  DESKTOP_SESSION_NESTED=1, makes the components start from there (tests)
 #   DESKTOP_SESSION_FIRST_RUN_DELAY  seconds before detent --first-run (default 5)
 #   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill, no portal (tests)
 #   DESKTOP_SESSION_UNIT           the casement unit (default casement.service)
+#   DESKTOP_SESSION_OS_RELEASE     the os-release file read for the wallet hint (default /etc/os-release; tests)
+#
+# casement.service itself is installed by casement's own installer under its prefix (../install.sh runs it); this
+# script only writes the session drop-in that sets the command line, and gives it casement's full path (the
+# directory this script is in, else PATH), because systemd looks a bare name up only in its own fixed directories.
+# X11 apps: casement starts xwayland-satellite itself when it is installed (its default), so nothing is passed.
 set -euo pipefail
 
 log() { printf 'desktop-session: %s\n' "$*" >&2; }
@@ -83,9 +96,35 @@ read -r -a casement_cmd <<<"${DESKTOP_SESSION_CASEMENT_CMD:-casement}"
 read -r -a backend_args <<<"${DESKTOP_SESSION_BACKEND_ARGS---backend tty}"
 unit="${DESKTOP_SESSION_UNIT:-casement.service}"
 unit_dir="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/systemd/user/$unit.d"
+# The unit's ExecStart is the drop-in below, and systemd finds a bare program name only in its own directories
+# (/usr/bin, /usr/local/bin ...): a casement under another prefix would not be found. Give it the full path.
+if [ -z "$nested" ]; then
+    case "${casement_cmd[0]}" in
+        */*) ;;
+        *)
+            if [ -x "$(dirname "$0")/${casement_cmd[0]}" ]; then
+                casement_cmd[0]="$(cd "$(dirname "$0")" && pwd)/${casement_cmd[0]}"
+            elif found=$(command -v "${casement_cmd[0]}"); then
+                casement_cmd[0]=$found
+            fi
+            ;;
+    esac
+fi
 mkdir -p "$state"
 guard_log="$state/guard.log"
 guard() { printf '%s\n' "$*" >>"$guard_log"; log "$*"; }
+
+# Ubuntu's snap programs: /snap/bin is on PATH and snapd's desktop files on XDG_DATA_DIRS in a normal login, but
+# not always in the shell the display manager starts; add them when the directory is there and missing.
+if [ -d /snap/bin ]; then
+    case ":$PATH:" in *:/snap/bin:*) ;; *) export PATH="$PATH:/snap/bin" ;; esac
+fi
+if [ -d /var/lib/snapd/desktop ]; then
+    case ":${XDG_DATA_DIRS:-}:" in
+        *:/var/lib/snapd/desktop:*) ;;
+        *) export XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}:/var/lib/snapd/desktop" ;;
+    esac
+fi
 
 export XDG_CURRENT_DESKTOP=quire
 export XDG_SESSION_DESKTOP=quire
@@ -93,13 +132,20 @@ export XDG_SESSION_TYPE=wayland
 export MOZ_ENABLE_WAYLAND=1
 export QT_QPA_PLATFORM="wayland;xcb"
 export GDK_BACKEND="wayland,x11"
+# The input method: fcitx5 when it is installed, else ibus (Ubuntu's default), else none.
+ibus_daemon=
 if command -v fcitx5 >/dev/null; then
     export XMODIFIERS="${XMODIFIERS-@im=fcitx}"
     unset GTK_IM_MODULE QT_IM_MODULE
+elif command -v ibus-daemon >/dev/null; then
+    export GTK_IM_MODULE=ibus QT_IM_MODULE=ibus XMODIFIERS=@im=ibus
+    ibus_daemon=ibus-daemon
 fi
 
 component_pids=()
 casement_pid=
+portal_unit=xdg-desktop-portal-wlr.service
+portal_unit_started=
 
 stop_components() {
     local pid
@@ -111,6 +157,10 @@ stop_components() {
     done
     component_pids=()
     stop_shell
+    if [ -n "$portal_unit_started" ]; then
+        systemctl --user stop "$portal_unit" 2>/dev/null || true
+        portal_unit_started=
+    fi
 }
 
 on_term() {
@@ -130,19 +180,32 @@ socket_of() { sed -n 's/^casement: listening on //p' "$1" | head -n 1; }
 # The environment D-Bus activation and systemd user units see (portals, autostart, Flatpak).
 publish_environment() {
     local vars="WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE \
-MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS"
+MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS GTK_IM_MODULE QT_IM_MODULE XDG_DATA_DIRS"
+    local var unset=()
     [ -z "$nested" ] || return 0
+    for var in GTK_IM_MODULE QT_IM_MODULE; do
+        [ -n "${!var:-}" ] || unset+=("$var")
+    done
     # shellcheck disable=SC2086  # a word list on purpose
     dbus-update-activation-environment --systemd $vars 2>/dev/null || log "could not update the activation environment"
     # shellcheck disable=SC2086
     systemctl --user import-environment $vars 2>/dev/null || true
-    systemctl --user unset-environment GTK_IM_MODULE QT_IM_MODULE 2>/dev/null || true
+    [ "${#unset[@]}" = 0 ] || systemctl --user unset-environment "${unset[@]}" 2>/dev/null || true
     systemctl --user start desktop-session.target || log "desktop-session.target did not start"
 }
 
 # The program NAME: the stand-in in $stubs when there is one, else the default path or name $2.
 bin() { if [ -n "$stubs" ]; then echo "$stubs/$1"; else echo "${2:-$1}"; fi; }
 have() { if [ -n "$stubs" ]; then [ -x "$stubs/$1" ]; else command -v "${2:-$1}" >/dev/null; fi; }
+
+# first_executable PATH...: the first of those paths that is an executable file (nothing if none is).
+first_executable() {
+    local path
+    for path in "$@"; do
+        if [ -x "$path" ] && [ ! -d "$path" ]; then echo "$path"; return 0; fi
+    done
+    return 0
+}
 
 # Run "$@" until the session ends, in this (background) shell: restart it when it exits, and give up
 # after five exits within ten seconds each, so a component that cannot start does not spin. A TERM
@@ -168,23 +231,71 @@ keep_running() {
     component_pids+=("$!")
 }
 
-# The wallet. KWallet 6 has no daemon that unlocks itself: pam-kwallet's session module starts ksecretd,
-# which holds the wallet (the Secret Service that libsecret clients use) and waits for the login password
-# on a socket; the Plasma session sends it with pam_kwallet_init (an autostart entry marked
-# X-systemd-skip), so no other session does it. If nothing owns org.freedesktop.secrets afterwards, start
-# ksecretd ourselves (the wallet then asks for its password on first use).
-wallet() {
-    local init try
-    init=$(bin pam_kwallet_init /usr/libexec/pam_kwallet_init)
-    if [ -n "${PAM_KWALLET5_LOGIN:-}" ] && [ -x "$init" ]; then
-        "$init" || log "pam_kwallet_init failed"
+# The wallet: where saved passwords live (the Secret Service that libsecret clients use).
+# KWallet 6 has no daemon that unlocks itself: pam-kwallet's session module starts ksecretd, which holds the
+# wallet and waits for the login password on a socket; the Plasma session sends it with pam_kwallet_init (an
+# autostart entry marked X-systemd-skip), so no other session does it. That step is skipped silently when
+# PAM_KWALLET5_LOGIN is unset. Then the first of these that works ends it: a provider D-Bus can start on demand
+# (gnome-keyring, ksecretd), one that is already running, gnome-keyring-daemon, ksecretd ourselves (it then asks
+# for its password on first use). With none, one line names the package to install.
+secrets_name=org.freedesktop.secrets
+
+# secrets_activatable: D-Bus can start a provider of the Secret Service on demand.
+secrets_activatable() {
+    local out=
+    if have busctl; then
+        out=$("$(bin busctl)" --user list --activatable --no-legend 2>/dev/null) || out=
+    elif have dbus-send; then
+        out=$("$(bin dbus-send)" --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
+            org.freedesktop.DBus.ListActivatableNames 2>/dev/null) || out=
     fi
-    for try in 1 2 3 4 5 6 7 8 9 10; do
-        "$(bin busctl)" --user status org.freedesktop.secrets >/dev/null 2>&1 && return 0
+    case "$out" in *"$secrets_name"*) return 0 ;; esac
+    return 1
+}
+
+# secrets_owned TRIES: some provider is running (checked every half second, TRIES times).
+secrets_owned() {
+    local try
+    for try in $(seq "$1"); do
+        "$(bin busctl)" --user status "$secrets_name" >/dev/null 2>&1 && return 0
         sleep 0.5
     done
-    have ksecretd || return 0
-    respawn_loop ksecretd "$(bin ksecretd)"
+    return 1
+}
+
+# secrets_hint: what to install on this distro, as a command a person can type.
+secrets_hint() {
+    local ids
+    ids=$( (ID=''; ID_LIKE=''; . "${DESKTOP_SESSION_OS_RELEASE:-/etc/os-release}" 2>/dev/null || true; printf ' %s %s ' "${ID:-}" "${ID_LIKE:-}") )
+    case "$ids" in
+        *" fedora "* | *" rhel "*) echo "sudo dnf install gnome-keyring" ;;
+        *" debian "* | *" ubuntu "*) echo "sudo apt install gnome-keyring" ;;
+        *" arch "*) echo "sudo pacman -S gnome-keyring" ;;
+        *) echo "install gnome-keyring or kwallet with your package manager" ;;
+    esac
+}
+
+wallet() {
+    local init=
+    if [ -n "${PAM_KWALLET5_LOGIN:-}" ]; then
+        if [ -n "$stubs" ]; then
+            init="$stubs/pam_kwallet_init"
+        else
+            init=$(first_executable /usr/libexec/pam_kwallet_init /usr/lib/pam_kwallet_init /usr/lib/x86_64-linux-gnu/libexec/pam_kwallet_init)
+        fi
+        if [ -n "$init" ] && [ -x "$init" ]; then "$init" || log "pam_kwallet_init failed"; fi
+    fi
+    ! secrets_activatable || return 0
+    ! secrets_owned 10 || return 0
+    if have gnome-keyring-daemon; then
+        "$(bin gnome-keyring-daemon)" --start --components=secrets >/dev/null 2>&1 || log "gnome-keyring-daemon did not start"
+        ! secrets_owned 6 || return 0
+    fi
+    if have ksecretd; then
+        respawn_loop ksecretd "$(bin ksecretd)"
+        return 0
+    fi
+    log "nothing keeps saved passwords here and no program for it is installed: $(secrets_hint)"
 }
 
 # sill as the transient user service sill.service (systemd-run, Type=exec, so it has a real main
@@ -228,6 +339,32 @@ sill_shell() {
     log "$sill_unit ended"
 }
 
+# The wlr portal: the distro's user unit when it ships one (Ubuntu, Arch and Fedora do), so the path to the program
+# is the distro's business; else the program from the first place it is installed (/usr/libexec on Fedora and
+# Ubuntu, /usr/lib on Arch).
+start_portal() {
+    local program listed=
+    if [ -z "$stubs" ]; then
+        listed=$(systemctl --user list-unit-files "$portal_unit" --no-legend 2>/dev/null) || listed=
+        if [ -n "$listed" ]; then
+            if systemctl --user start "$portal_unit"; then
+                portal_unit_started=1
+                return 0
+            fi
+            log "could not start $portal_unit; trying the program itself"
+        fi
+        program=$(first_executable /usr/libexec/xdg-desktop-portal-wlr /usr/lib/xdg-desktop-portal-wlr \
+            /usr/lib/x86_64-linux-gnu/xdg-desktop-portal-wlr)
+    else
+        program="$stubs/xdg-desktop-portal-wlr"
+    fi
+    if [ -z "$program" ]; then
+        log "xdg-desktop-portal-wlr is not installed: screenshots and screen sharing will not work"
+        return 0
+    fi
+    keep_running portal "$program"
+}
+
 first_run() {
     sleep "$first_run_delay"
     "$(bin detent)" --first-run || log "detent --first-run exited with $?"
@@ -241,7 +378,8 @@ start_components() {
     wallet & component_pids+=("$!")
     keep_running power-key "$(bin systemd-inhibit)" --what=handle-power-key --who=desktop-session \
         --why="the power key opens sill's power menu" --mode=block sleep infinity
-    keep_running portal "$(bin xdg-desktop-portal-wlr /usr/libexec/xdg-desktop-portal-wlr)"
+    start_portal
+    if [ -n "$ibus_daemon" ] && have ibus-daemon; then keep_running ibus "$(bin ibus-daemon)" --xim --replace; fi
     if have systemd-run; then
         keep_running sill sill_shell
     else
@@ -263,13 +401,18 @@ stop_unit() {
 # WAYLAND_DISPLAY is not among them: casement makes the socket and publish_environment adds it.
 import_unit_environment() {
     local vars="XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE MOZ_ENABLE_WAYLAND \
-QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS XDG_SEAT XDG_VTNR XDG_SESSION_ID XDG_SESSION_CLASS"
-    local var set=()
+QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS GTK_IM_MODULE QT_IM_MODULE XDG_DATA_DIRS XDG_SEAT XDG_VTNR XDG_SESSION_ID \
+XDG_SESSION_CLASS"
+    local var set=() unset=(WAYLAND_DISPLAY DISPLAY)
     for var in $vars; do
         [ -z "${!var:-}" ] || set+=("$var=${!var}")
     done
+    # An input method variable this session does not set (fcitx5 uses XMODIFIERS only) must not linger from before.
+    for var in GTK_IM_MODULE QT_IM_MODULE; do
+        [ -n "${!var:-}" ] || unset+=("$var")
+    done
     systemctl --user set-environment "${set[@]}"
-    systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY GTK_IM_MODULE QT_IM_MODULE 2>/dev/null || true
+    systemctl --user unset-environment "${unset[@]}" 2>/dev/null || true
 }
 
 # Write the drop-in for one run (extra args "$@") and make the manager read it.
@@ -367,7 +510,7 @@ while :; do
     fi
     if [ "$mode" = safe ]; then
         guard "casement --safe exited quickly too"
-        guard "casement --safe failed too: the crash guard ends the session (the Plasma login is a separate entry)"
+        guard "casement --safe failed too: the crash guard ends the session (your other session stays available at the login screen)"
         [ -n "$nested" ] || stop_unit
         exit 1
     fi
