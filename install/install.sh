@@ -8,7 +8,7 @@
 #   install/install.sh              do it
 #   (flags: see install/lib.sh)
 #
-# Not installed here: casement, sill and xdg-desktop-portal-wlr themselves (their own installers
+# Not installed here: casement, sill and transom (the portal backend) themselves (their own installers
 # and packages), other sessions (left untouched), and
 # anything under $HOME. install/uninstall.sh removes exactly the files listed below.
 set -euo pipefail
@@ -24,7 +24,8 @@ for tool in casement sill; do
   command -v "$tool" >/dev/null || note "WARNING: $tool is not on PATH; the session cannot start without it"
 done
 [ -f "$casement_unit" ] || note "WARNING: no casement unit at $casement_unit (build the casement repo's dist/casement.service, or set CASEMENT_UNIT_FILE); the session needs casement.service and will not start casement without it"
-[ -x /usr/libexec/xdg-desktop-portal-wlr ] || note "WARNING: /usr/libexec/xdg-desktop-portal-wlr is missing (dnf install xdg-desktop-portal-wlr)"
+[ -x "$prefix/libexec/transom" ] || [ -x /usr/libexec/transom ] || note "WARNING: transom is not installed (the repo's scripts/install.sh, or the top-level ./install.sh --only transom); screen sharing and screenshots need it"
+[ -x /usr/libexec/xdg-desktop-portal ] || note "WARNING: xdg-desktop-portal is missing (dnf install xdg-desktop-portal)"
 
 step "2/3 the files"
 dests=()
@@ -49,5 +50,5 @@ fi
 
 step "done"
 note "Pick \"sill (casement)\" at the login screen. First-login checks (not testable without a login):"
-note "  the guard's real tty path, sill and the wlr portal against the real casement, the target, casement.service"
-note "  the activation environment, a screen share through the wlr portal, logout through sill's power menu."
+note "  the guard's real tty path, sill and transom against the real casement, the target, casement.service"
+note "  the activation environment, a screen share through transom (a browser, OBS), logout through sill's power menu."

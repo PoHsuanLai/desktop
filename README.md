@@ -6,13 +6,13 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | Path | What |
 |---|---|
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
-| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, detent, sill, keycap, anyview, mailo, palmrest); see below |
+| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, detent, sill, transom, keycap, anyview, mailo, palmrest); see below |
 | `harness/jail.sh` | the one jail: a bubblewrap namespace with no input devices, no GPU, no session, no network |
 | `harness/lib/` | `require_jail`, step timing and exit codes, budgets, run ids, a private dbus-daemon |
-| `harness/scenario-build.sh` | outside the jail: builds what the scenarios run (casement tools, foot, sill, shell-host's demos, detent at its pin) into the git-ignored `build/`; the gate runs it first |
+| `harness/scenario-build.sh` | outside the jail: builds what the scenarios run (casement tools, foot, sill, shell-host's demos, detent at its pin, transom) into the git-ignored `build/`; the gate runs it first |
 | `harness/selftest.sh` | proves the jail holds (`--all` also runs the negative check outside) |
 | `gate/desktop-gate.sh` | `--self`, `--merge`, `--phase P<n>`: prints `DESKTOP GATE GREEN (<tier>)` |
-| `session/` | the "sill (casement)" login: `desktop-session` (casement as the session's compositor child, with sill and xdg-desktop-portal-wlr beside it, `XDG_CURRENT_DESKTOP=quire`, and the crash-loop guard: three quick exits, then `casement --safe`, then the session ends with a guard log line; Plasma is a separate login entry), the wayland-sessions entry, `quire-portals.conf`, `desktop-session.target` |
+| `session/` | the "sill (casement)" login: `desktop-session` (casement as the session's compositor child, with sill beside it; the portal is transom, started by D-Bus activation, `XDG_CURRENT_DESKTOP=quire`, and the crash-loop guard: three quick exits, then `casement --safe`, then the session ends with a guard log line; Plasma is a separate login entry), the wayland-sessions entry, `quire-portals.conf`, `desktop-session.target` |
 | `release/` | signed release bundle of the whole desktop: `build.sh` (components at their manifest revs, staged under `/opt/quire/current`), `pack.sh`, `verify.sh`, `selftest.sh` (in `gate/desktop-gate.sh --self`), `README.md` (what to set up once and how to cut a release); built by `.github/workflows/release.yml` and published to the public PoHsuanLai/desktop-releases |
 | `install/` | `install.sh` and `uninstall.sh` for `session/` (`--dry-run`, `--prefix`, `--destdir`, `--sysconfdir`, `--sessions-dir`); never sudo, never `$HOME`; the uninstall removes exactly the files the install wrote, and only while they are unchanged |
 | `gate/installer-check.sh` | `install.sh` against stub installers in a scratch dir: the dry-run plan and order, PREFIX/DESTDIR passed through, stop at the first failure, no sudo, nothing written to the home |
@@ -28,7 +28,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 `./install.sh [--dry-run] [--prefix DIR] [--destdir DIR] [--sysconfdir DIR] [--siblings DIR] [--only NAME,...]`
 runs each component's own installer, siblings checked out side by side, in this order: porter
 (`scripts/install.sh`: the daemons and the caller table), detent (`scripts/install.sh`: Settings, which
-porter's caller table knows as the unit `org.quire.Settings.service`), sill (`dist/install.sh`), keycap,
+porter's caller table knows as the unit `org.quire.Settings.service`), sill (`dist/install.sh`), transom (`scripts/install.sh`: the portal backend for screen sharing and screenshots), keycap,
 anyview, mailo, palmrest. `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
 installer takes; the first failure stops the run and names the component and what was installed before it.
 `--dry-run` prints the plan and runs and builds nothing.
