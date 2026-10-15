@@ -50,6 +50,7 @@ runtime_arch="wayland libxkbcommon xkeyboard-config libinput seatd systemd-libs 
   libpulse pam alsa-lib fontconfig freetype2 harfbuzz libxml2 libpng dbus libx11 libxcb dav1d vulkan-icd-loader"
 
 case "$family" in debian|fedora|arch) ;; *) echo "deps.sh: unknown family '$family' (debian, fedora, arch or auto)" >&2; exit 2 ;; esac
+# shellcheck disable=SC2086  # the lists are space-separated words on purpose
 pick() { local var="$1_$family"; printf '%s\n' ${!var}; }
 case "$role" in
   tools) pick tools ;;
