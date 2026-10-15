@@ -6,7 +6,7 @@
 # Identity. The daemons are test-proc-root builds: they name the process behind a bus connection from
 # $PROC/<pid>/cgroup (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs
 # in a systemd scope; the role of each is the caller table ($CONFIG/porter/callers.toml: porter's dist copy).
-# `acc_identity UNIT PID` writes a unit's cgroup (sill-shell.scope, syncd.service, inferd.service) and, for a service
+# `acc_identity UNIT PID` writes a unit's cgroup (sill.service, syncd.service, inferd.service) and, for a service
 # unit, its main pid ($PROC/units/<unit>); `acc_app APP PID` names detent the Settings unit (org.quire.Settings.service)
 # and any other app a Flatpak (its scope and $PROC/<pid>/root/.flatpak-info).
 #
@@ -214,10 +214,10 @@ syncd_stop() { [ -z "$SYNCD_PID" ] || acc_kill "$SYNCD_PID"; SYNCD_PID=; }
 
 # inferd_write_config: $CONFIG/quire/inferd.toml: what is on stdin (tables of the scenario: [probe], [ai] ...), then the
 # caller table. inferd serves its settings module to the unit org.quire.Settings.service and draws its sheets through
-# the shell (sill-shell.scope); an app in a Flatpak or app scope needs no row. Call it before inferd_start.
+# the shell (sill.service); an app in a Flatpak or app scope needs no row. Call it before inferd_start.
 inferd_write_config() {
   mkdir -p "$CONFIG/quire"
-  { cat; printf '\n[callers]\nsettings = ["%s"]\nshell = ["sill-shell.scope"]\n' "$SETTINGS_UNIT"; } >"$CONFIG/quire/inferd.toml"
+  { cat; printf '\n[callers]\nsettings = ["%s"]\nshell = ["sill.service"]\n' "$SETTINGS_UNIT"; } >"$CONFIG/quire/inferd.toml"
 }
 
 INFERD_PID=
@@ -234,7 +234,7 @@ inferd_start() { # needs $CONFIG/quire/inferd.toml (inferd_write_config)
   acc_wait 20 bus_has_owner org.quire.Inference1 || { echo "inferd never took org.quire.Inference1:" >&2; cat "$OUT_DIR/inferd.log" >&2; return 1; }
 }
 
-# sill_start: sill (the sheet host) on the same bus; its pid is named sill-shell.scope, the sheet host's unit.
+# sill_start: sill (the sheet host) on the same bus; its pid is named sill.service (and is that unit's main pid), the sheet host's unit.
 sill_start() {
   cat >"$BIN_DIR/xdg-open" <<EOF
 #!/usr/bin/env bash
@@ -251,7 +251,7 @@ EOF
   IN_ENV_EXTRA=("PATH=$BIN_DIR:$PATH" "QUIRE_DEBUG_PROBE=$SPROBE")
   # sill names itself to accountd within its first moments (its accounts service asks NeedingReauth as it connects, and a
   # refused first ask is not repeated), so its identity is written by the shell that execs it, before it exists.
-  LAUNCH_PREFIX=(bash -c 'mkdir -p "$0/$$"; echo "0::/user.slice/user-1000.slice/user@1000.service/app.slice/sill-shell.scope" >"$0/$$/cgroup"; exec "$@"' "$PROC")
+  LAUNCH_PREFIX=(bash -c 'mkdir -p "$0/$$" "$0/units"; echo "0::/user.slice/user-1000.slice/user@1000.service/app.slice/sill.service" >"$0/$$/cgroup"; echo "$$" >"$0/units/sill.service"; exec "$@"' "$PROC")
   launch_daemon || return 1
   NAME=$(output_name) || return 1
   SHEET="sill-accounts-sheet-$NAME"
