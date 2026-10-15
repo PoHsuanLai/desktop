@@ -5,7 +5,10 @@
 #
 # Identity. The daemons are test-proc-root builds: they name the process behind a bus connection from
 # $PROC/<pid>/cgroup (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs
-# in a systemd scope; the role of each is the caller table ($CONFIG/porter/callers.toml: porter's dist copy).
+# in a systemd scope; the role of each is the system caller table, porter's dist copy at $ACC_SYSTEM_CALLERS
+# (PORTER_SYSTEM_CALLERS: the jail cannot write /etc/porter/callers.toml, and a person's own file gives no fixed role);
+# inferd's is $INFERD_SYSTEM_CALLERS (PORTER_INFERD_CALLERS, in place of /etc/porter/inferd-callers.toml: porter
+# reads no [callers] from inferd.toml since CALLER-INFERD).
 # `acc_identity UNIT PID` writes a unit's cgroup (sill.service, syncd.service, inferd.service) and, for a service
 # unit, its main pid ($PROC/units/<unit>); `acc_app APP PID` names detent the Settings unit (org.quire.Settings.service)
 # and any other app a Flatpak (its scope and $PROC/<pid>/root/.flatpak-info).
@@ -32,9 +35,11 @@ acc_env() {
 }
 
 # Where the scenario keeps things; set by acc_dirs after scratch_new.
-RIG_DIR= PROC= PROV= BIN_DIR=
+RIG_DIR= PROC= PROV= BIN_DIR= ACC_SYSTEM_CALLERS= INFERD_SYSTEM_CALLERS=
 acc_dirs() {
   RIG_DIR="$OUT_DIR/rig"; PROC="$RIG_DIR/proc"; PROV="$RIG_DIR/providers"; BIN_DIR="$RIG_DIR/bin"
+  ACC_SYSTEM_CALLERS="$RIG_DIR/system-callers.toml"
+  INFERD_SYSTEM_CALLERS="$RIG_DIR/inferd-callers.toml"
   mkdir -p "$RIG_DIR" "$PROC" "$PROV" "$BIN_DIR" "$CONFIG/porter" "$CONFIG/quire" "$STATE/porter"
 }
 
@@ -133,10 +138,10 @@ secrets_start() {
 }
 
 # --- configuration -------------------------------------------------------------------------------------------
-# acc_config: the caller table (porter's own), the shipped provider files, and the person's clients file
-# (acc_clients_for_issuer writes the shipped one).
+# acc_config: the system caller table (porter's own, read through PORTER_SYSTEM_CALLERS), the shipped provider
+# files, and the person's clients file (acc_clients_for_issuer writes the shipped one).
 acc_config() {
-  cp "$SCEN_BUILD/pin/porter/dist/callers.toml" "$CONFIG/porter/callers.toml"
+  cp "$SCEN_BUILD/pin/porter/dist/callers.toml" "$ACC_SYSTEM_CALLERS"
   cp "$SCEN_BUILD"/pin/porter/providers/*.toml "$PROV/"
 }
 
@@ -177,7 +182,7 @@ acc_providers_only() {
 # (org.quire.Inference1), syncd keeps its own accounts (org.quire.Sync1). A page that reads a daemon never starts it
 # (detent's live/io.rs answers NotRunning), so a scenario starts every daemon its page reads before opening the page.
 # Each daemon reads its caller table at startup only: acc_config installs callers.toml before accountd and syncd start,
-# inferd_write_config writes inferd's own table (inferd.toml) before inferd starts.
+# inferd_write_config writes inferd's own system table ($INFERD_SYSTEM_CALLERS) before inferd starts.
 
 # acc_ca_env: SSL_CERT_FILE=<the rig's CA> when the rig made one, else nothing (one word per line, for `env`).
 acc_ca_env() { [ ! -f "$RIG_DIR/servers/ca.pem" ] || echo "SSL_CERT_FILE=$RIG_DIR/servers/ca.pem"; }
@@ -194,7 +199,7 @@ acc_ship_providers() {
 ACCOUNTD_PID=
 accountd_start() {
   local ca; ca=$(acc_ca_env)
-  acc_bg "$OUT_DIR/accountd.log" env ACCOUNTD_PROC_ROOT="$PROC" ${ca:+"$ca"} "$ARIG/accountd" --providers "$PROV"
+  acc_bg "$OUT_DIR/accountd.log" env ACCOUNTD_PROC_ROOT="$PROC" PORTER_SYSTEM_CALLERS="$ACC_SYSTEM_CALLERS" ${ca:+"$ca"} "$ARIG/accountd" --providers "$PROV"
   ACCOUNTD_PID=$ACC_LAST
   acc_wait 20 bus_has_owner org.quire.Accounts1 || { echo "accountd never took org.quire.Accounts1:" >&2; cat "$OUT_DIR/accountd.log" >&2; return 1; }
   acc_identity accountd.service "$ACCOUNTD_PID"
@@ -205,30 +210,32 @@ SYNCD_PID=
 syncd_start() {
   local ca; ca=$(acc_ca_env)
   acc_ship_providers
-  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" ${ca:+"$ca"} "$ARIG/syncd"
+  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" PORTER_SYSTEM_CALLERS="$ACC_SYSTEM_CALLERS" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" ${ca:+"$ca"} "$ARIG/syncd"
   SYNCD_PID=$ACC_LAST
   acc_identity syncd.service "$SYNCD_PID"
   acc_wait 20 bus_has_owner org.quire.Sync1 || { echo "syncd never took org.quire.Sync1:" >&2; cat "$OUT_DIR/syncd.log" >&2; return 1; }
 }
 syncd_stop() { [ -z "$SYNCD_PID" ] || acc_kill "$SYNCD_PID"; SYNCD_PID=; }
 
-# inferd_write_config: $CONFIG/quire/inferd.toml: what is on stdin (tables of the scenario: [probe], [ai] ...), then the
-# caller table. inferd serves its settings module to the unit org.quire.Settings.service and draws its sheets through
-# the shell (sill.service); an app in a Flatpak or app scope needs no row. Call it before inferd_start.
+# inferd_write_config: $CONFIG/quire/inferd.toml is what is on stdin (tables of the scenario: [probe], [ai] ...), and
+# $INFERD_SYSTEM_CALLERS is inferd's caller table, in the shape of porter's dist/inferd-callers.toml: inferd serves its
+# settings module to the unit org.quire.Settings.service and draws its sheets through the shell (sill.service); an app
+# in a Flatpak or app scope needs no row. Call it before inferd_start.
 inferd_write_config() {
   mkdir -p "$CONFIG/quire"
-  { cat; printf '\n[callers]\nsettings = ["%s"]\nshell = ["sill.service"]\n' "$SETTINGS_UNIT"; } >"$CONFIG/quire/inferd.toml"
+  cat >"$CONFIG/quire/inferd.toml"
+  printf 'settings = ["%s"]\nshell = ["sill.service"]\n' "$SETTINGS_UNIT" >"$INFERD_SYSTEM_CALLERS"
 }
 
 INFERD_PID=
-inferd_start() { # needs $CONFIG/quire/inferd.toml (inferd_write_config)
+inferd_start() { # needs $CONFIG/quire/inferd.toml and $INFERD_SYSTEM_CALLERS (inferd_write_config)
   # The model catalog at the manifest's stoker pin, where inferd reads it ($XDG_DATA_HOME/stoker/catalog): without
   # it no hosted model is known, so a turn on an AI key is refused before the key is ever read.
   mkdir -p "$DATA/stoker/catalog"
   cp "$SCEN_BUILD"/pin/stoker/catalog/*.toml "$DATA/stoker/catalog/"
   local ca; ca=$(acc_ca_env)
   acc_ship_providers
-  acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" ${ca:+"$ca"} "$ARIG/inferd"
+  acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" PORTER_INFERD_CALLERS="$INFERD_SYSTEM_CALLERS" ${ca:+"$ca"} "$ARIG/inferd"
   INFERD_PID=$ACC_LAST
   acc_identity inferd.service "$INFERD_PID"
   acc_wait 20 bus_has_owner org.quire.Inference1 || { echo "inferd never took org.quire.Inference1:" >&2; cat "$OUT_DIR/inferd.log" >&2; return 1; }
