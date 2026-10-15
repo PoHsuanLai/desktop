@@ -74,6 +74,29 @@ STUB_LINKER=no inst --destdir "$dest" >"$tmp/out.log" 2>&1 || fail "the run with
 grep -q 'LINKER=cc FLAGS= ' "$log" || grep -q 'LINKER=cc FLAGS=$' "$log" || fail "no system linker without mold: $(cat "$log")"
 grep -q 'faster linker (clang and mold) was not found' "$tmp/out.log" || fail "the missing faster linker was not said"
 
+# 3c. the emoji font: staged under the prefix with its licence; not when --only leaves it out; not when fontconfig
+# already has a COLRv1 Noto Color Emoji; fc-cache runs on a real (unstaged) install.
+[ -f "$dest/opt/d/share/fonts/quire/Noto-COLRv1.ttf" ] || fail "the emoji font was not staged"
+[ -f "$dest/opt/d/share/fonts/quire/OFL-Noto-COLRv1.txt" ] || fail "the font licence was not staged"
+rm -rf -- "$tmp/dest2"
+inst --destdir "$tmp/dest2" --prefix /opt/d --only porter >/dev/null 2>&1 || fail "--only porter failed"
+[ ! -e "$tmp/dest2/opt/d/share/fonts" ] || fail "--only porter installed the font"
+mkdir -p "$tmp/fcbin" "$tmp/user"
+printf '#!/bin/sh\necho "fc-cache $*" >>"%s"\n' "$log" >"$tmp/fcbin/fc-cache"
+printf '#!/bin/sh\necho "/usr/share/fonts/Noto-COLRv1.ttf: Noto Color Emoji:style=Regular"\n' >"$tmp/fcbin/fc-list-present"
+printf '#!/bin/sh\necho "/usr/share/fonts/NotoColorEmoji.ttf: Noto Color Emoji:style=Regular"\n' >"$tmp/fcbin/fc-list"
+chmod +x "$tmp/fcbin"/*
+: >"$log"
+PATH="$tmp/fcbin:$PATH" inst --prefix "$tmp/user" --only fonts >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "the font step failed"; }
+[ -f "$tmp/user/share/fonts/quire/Noto-COLRv1.ttf" ] || fail "the font was not installed under the prefix"
+grep -q "fc-cache -f $tmp/user/share/fonts/quire" "$log" || fail "fc-cache was not run: $(cat "$log")"
+rm -rf -- "$tmp/user"; : >"$log"
+mv "$tmp/fcbin/fc-list-present" "$tmp/fcbin/fc-list"
+PATH="$tmp/fcbin:$PATH" inst --prefix "$tmp/user" --only fonts >"$tmp/out.log" 2>&1 || fail "the font step failed with a system font"
+[ ! -e "$tmp/user/share/fonts" ] || fail "the font was installed although fontconfig has a COLRv1 one"
+grep -q 'fontconfig already has' "$tmp/out.log" || fail "the skip was not said"
+: >"$log"
+
 # 4. a failing component stops the run and is named.
 : >"$log"
 if STUB_FAIL=detent inst --destdir "$dest" >"$tmp/out.log" 2>&1; then fail "a failing component did not fail the run"; fi

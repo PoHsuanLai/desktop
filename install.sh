@@ -12,13 +12,18 @@
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: porter, detent, casement, sill, keycap, anyview, mailo, palmrest)
+#   --only NAMES   just these components (comma separated: porter, detent, casement, sill, keycap, anyview, mailo,
+#                  palmrest, fonts)
 #
 # Order: porter (the account daemons and the caller table), detent (Settings), casement (the compositor and
 # its user unit), sill (the session), keycap, anyview, mailo, palmrest. Each component's installer is its
 # own: this script passes the prefix and the staging root through and nothing else, and stops at the first
 # one that fails. A component whose installer is not in its checkout yet (casement, until its scripts/install.sh
 # lands) is reported and skipped; the others carry on.
+#
+# The colour emoji font (fonts/Noto-COLRv1.ttf) goes to <prefix>/share/fonts/quire/ after the components, unless
+# fontconfig already has a COLRv1 Noto Color Emoji (Fedora does; Ubuntu and Arch ship a bitmap build our renderer
+# cannot draw). It is the step named "fonts".
 #
 # porter always goes to /usr, whatever --prefix says: its daemons read the data they ship (providers, the
 # client table, the model catalog) only from /usr/share for now.
@@ -46,6 +51,8 @@ source "$HERE/install/linker.sh"
 source "$HERE/install/packages.sh"
 # shellcheck source=install/check.sh
 source "$HERE/install/check.sh"
+# shellcheck source=install/fonts.sh
+source "$HERE/install/fonts.sh"
 ORDER=(porter detent casement sill keycap anyview mailo palmrest)
 
 # Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
@@ -148,6 +155,9 @@ writable() {
   [ -w "$p" ]
 }
 
+# needs_root_for PATH: PATH when this user cannot write it (or create it), else nothing.
+needs_root_for() { if writable "$1"; then :; else printf '%s' "$1"; fi; }
+
 # needs_root: the first place the component writes that this user cannot (empty when all are writable).
 needs_root() {
   local w
@@ -177,8 +187,12 @@ root_command_text() {
   if [ "${#words[@]}" -gt $((1 + ${#args[@]})) ]; then as_root_hint env "${words[@]}"; else as_root_hint "${words[@]}"; fi
 }
 
-# Which components, in order.
+# Which components, in order. "fonts" is the emoji font step, not a component.
 selected=()
+fonts_wanted=1
+if [ -n "$only" ]; then
+  case ",$only," in *",fonts,"*) ;; *) fonts_wanted=0 ;; esac
+fi
 for name in "${ORDER[@]}"; do
   if [ -n "$only" ]; then
     case ",$only," in *",$name,"*) ;; *) continue ;; esac
@@ -187,10 +201,10 @@ for name in "${ORDER[@]}"; do
 done
 if [ -n "$only" ]; then
   for name in ${only//,/ }; do
-    case " ${ORDER[*]} " in *" $name "*) ;; *) die "no component named $name (known: ${ORDER[*]})" ;; esac
+    case " ${ORDER[*]} fonts " in *" $name "*) ;; *) die "no component named $name (known: ${ORDER[*]} fonts)" ;; esac
   done
 fi
-[ "${#selected[@]}" -gt 0 ] || die "nothing selected"
+[ "${#selected[@]}" -gt 0 ] || [ "$fonts_wanted" = 1 ] || die "nothing selected"
 
 # Plan: decide each component's fate before anything runs.
 run=() left=() reasons=() absent=()
@@ -232,6 +246,28 @@ for name in "${selected[@]}"; do
       esac ;;
   esac
 done
+fonts_state=skipped fonts_root=""
+if [ "$fonts_wanted" = 1 ]; then
+  if [ ! -f "$(emoji_font_src)/Noto-COLRv1.ttf" ]; then
+    echo "fonts: no $(emoji_font_src)/Noto-COLRv1.ttf in this checkout; colour emoji will be missing unless the system has a COLRv1 font"
+  else
+    fonts_state=$(emoji_font_state)
+    case "$fonts_state" in
+      installed) echo "fonts: the colour emoji font is already in $destdir$(emoji_font_dir)" ;;
+      present) echo "fonts: fontconfig already has a COLRv1 Noto Color Emoji; nothing to install" ;;
+      wanted)
+        if fonts_root=$(needs_root_for "$destdir$(emoji_font_dir)") && [ -n "$fonts_root" ]; then
+          fonts_state=yourself
+          left+=("fonts"); reasons+=("needs root: $fonts_root is not writable by you")
+          echo "fonts: colour emoji font, yourself (needs root: $fonts_root is not writable by you):"
+          emoji_font_commands | sed 's/^/             /'
+        else
+          echo "fonts: runs   colour emoji font to $destdir$(emoji_font_dir)"
+        fi
+        case "$prefix" in /usr | /usr/local) ;; *) echo "note: fontconfig does not look under $prefix/share/fonts; add $(emoji_font_dir) to its font directories" ;; esac ;;
+    esac
+  fi
+fi
 case " ${selected[*]} " in *" porter "*)
   [ "$prefix" = "$PORTER_PREFIX" ] || echo "note: porter goes to $PORTER_PREFIX, not $prefix: its daemons read what they ship only from $PORTER_PREFIX/share" ;;
 esac
@@ -264,6 +300,12 @@ for name in "${run[@]:-}"; do
   fi
   done_list+=("$name")
 done
+
+if [ "$fonts_state" = wanted ]; then
+  echo "== fonts"
+  install_emoji_font || { echo "install.sh: the colour emoji font was not installed. Installed so far: ${done_list[*]:-nothing}." >&2; exit 1; }
+  done_list+=(fonts)
+fi
 
 echo "installed: ${done_list[*]:-nothing}"
 if [ "${#absent[@]}" -gt 0 ]; then
