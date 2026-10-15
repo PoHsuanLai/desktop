@@ -4,7 +4,7 @@
 # writes into a sibling checkout: each repo builds into its own target directory under build/.
 #
 #   build/tools/bin/{casement,casementctl,casement-probe,fake-logind}   casement's dev/bootstrap.sh --build-only
-#   build/tools/bin/foot                                                 the host's, else Fedora's (dnf download, unpacked)
+#   build/tools/bin/foot                                                 the host's (install foot from your distro), else, on Fedora only, its rpm (dnf download, unpacked)
 #   build/sill-target/debug/sill                                         sill with --features debug (the fake DDC)
 #   build/shell-host-target/debug/examples/demo_*                        shell-host's real-input demos
 #   build/src/{sill,shell-host}                                          private checkouts of the siblings' HEADs the scripts run from
@@ -28,8 +28,12 @@ esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/all.sh
 source "$ROOT/harness/lib/all.sh"
+# shellcheck source=../install/distro.sh
+source "$ROOT/install/distro.sh"
+# shellcheck source=../install/packages.sh
+source "$ROOT/install/packages.sh"
 if [ -z "$(jail_violations)" ]; then
-  echo "scenario-build: this builds (cargo, dnf, git, the network): run it outside the jail" >&2
+  echo "scenario-build: this builds (cargo, git, the network): run it outside the jail" >&2
   exit 2
 fi
 source "$ROOT/harness/lib/scenario.sh"
@@ -49,6 +53,8 @@ fetch_foot() {
   local bin="$SCEN_BUILD/tools/bin/foot" dir="$SCEN_BUILD/foot-root"
   [ ! -x "$bin" ] || return 0
   if command -v foot >/dev/null; then ln -sf "$(command -v foot)" "$bin"; return 0; fi
+  # Only the dnf family can fetch the rpm and unpack it; every other family installs foot from its archive.
+  [ "$(distro_family)" = fedora ] || return 1
   command -v dnf >/dev/null && command -v rpm2cpio >/dev/null && command -v cpio >/dev/null || return 1
   rm -rf "$dir"; mkdir -p "$dir/rpms"
   (cd "$dir/rpms" && timeout 300 dnf download --arch x86_64 foot fcft)
@@ -147,6 +153,12 @@ build_porter() {
 build_sill_pin() {
   (cd "$SCEN_BUILD/pin/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" cargo build -p sill --features debug,ds-blitz/debug-probe)
 }
+
+# foot is the scenarios' terminal: say how to get it before the long builds, not after.
+if [ "$only_accounts" = 0 ] && [ ! -x "$SCEN_BUILD/tools/bin/foot" ] && ! command -v foot >/dev/null && [ "$(distro_family)" != fedora ]; then
+  echo "scenario-build: foot (a terminal the scenarios start) is not installed: $(install_hint foot | tr '\n' ' ')" >&2
+  exit 3
+fi
 
 stage "casement (bootstrap --build-only)" build_casement
 if [ "$only_accounts" = 0 ]; then

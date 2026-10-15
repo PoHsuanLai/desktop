@@ -93,6 +93,7 @@ build   pc-dav1d          pc:dav1d
 build   pc-vulkan         pc:vulkan
 gate    bwrap             cmd:bwrap
 gate    foot              cmd:foot
+gate    lavapipe          file:/usr/share/vulkan/icd.d/lvp_icd*.json
 TABLE
 }
 
@@ -157,6 +158,7 @@ packages_fedora() {
     pc-dav1d) echo libdav1d-devel ;;
     pc-vulkan) echo vulkan-loader-devel ;;
     foot) echo foot ;;
+    lavapipe) echo mesa-vulkan-drivers ;;
     *) echo - ;;
   esac
 }
@@ -222,6 +224,7 @@ packages_debian() {
     pc-dav1d) echo libdav1d-dev ;;
     pc-vulkan) echo libvulkan-dev ;;
     foot) echo foot ;;
+    lavapipe) echo mesa-vulkan-drivers ;;
     *) echo - ;;
   esac
 }
@@ -285,6 +288,7 @@ packages_arch() {
     pc-dav1d) echo dav1d ;;
     pc-vulkan) echo vulkan-icd-loader ;;
     foot) echo foot ;;
+    lavapipe) echo vulkan-swrast ;; # unverified
     *) echo - ;;
   esac
 }
