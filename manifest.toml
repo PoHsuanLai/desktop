@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "d7fa5c6387d24bbd47b98f92aa5cd3d297e5f4b6"
+rev = "7130cb301266feb1e4325d38545d6034bc768a66"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -71,7 +71,7 @@ gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "42e4b838c53e4c0db10a2e1b7da5db4258cc5402"
+rev = "1be448b6e5f5581666a0039fe83c2e4b60f2049a"
 branch = "master"
 gate = "lane"
 
@@ -90,7 +90,7 @@ gate = "lane"
 [repo.bulkhead]
 # The sandbox docket runs agent tools in (public); its kill takes the whole sandbox.
 url = "https://github.com/PoHsuanLai/bulkhead.git"
-rev = "e647c4f95d6fff94e504471056a89929d096b50b"
+rev = "a973884b55551880bbd5d7afc0cf2908c27fea64"
 branch = "master"
 gate = "lane"
 
