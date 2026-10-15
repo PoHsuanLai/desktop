@@ -2,6 +2,16 @@
 # public PoHsuanLai/desktop-releases (binaries only; the source repos are private). release/README.md says
 # what the owner sets up once. Secrets: RELEASE_READ_TOKEN (read the private repos), MINISIGN_SECRET_KEY and
 # MINISIGN_PASSWORD (sign), RELEASES_TOKEN (create the release in desktop-releases).
+#
+# The programs are built on Ubuntu 24.04 (container ubuntu:24.04, the oldest base the desktop supports: glibc
+# 2.39, GCC 13's libstdc++, noble's libinput, wayland, pipewire), so they load on Fedora and Arch too; a build
+# on a newer base would not load on Ubuntu. After the build, release/check-glibc.sh and check-ldd.sh fail the job
+# if a program asks for a newer C library than that or a library that is not there. The signed result is then
+# installed by slipway's helper in clean ubuntu:24.04, fedora:44 and archlinux:latest containers (job smoke)
+# before anything is published.
+#
+# Jobs: prepare -> build (parallel, per component group) -> pack (merge, sign, verify) -> smoke (three
+# distributions) -> publish (create the release in desktop-releases).
 name: release
 
 on:
@@ -47,9 +57,14 @@ jobs:
 
   build:
     needs: prepare
-    runs-on: ubuntu-latest
-    container: fedora:44
+    runs-on: ubuntu-24.04
+    # The oldest supported base, not the runner image (which has newer toolchain pieces). Disk: the runner's
+    # ~14 GB is shared with the container; the heavy components have a job each for that reason (unverified
+    # that casement and sill fit; if not, free space cannot be reclaimed from inside the container).
+    container: ubuntu:24.04
     timeout-minutes: 350
+    env:
+      DEBIAN_FRONTEND: noninteractive
     strategy:
       fail-fast: true
       matrix:
@@ -61,20 +76,25 @@ jobs:
           - { name: porter, only: porter }
           - { name: small, only: "session,detent,keycap,palmrest,slipway" }
     steps:
-      - name: Build tools and development packages
+      - name: Git and certificates (the checkout needs them)
         run: |
-          dnf -y install --setopt=install_weak_deps=False \
-            git tar zstd gzip findutils which curl ca-certificates python3 perl-core \
-            gcc gcc-c++ clang clang-devel llvm-devel make cmake pkgconf-pkg-config \
-            pipewire-devel libxkbcommon-devel mesa-libgbm-devel mesa-libEGL-devel mesa-libGL-devel \
-            libinput-devel libseat-devel systemd-devel libdrm-devel dbus-devel wayland-devel \
-            wayland-protocols-devel fontconfig-devel freetype-devel alsa-lib-devel libdav1d-devel \
-            openssl-devel vulkan-loader-devel libxcb-devel libX11-devel
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl
 
       - name: Checkout desktop
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: desktop
+
+      - name: Build tools and development packages (Ubuntu names, release/deps.sh)
+        run: |
+          set -euo pipefail
+          apt-get install -y --no-install-recommends $(desktop/release/deps.sh debian build)
+          ldd --version | head -n 1
+          g++ --version | head -n 1
+
+      - name: Zig 0.16 (temor), checked against its published SHA-256
+        run: desktop/release/install-zig.sh --version 0.16.0
 
       - name: Rust toolchains named by the repos
         run: |
@@ -89,6 +109,7 @@ jobs:
           set -euo pipefail
           desktop/release/checkout.sh --siblings "$GITHUB_WORKSPACE"
           export PATH="$HOME/.cargo/bin:$PATH"
+          # Each repo pins its own toolchain in rust-toolchain.toml (1.98.1 for the program as a whole).
           for f in */rust-toolchain.toml; do
             channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$f")
             [ -z "$channel" ] || rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
@@ -101,9 +122,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             desktop/build/release/target
-          key: cargo-${{ matrix.name }}-${{ hashFiles('desktop/manifest.toml') }}
+          key: cargo-ubuntu2404-${{ matrix.name }}-${{ hashFiles('desktop/manifest.toml') }}
           restore-keys: |
-            cargo-${{ matrix.name }}-
+            cargo-ubuntu2404-${{ matrix.name }}-
 
       - name: Build and stage
         run: |
@@ -112,6 +133,24 @@ jobs:
             --out "$GITHUB_WORKSPACE/desktop/build/release" --siblings "$GITHUB_WORKSPACE" --only "${{ matrix.only }}"
           # An artifact is a zip, which would drop the modes: ship the staged tree as a tar.
           tar -C desktop/build/release -cf "stage-${{ matrix.name }}.tar" stage components.d
+          # slipway-apply is not in the bundle (a release must not replace a program that runs as root), but the
+          # smoke job needs the one built from the same pin, on the same oldest base.
+          if [ "${{ matrix.name }}" = small ]; then
+            mkdir helper
+            cp desktop/build/release/target/slipway/release/slipway-apply helper/
+          fi
+
+      - name: The C library the programs need is no newer than Ubuntu 24.04's
+        run: |
+          set -euo pipefail
+          desktop/release/check-glibc.sh 2.39 --stage desktop/build/release/stage
+          if [ -d helper ]; then desktop/release/check-glibc.sh 2.39 --stage helper; fi
+
+      - name: Every shared library the programs name is installed
+        run: |
+          set -euo pipefail
+          desktop/release/check-ldd.sh --stage desktop/build/release/stage
+          if [ -d helper ]; then desktop/release/check-ldd.sh --stage helper; fi
 
       - name: Upload the staged tree
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -121,14 +160,26 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  publish:
+      - name: Upload the privileged helper (for the smoke job)
+        if: matrix.name == 'small'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: helper
+          path: helper/slipway-apply
+          if-no-files-found: error
+          retention-days: 3
+
+  # Merges the staged trees, packs and signs them, and checks the result as slipway will.
+  pack:
     needs: [prepare, build]
-    runs-on: ubuntu-latest
-    container: fedora:44
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - name: Tools
-        run: dnf -y install --setopt=install_weak_deps=False git tar zstd python3 minisign gh
+        run: |
+          sudo apt-get update
+          # minisign 0.11 or later is needed to sign prehashed; pack.sh passes -H either way. (Ubuntu's version: unverified.)
+          sudo apt-get install -y --no-install-recommends minisign zstd
 
       - name: Checkout desktop
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -185,11 +236,100 @@ jobs:
           [ -f desktop/release/release.pub ] || { echo "release/release.pub is not committed (release/README.md step 3)" >&2; exit 1; }
           desktop/release/verify.sh out --pubkey desktop/release/release.pub
 
+      - name: Keep the signed release for the smoke and publish jobs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-out
+          path: |
+            out/release.toml
+            out/release.toml.minisig
+            out/bundle.tar.zst
+            notes.txt
+          if-no-files-found: error
+          retention-days: 3
+
+  # Installs the signed release with slipway's helper in a clean container of each supported distribution and
+  # checks what landed. The container is root on a throwaway file system, so the helper writes /etc, /usr and
+  # /opt for real. No privileged container is needed: nothing here starts systemd or a sandbox. Steps that do
+  # (unit start-up, the agent sandbox, bubblewrap) would need `options: --privileged` or a systemd-nspawn root
+  # on the runner, which hosted runners may not allow (unverified), so they are not in this job.
+  smoke:
+    needs: [pack, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: ubuntu-24.04, image: "ubuntu:24.04", family: debian }
+          - { name: fedora-44, image: "fedora:44", family: fedora }
+          - { name: arch, image: "archlinux:latest", family: arch }
+    container: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Git and certificates (the checkout needs them)
+        run: |
+          case "${{ matrix.family }}" in
+            debian) apt-get update && apt-get install -y --no-install-recommends git ca-certificates ;;
+            fedora) dnf -y install --setopt=install_weak_deps=False git ca-certificates ;;
+            arch) pacman -Syu --noconfirm --needed git ca-certificates ;;
+          esac
+
+      - name: Checkout desktop
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: desktop
+
+      - name: Tools and the libraries the programs load (this distribution's names, release/deps.sh)
+        run: |
+          set -euo pipefail
+          pkgs=$(desktop/release/deps.sh ${{ matrix.family }} runtime)
+          case "${{ matrix.family }}" in
+            debian) apt-get install -y --no-install-recommends $pkgs ;;
+            fedora) dnf -y install --setopt=install_weak_deps=False $pkgs ;;
+            arch) pacman -S --noconfirm --needed $pkgs ;;
+          esac
+
+      - name: Download the signed release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-out
+          path: in/release
+
+      - name: Download the helper
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: helper
+          path: in/helper
+
+      - name: Install it and check what landed
+        run: |
+          set -euo pipefail
+          # The artifact zip dropped the helper's executable bit.
+          chmod 755 in/helper/slipway-apply
+          desktop/release/smoke.sh --really --release in/release/out \
+            --pubkey desktop/release/release.pub --helper in/helper/slipway-apply
+
+  # Only a release that installed on all three distributions is published.
+  publish:
+    needs: [prepare, smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Download the signed release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-out
+          path: in
+
       - name: Create the release in desktop-releases
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
+          # The artifact keeps the paths it was given: out/... and notes.txt.
+          cd in
           gh release create "v$VERSION" out/release.toml out/release.toml.minisig out/bundle.tar.zst \
             --repo PoHsuanLai/desktop-releases --title "Desktop $VERSION" --notes-file notes.txt
