@@ -6,7 +6,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | Path | What |
 |---|---|
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
-| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, detent, casement, sill, keycap, anyview, mailo, palmrest) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
+| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, detent, casement, sill, keycap, anyview, mailo, palmrest, session) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
 | `docs/distros.md` | Ubuntu 24.04+, Fedora and Arch: what is checked, the install lines, picking the session at login, the Ubuntu AppArmor note |
 | `install/` (helpers) | `distro.sh` (family from os-release, sudo/doas/pkexec), `packages.sh` (the one package table), `check.sh`, `linker.sh` (system linker when clang or mold is missing), `fonts.sh` |
 | `fonts/` | `Noto-COLRv1.ttf` (OFL) with its source and sha256: Ubuntu and Arch ship a bitmap emoji font our renderer cannot draw |
@@ -32,7 +32,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 runs each component's own installer, siblings checked out side by side, in this order: porter
 (`scripts/install.sh`: the daemons and the caller table), detent (`scripts/install.sh`: Settings, which
 porter's caller table knows as the unit `org.quire.Settings.service`), sill (`dist/install.sh`), keycap,
-anyview, mailo, palmrest (casement, with its unit, goes between detent and sill; it is skipped with a message until casement's `scripts/install.sh` exists). porter always goes to `/usr`, whatever `--prefix` says. `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
+anyview, mailo, palmrest, then the session itself (`install/install.sh`: `desktop-session`, the user target, the login entry; it never runs sudo and prints the root command when a place is not writable) (casement, with its unit, goes between detent and sill; it is skipped with a message until casement's `scripts/install.sh` exists). porter always goes to `/usr`, whatever `--prefix` says. `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
 installer takes; the first failure stops the run and names the component and what was installed before it.
 `--dry-run` prints the plan and runs and builds nothing.
 

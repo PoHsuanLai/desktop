@@ -45,13 +45,16 @@ inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot DESKTOP
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "porter detent casement sill keycap anyview mailo palmrest " ] || fail "plan order is: $order"
+[ "$order" = "porter detent casement sill keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
 printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
+printf '%s\n' "$plan" | grep -q 'session .*runs' || fail "the session step does not run into a staging root"
 
 # 2. a system prefix without root is left to the person, not attempted.
 plan=$(inst --dry-run --prefix /usr) || fail "system prefix dry run failed"
 printf '%s\n' "$plan" | grep -q 'porter .*yourself (needs root' || fail "a system prefix was not reported as needing root"
+printf '%s\n' "$plan" | grep -q 'session .*yourself (needs root' || fail "the session step was not left to the person without root: $plan"
+printf '%s\n' "$plan" | grep -q '&& asroot .*install/install.sh --prefix /usr --sysconfdir /etc' || fail "the session root command does not go through the escalation program: $plan"
 printf '%s\n' "$plan" | grep -q 'cd .*porter && asroot .*scripts/install.sh --prefix /usr' || fail "the root command does not go through the escalation program: $plan"
 
 # 3. a real run into a staging root passes PREFIX and DESTDIR through, runs the stageable ones, never sudo.
@@ -60,6 +63,11 @@ inst --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.l
 grep -q "^porter/scripts/install.sh --prefix /usr --sysconfdir /etc --destdir $dest" "$log" || fail "porter did not get /usr and the destdir: $(cat "$log")"
 grep -q "^casement/scripts/install.sh --prefix /opt/d --locked --destdir $dest" "$log" || fail "casement did not get the prefix and destdir: $(cat "$log")"
 grep -q 'note: porter goes to /usr, not /opt/d' "$tmp/out.log" || fail "the porter prefix note is missing"
+# the session step is this repo's own installer: really run, into the staging root
+[ -x "$dest/opt/d/bin/desktop-session" ] || fail "desktop-session was not staged under the prefix"
+[ -f "$dest/etc/systemd/user/desktop-session.target" ] || fail "the user target was not staged"
+[ -f "$dest/usr/share/wayland-sessions/sill-casement.desktop" ] || fail "the login entry was not staged"
+[ ! -e "$dest/etc/systemd/user/casement.service" ] || fail "the session installer copied casement.service"
 grep -q "^detent/scripts/install.sh  PREFIX=/opt/d DESTDIR=$dest" "$log" || fail "detent did not get PREFIX and DESTDIR"
 grep -q "MAILO_PREFIX=$dest/opt/d" "$log" || fail "mailo did not get its prefix"
 grep -q "^keycap/install.sh" "$log" || fail "no component ran"
@@ -107,6 +115,19 @@ grep -q 'detent failed (exit 7)' "$tmp/out.log" || fail "the failure does not na
 rm -f -- "$sib/casement/scripts/install.sh"
 plan=$(inst --dry-run --destdir "$dest") || fail "a missing optional installer failed the dry run"
 printf '%s\n' "$plan" | grep -q 'casement .*skipped' || fail "the missing casement installer was not reported: $plan"
+
+# 4c. the session uninstall removes the old casement.service only when it is what the old installer shipped.
+old="$dest/etc/systemd/user/casement.service"
+mkdir -p "$(dirname "$old")"
+printf '[Service]\nExecStart=/usr/bin/casement\n' >"$old"
+sum=$(sha256sum "$old" | cut -d' ' -f1)
+OLD_CASEMENT_UNIT_SHA256=$sum "$HERE/../install/uninstall.sh" --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "uninstall failed"; }
+[ ! -e "$old" ] || fail "an unchanged old casement.service was kept"
+[ ! -e "$dest/opt/d/bin/desktop-session" ] || fail "the uninstall left desktop-session"
+printf '[Service]\nExecStart=/opt/mine/casement\n' >"$old"
+OLD_CASEMENT_UNIT_SHA256=$sum "$HERE/../install/uninstall.sh" --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || fail "uninstall failed (changed unit)"
+[ -f "$old" ] || fail "a changed casement.service was removed"
+grep -q 'kept (not what the earlier installer copied)' "$tmp/out.log" || fail "the kept unit was not reported"
 
 # 5. a missing component repo is exit 2 with its path.
 rm -rf -- "${sib:?}/mailo"

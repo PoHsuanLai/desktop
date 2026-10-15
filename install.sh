@@ -13,10 +13,12 @@
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
 #   --only NAMES   just these components (comma separated: porter, detent, casement, sill, keycap, anyview, mailo,
-#                  palmrest, fonts)
+#                  palmrest, session, fonts)
 #
 # Order: porter (the account daemons and the caller table), detent (Settings), casement (the compositor and
-# its user unit), sill (the session), keycap, anyview, mailo, palmrest. Each component's installer is its
+# its user unit), sill (the shell), keycap, anyview, mailo, palmrest, and last the session itself (this repo's
+# install/install.sh: the desktop-session script, the user target and the login entry "sill (casement)"). Each
+# component's installer is its
 # own: this script passes the prefix and the staging root through and nothing else, and stops at the first
 # one that fails. A component whose installer is not in its checkout yet (casement, until its scripts/install.sh
 # lands) is reported and skipped; the others carry on.
@@ -53,7 +55,7 @@ source "$HERE/install/packages.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(porter detent casement sill keycap anyview mailo palmrest)
+ORDER=(porter detent casement sill keycap anyview mailo palmrest session)
 
 # Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
 # catalog only under /usr/share (finding B1). Remove this, and the --prefix /usr below, once porter searches
@@ -144,6 +146,13 @@ describe() {
     palmrest)
       script=install.sh
       yourself="it installs a user service under your home and prints root commands for the udev rules" ;;
+    session)
+      # This repo's own session installer (never sudo; it stops with the root command when a place is not writable).
+      dir="$HERE"
+      script=install/install.sh
+      args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix" "$destdir$sysconfdir" "$destdir/usr/share/wayland-sessions") ;;
     *) die "no component named $1 (known: ${ORDER[*]})" ;;
   esac
 }

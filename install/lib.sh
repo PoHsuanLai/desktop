@@ -48,6 +48,12 @@ parse_flags() {
   sessions_dir=${sessions_dir%/}
 }
 
+# The casement.service this installer used to copy into SYSCONFDIR/systemd/user (casement's dist/casement.service
+# at 124c674, ExecStart=/usr/bin/casement; the only version that ever existed), as a sha256. The uninstall removes
+# an old copy only when it still has exactly this content.
+OLD_CASEMENT_UNIT_SHA256=${OLD_CASEMENT_UNIT_SHA256:-1a903fa4f61a72ae75b851e05cdf28e5ed155027f333b2b3f32b4c091d781e21}  # overridable for tests
+old_casement_unit() { echo "$sysconfdir/systemd/user/casement.service"; }
+
 # files: "MODE SOURCE DEST" per line, DEST without the destdir. The desktop entry's SOURCE is
 # rendered (Exec filled in) by render_entry; the others are copied as they are.
 files() {

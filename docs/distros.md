@@ -149,5 +149,6 @@ them fails to start on Ubuntu with a "namespace" error, the same two fixes apply
 
 `./install.sh` takes `--prefix` (default `/usr/local`) and `--destdir`. porter always goes to `/usr`: its daemons
 read the data they ship only from `/usr/share` for now. The session script, the desktop target and the login entry
-are installed by `install/install.sh`. casement and its user unit are installed by casement's own installer, which
-`./install.sh` runs.
+are installed by `install/install.sh`, which `./install.sh` runs last. casement and its user unit are installed by
+casement's own installer, which `./install.sh` runs too. Both print the exact command to run as root when they
+cannot write a place (`/etc`, `/usr/share/wayland-sessions`) themselves.
