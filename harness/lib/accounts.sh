@@ -5,7 +5,8 @@
 #
 # Identity. The daemons are test-proc-root builds: they name the process behind a bus connection from
 # $PROC/<pid>/cgroup (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs
-# in a systemd scope; the role of each is the caller table ($CONFIG/porter/callers.toml: porter's dist copy).
+# in a systemd scope; the role of each is the system caller table, porter's dist copy at $ACC_SYSTEM_CALLERS
+# (PORTER_SYSTEM_CALLERS: the jail cannot write /etc/porter/callers.toml, and a person's own file gives no fixed role).
 # `acc_identity UNIT PID` writes a unit's cgroup (sill.service, syncd.service, inferd.service) and, for a service
 # unit, its main pid ($PROC/units/<unit>); `acc_app APP PID` names detent the Settings unit (org.quire.Settings.service)
 # and any other app a Flatpak (its scope and $PROC/<pid>/root/.flatpak-info).
@@ -32,9 +33,10 @@ acc_env() {
 }
 
 # Where the scenario keeps things; set by acc_dirs after scratch_new.
-RIG_DIR= PROC= PROV= BIN_DIR=
+RIG_DIR= PROC= PROV= BIN_DIR= ACC_SYSTEM_CALLERS=
 acc_dirs() {
   RIG_DIR="$OUT_DIR/rig"; PROC="$RIG_DIR/proc"; PROV="$RIG_DIR/providers"; BIN_DIR="$RIG_DIR/bin"
+  ACC_SYSTEM_CALLERS="$RIG_DIR/system-callers.toml"
   mkdir -p "$RIG_DIR" "$PROC" "$PROV" "$BIN_DIR" "$CONFIG/porter" "$CONFIG/quire" "$STATE/porter"
 }
 
@@ -133,10 +135,10 @@ secrets_start() {
 }
 
 # --- configuration -------------------------------------------------------------------------------------------
-# acc_config: the caller table (porter's own), the shipped provider files, and the person's clients file
-# (acc_clients_for_issuer writes the shipped one).
+# acc_config: the system caller table (porter's own, read through PORTER_SYSTEM_CALLERS), the shipped provider
+# files, and the person's clients file (acc_clients_for_issuer writes the shipped one).
 acc_config() {
-  cp "$SCEN_BUILD/pin/porter/dist/callers.toml" "$CONFIG/porter/callers.toml"
+  cp "$SCEN_BUILD/pin/porter/dist/callers.toml" "$ACC_SYSTEM_CALLERS"
   cp "$SCEN_BUILD"/pin/porter/providers/*.toml "$PROV/"
 }
 
@@ -194,7 +196,7 @@ acc_ship_providers() {
 ACCOUNTD_PID=
 accountd_start() {
   local ca; ca=$(acc_ca_env)
-  acc_bg "$OUT_DIR/accountd.log" env ACCOUNTD_PROC_ROOT="$PROC" ${ca:+"$ca"} "$ARIG/accountd" --providers "$PROV"
+  acc_bg "$OUT_DIR/accountd.log" env ACCOUNTD_PROC_ROOT="$PROC" PORTER_SYSTEM_CALLERS="$ACC_SYSTEM_CALLERS" ${ca:+"$ca"} "$ARIG/accountd" --providers "$PROV"
   ACCOUNTD_PID=$ACC_LAST
   acc_wait 20 bus_has_owner org.quire.Accounts1 || { echo "accountd never took org.quire.Accounts1:" >&2; cat "$OUT_DIR/accountd.log" >&2; return 1; }
   acc_identity accountd.service "$ACCOUNTD_PID"
@@ -205,7 +207,7 @@ SYNCD_PID=
 syncd_start() {
   local ca; ca=$(acc_ca_env)
   acc_ship_providers
-  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" ${ca:+"$ca"} "$ARIG/syncd"
+  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" PORTER_SYSTEM_CALLERS="$ACC_SYSTEM_CALLERS" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" ${ca:+"$ca"} "$ARIG/syncd"
   SYNCD_PID=$ACC_LAST
   acc_identity syncd.service "$SYNCD_PID"
   acc_wait 20 bus_has_owner org.quire.Sync1 || { echo "syncd never took org.quire.Sync1:" >&2; cat "$OUT_DIR/syncd.log" >&2; return 1; }
