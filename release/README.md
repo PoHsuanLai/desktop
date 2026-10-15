@@ -10,6 +10,12 @@ slipway, the updater, reads it.
 | `pack.sh` | stage -> `release.toml` (digests, modes, components, exports), `bundle.tar.zst` (deterministic), `release.toml.minisig` |
 | `verify.sh` | checks a packed release the way slipway will; the CI runs it before publishing |
 | `selftest.sh` | packs a fake stage with a throwaway key, verifies it, and checks that hostile releases are refused; a SKIP (exit 2) without minisign; run by `gate/desktop-gate.sh --self` |
+| `check-glibc.sh` | fails if a program in the stage needs a newer glibc (default 2.39), libstdc++ (GCC 13) or libgcc ABI than Ubuntu 24.04 has; the workflow runs it after each build |
+| `check-ldd.sh` | fails if `ldd` reports a library "not found" for any program in a tree; run after the build and again inside each distribution |
+| `deps.sh` | the packages the flow needs per family (debian, fedora, arch): `tools`, `build`, `runtime` |
+| `install-zig.sh` | Zig 0.16 from the official tarball, SHA-256 checked (temor builds with it; no distribution ships a fixed 0.16) |
+| `smoke.sh` | installs a packed release with slipway's helper on a throwaway machine (a CI container) and checks the links, system files, libraries and a repeat install |
+| `lib.sh` | sourced by the scripts: the distribution family and the one-line install hint for a missing tool |
 | `bootstrap.sh` | first install on a machine: downloads the latest release, verifies it, runs slipway's helper |
 | `checkout.sh` | checks out every manifest repo at its rev, side by side (used by the workflow) |
 | `exports.toml` | exports beyond the ones derived from the staged tree (`/usr/local/bin` links) |
@@ -26,9 +32,18 @@ table (repo -> rev, from `manifest.toml`, plus the repos built that it does not 
 relative to `/opt/quire/current`). The bundle is a tar.zst of regular files and directories only (no links),
 clean relative paths, owner 0, mtime 0, modes 0644 or 0755. Exports may only go under
 `/usr/share/wayland-sessions`, `/usr/share/xdg-desktop-portal`, `/usr/share/dbus-1/services`,
-`/usr/lib/systemd/user`, `/usr/share/applications`, `/usr/share/polkit-1/actions` and `/usr/local/bin`; every
-file staged under the first six directories (as `share/...` or `lib/systemd/user`) is exported to the same path
-under `/usr`, and `exports.toml` adds the rest.
+`/usr/lib/systemd/user`, `/usr/share/applications`, `/usr/share/polkit-1/actions`, `/usr/share/quire`,
+`/usr/share/porter`, `/usr/share/stoker`, `/usr/share/fonts` and `/usr/local/bin`; every file staged under
+the first ten directories (as `share/...` or `lib/systemd/user`) is exported to the same path under `/usr`,
+and `exports.toml` adds the rest.
+
+`[[system]]` (`path`): a file slipway's helper copies, as root, to an absolute path on the computer. Its
+contents are the bundle file `system/<path>` (so `system/etc/pam.d/sill` lands at `/etc/pam.d/sill`); every
+file under `system/` must be listed and every listed path needs its file. The path must be directly inside
+`/etc/udev/rules.d`, `/etc/modules-load.d`, `/etc/modprobe.d`, `/usr/lib/systemd/system`, `/etc/pam.d`,
+`/etc/polkit-1/rules.d`, `/etc/porter` or `/etc/quire`; anything else refuses the release (the same list is
+in `release.py` and slipway-core). `build.sh` stages keycap's unit, udev rule, polkit rule and module list,
+palmrest's udev rule and module options, sill's PAM service and porter's caller table there.
 
 ## What you do once
 
@@ -82,7 +97,10 @@ gh workflow run release.yml --repo PoHsuanLai/desktop -f version=0.2.0 -f notes=
 
 or tag: `git tag -a v0.2.0 -m "What changed" && git push origin v0.2.0` (the tag's message is the notes).
 The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, and the small
-ones together), packs and signs, verifies, and creates the release `v0.2.0` in desktop-releases. Watch it with
+ones together) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
+Arch as well), checks their glibc and library needs, packs and signs, verifies, installs the signed release with
+slipway's helper in clean Ubuntu 24.04, Fedora 44 and Arch containers, and only then creates the release
+`v0.2.0` in desktop-releases. Watch it with
 `gh run watch --repo PoHsuanLai/desktop`. A tag that already exists in desktop-releases fails the last step;
 nothing is overwritten.
 

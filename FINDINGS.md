@@ -35,19 +35,43 @@ and `--locked` builds, the installed path (never the destdir-prefixed one) insid
 - transom: named in the brief, but no repo beside this one and no entry in `manifest.toml`; not built.
   Add it to `ALL` and a `build_transom` in `release/build.sh` when it exists.
 
-Things the bundle cannot export (outside the allowed directories) and so cannot activate by itself; they sit
-in the bundle as data and need slipway's privileged apply step, or the bootstrap, to install:
-`share/sill/pam.d/sill` (needs `/etc/pam.d/sill`), `share/keycap/` (system unit, udev and polkit rules, the
-Plasma overlay), `share/palmrest/` (udev rule, modprobe file), porter's caller table at `etc/porter/callers.toml`
-(porter reads `/etc/porter/callers.toml`; the installer's `--sysconfdir` was pointed under the prefix) and the
-`/usr/lib/systemd/user` units that name `/opt/quire/current` paths. `share/sill/keycap.toml` is the sill
-session's keycap layer, which sill's installer copied into the home. Decide with the slipway lane whether
-the allowed export set grows (`/etc/pam.d`, `/etc/porter`, `/usr/lib/systemd/system`, `/etc/udev/rules.d`,
-`/usr/share/polkit-1/rules.d`) or those stay a bootstrap step.
+What the bundle exports and places (lane distro-slip, 2026-10-16; slipway-core's allow-lists are the same
+lists as `release.py`'s):
+
+- Links (`[[export]]`, derived from the staged tree): everything staged under `share/wayland-sessions`,
+  `share/xdg-desktop-portal`, `share/dbus-1/services`, `lib/systemd/user`, `share/applications`,
+  `share/polkit-1/actions`, and now `share/quire` (intents, skills, settings schemas, helpers, icons),
+  `share/porter` (providers, client tables), `share/stoker` (the model catalog) and `share/fonts` (the desktop
+  lane ships `fonts/Noto-COLRv1.ttf` to `share/fonts/quire/`). Commands are `exports.toml` links in `/usr/local/bin`.
+  A distribution's own file at the same path is a conflict and is left alone.
+- Files (`[[system]]`, staged in `system/<absolute path>`): `/etc/pam.d/sill`, keycap's `keycap.service` (at
+  `/usr/lib/systemd/system`), `70-keycap.rules`, `keycap.polkit.rules` and `modules-load.d/keycap.conf` (`uinput`,
+  written by build.sh because keycap ships none), palmrest's `70-palmrest.rules` and `modprobe.d/99-palmrest.conf`,
+  and porter's `/etc/porter/callers.toml` (porter's installer is pointed at `<prefix>/system/etc`).
+- Still data only (no home on the system): `share/sill/keycap.toml` (the sill session's keycap layer, which sill's
+  installer copied into the home), `share/keycap/keycap.plasma.toml` (the Plasma overlay; not used by this
+  desktop).
+- Not staged yet: sill's DDC/CI udev rule and `i2c-dev` module list (`dist/udev`, `dist/modules-load.d`; sill's own
+  installer leaves them out on purpose, ddcutil's package ships the rule on Fedora; audit D7 decides) and
+  `/etc/keycap/keycap.toml` (keycap's machine layer; `/etc/keycap` is not an allowed system folder).
+
+Whether the release should write `/etc/pam.d` at all is slipway's open question 5; deleting the folder from
+both lists (`ALLOWED_SYSTEM_DIRS`, `SYSTEM_DIRS`) turns it off.
 
 Other choices: file modes are normalised to 0644 or 0755 (executable bit kept) so the bundle does not depend on
 the builder's umask; the date is the packing time (`SOURCE_DATE_EPOCH` overrides it); `release/release.pub`
 is committed by the owner and the CI refuses to publish without it.
+
+## Distro audit (lane 5, 2026-10-16)
+
+B3/D18: the workflow builds in `ubuntu:24.04` (was `fedora:44`), with `release/deps.sh debian build`, rustup with each
+repo's pinned toolchain, and Zig 0.16.0 from ziglang.org with its SHA-256 pinned; `check-glibc.sh` and `check-ldd.sh`
+run after every build. The smoke job installs the signed release with slipway-apply in `ubuntu:24.04`, `fedora:44` and
+`archlinux:latest`; publishing waits for it. B2: four more export folders (above). D17: the system step (above).
+N2: `lib.sh` gives the install hint per family. Not run (no compiler, minisign or runner here): the workflow, the
+package names marked `# unverified` in `deps.sh` (Ubuntu t64 and libdav1d names, Fedora libdav1d), the selftest's
+new cases, and `smoke.sh`. The smoke runs the helper as root against `/etc/slipway/config.toml` and the real
+`/opt/quire`, which is why it only runs with `--really` as root.
 
 ## Round 2 (release.py aligned with slipway-core)
 
