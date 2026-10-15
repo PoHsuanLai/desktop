@@ -220,11 +220,18 @@ syncd_stop() { [ -z "$SYNCD_PID" ] || acc_kill "$SYNCD_PID"; SYNCD_PID=; }
 # inferd_write_config: $CONFIG/quire/inferd.toml is what is on stdin (tables of the scenario: [probe], [ai] ...), and
 # $INFERD_SYSTEM_CALLERS is inferd's caller table, in the shape of porter's dist/inferd-callers.toml: inferd serves its
 # settings module to the unit org.quire.Settings.service and draws its sheets through the shell (sill.service); an app
-# in a Flatpak or app scope needs no row. Call it before inferd_start.
+# in a Flatpak or app scope needs no row. A porter pin from before CALLER-INFERD (no dist/inferd-callers.toml) reads
+# the table from inferd.toml's [callers] instead, so it goes there too. Call it before inferd_start.
 inferd_write_config() {
+  local table
+  table=$(printf 'settings = ["%s"]\nshell = ["sill.service"]\n' "$SETTINGS_UNIT")
   mkdir -p "$CONFIG/quire"
   cat >"$CONFIG/quire/inferd.toml"
-  printf 'settings = ["%s"]\nshell = ["sill.service"]\n' "$SETTINGS_UNIT" >"$INFERD_SYSTEM_CALLERS"
+  if [ -f "$SCEN_BUILD/pin/porter/dist/inferd-callers.toml" ]; then
+    printf '%s\n' "$table" >"$INFERD_SYSTEM_CALLERS"
+  else
+    printf '\n[callers]\n%s\n' "$table" >>"$CONFIG/quire/inferd.toml"
+  fi
 }
 
 INFERD_PID=
