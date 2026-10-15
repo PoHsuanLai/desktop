@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "fe2829480a751468fa3734eab0a485ec1b771c3b"
+rev = "f589248d85cb0e484d7b81d4dd11d9fedb62e36a"
 branch = "master"
 gate = "lane"
 
@@ -64,7 +64,7 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "f35ed3f5b8edd83e17941ed0d839015c18c6c5ef"
+rev = "9af8e61d71b3b97c0b283d770aac31ecb2748f23"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
