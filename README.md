@@ -8,15 +8,16 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
 | `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, detent, casement, sill, transom, keycap, anyview, mailo, palmrest, session) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
 | `docs/distros.md` | Ubuntu 24.04+, Fedora and Arch: what is checked, the install lines, picking the session at login, the Ubuntu AppArmor note |
-| `install/` (helpers) | `distro.sh` (family from os-release, sudo/doas/pkexec), `packages.sh` (the one package table), `check.sh`, `linker.sh` (system linker when clang or mold is missing), `fonts.sh` |
+| `install/` (helpers) | `distro.sh` (family from os-release, sudo/doas/pkexec), `packages.sh` (the one package table), `check.sh`, `cargo.sh` (builds a tree from `/` with `--manifest-path`, so the system linker is used), `fonts.sh` |
 | `fonts/` | `Noto-COLRv1.ttf` (OFL) with its source and sha256: Ubuntu and Arch ship a bitmap emoji font our renderer cannot draw |
-| `gate/distro-check.sh` | the family detection, package table, escalation, linker fallback and `--check` against made-up machines |
+| `gate/distro-check.sh` | the family detection, package table, escalation, the cargo helper and `--check` against made-up machines |
 | `harness/jail.sh` | the one jail: a bubblewrap namespace with no input devices, no GPU, no session, no network |
 | `harness/lib/` | `require_jail`, step timing and exit codes, budgets, run ids, a private dbus-daemon |
 | `harness/scenario-build.sh` | outside the jail: builds what the scenarios run (casement tools, foot, sill, shell-host's demos, detent at its pin, transom) into the git-ignored `build/`; the gate runs it first |
 | `harness/selftest.sh` | proves the jail holds (`--all` also runs the negative check outside) |
 | `gate/desktop-gate.sh` | `--self`, `--merge`, `--phase P<n>`: prints `DESKTOP GATE GREEN (<tier>)` |
 | `session/` | the "sill (casement)" login: `desktop-session` (casement as the session's compositor child, with sill beside it; the portal is transom, started by D-Bus activation, `XDG_CURRENT_DESKTOP=quire`, and the crash-loop guard: three quick exits, then `casement --safe`, then the session ends with a guard log line; your other session stays available at the login screen), the wayland-sessions entry, `quire-portals.conf`, `desktop-session.target` |
+| `release/` | signed release bundle of the whole desktop: `build.sh` (components at their manifest revs, staged under `/opt/quire/current`), `pack.sh`, `verify.sh`, `selftest.sh` (in `gate/desktop-gate.sh --self`), `README.md` (what to set up once and how to cut a release); built by `.github/workflows/release.yml` and published to the public PoHsuanLai/desktop-releases |
 | `install/` | `install.sh` and `uninstall.sh` for `session/` (`--dry-run`, `--prefix`, `--destdir`, `--sysconfdir`, `--sessions-dir`); never sudo, never `$HOME`; the uninstall removes exactly the files the install wrote, and only while they are unchanged |
 | `gate/installer-check.sh` | `install.sh` against stub installers in a scratch dir: the dry-run plan and order, PREFIX/DESTDIR passed through, stop at the first failure, no sudo, nothing written to the home |
 | `gate/manifest-check.sh` | every Cargo.lock agrees with the manifest, and resolves `--locked` against the pinned siblings |

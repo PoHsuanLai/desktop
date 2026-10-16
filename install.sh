@@ -32,8 +32,9 @@
 # client table, the model catalog) only from /usr/share for now.
 #
 # Builds. The repos pin Rust 1.98.1 and need rustup (a distro's rust package is the wrong version). Some
-# repos' cargo config asks for clang and mold; when either is missing the build uses the system linker
-# instead (install/linker.sh), and says so.
+# repos' cargo config asks for clang and mold, which is how they are worked on. An install never reads it
+# and never asks for a linker: what this script builds itself (detent) runs from / with --manifest-path
+# (install/cargo.sh), and each component's own installer does the same for its own build.
 #
 # Root. This script never runs sudo and never writes under ~/.config or /etc itself. A component runs
 # here only when everything it writes is writable by you (a user prefix, or a --destdir); the others are
@@ -48,8 +49,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=install/distro.sh
 source "$HERE/install/distro.sh"
-# shellcheck source=install/linker.sh
-source "$HERE/install/linker.sh"
+# shellcheck source=install/cargo.sh
+source "$HERE/install/cargo.sh"
 # shellcheck source=install/packages.sh
 source "$HERE/install/packages.sh"
 # shellcheck source=install/check.sh
@@ -287,10 +288,6 @@ case " ${selected[*]} " in *" porter "*)
   [ "$prefix" = "$PORTER_PREFIX" ] || echo "note: porter goes to $PORTER_PREFIX, not $prefix: its daemons read what they ship only from $PORTER_PREFIX/share" ;;
 esac
 command -v rustup >/dev/null || echo "note: rustup was not found. Building from source needs it (the repos pin Rust 1.98.1): $RUSTUP_LINE"
-plain_linker_notice
-if [ "${#left[@]}" -gt 0 ] && ! faster_linker_present && [ "$(host_arch)" = x86_64 ]; then
-  echo "for the ones left to you, build with the system linker too: export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=cc RUSTFLAGS="
-fi
 [ "$dry" = 0 ] || exit 0
 
 done_list=()
@@ -300,14 +297,13 @@ for name in "${run[@]:-}"; do
   echo "== $name"
   # detent installs a built binary; build it first when it is not there.
   if [ "$name" = detent ] && [ -z "${DETENT_BIN:-}" ] && [ ! -x "$dir/target/release/detent" ]; then
-    (cd "$dir" && { use_plain_linker "$dir" || true; } && cargo build --release --locked) || {
+    build_outside "$dir" || {
       echo "install.sh: detent failed: its release build. Installed so far: ${done_list[*]:-nothing}. Not run: the rest." >&2
       exit 1
     }
   fi
   status=0
-  # The component's own build (if it has one) sees the system linker when clang or mold is missing.
-  (cd "$dir" && { use_plain_linker "$dir" || true; } && env "${envs[@]}" "./$script" "${args[@]}") || status=$?
+  (cd "$dir" && env "${envs[@]}" "./$script" "${args[@]}") || status=$?
   if [ "$status" != 0 ]; then
     echo "install.sh: $name failed (exit $status): $(command_text)" >&2
     echo "install.sh: installed so far: ${done_list[*]:-nothing}. Not run: everything after $name. Fix it and run this again (installers are safe to repeat)." >&2

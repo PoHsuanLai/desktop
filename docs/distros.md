@@ -36,8 +36,9 @@ It looks for:
 Everything the check prints comes from one file, `install/packages.sh`. The harness and the gate use it for their
 own hints.
 
-Source builds also do not need `clang` and `mold`: several repos' cargo config asks for them to link faster, and
-when they are missing the installer builds with the system linker and says so.
+Source builds do not need `mold`, and never use a linker other than the system's: several repos' cargo config asks
+for clang and mold to link faster, which is for the people who work on them. An install builds from `/` with
+`--manifest-path` (`install/cargo.sh`), so cargo does not read that file, and nothing is installed for the linker.
 
 ## Install lines
 

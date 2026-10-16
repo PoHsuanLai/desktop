@@ -1,0 +1,45 @@
+# Exports beyond the ones pack.sh derives from the staged tree (everything under share/wayland-sessions,
+# share/xdg-desktop-portal, share/dbus-1/services, lib/systemd/user, share/applications and
+# share/polkit-1/actions maps to the same path under /usr). A link may only go under one of those
+# directories or /usr/local/bin; the target is a path relative to /opt/quire/current and must be in the bundle.
+# Commands a person or a unit starts by name.
+
+[[export]]
+link = "/usr/local/bin/casement"
+target = "bin/casement"
+
+[[export]]
+link = "/usr/local/bin/casementctl"
+target = "bin/casementctl"
+
+[[export]]
+link = "/usr/local/bin/sill"
+target = "bin/sill"
+
+[[export]]
+link = "/usr/local/bin/desktop-session"
+target = "bin/desktop-session"
+
+[[export]]
+link = "/usr/local/bin/detent"
+target = "bin/detent"
+
+[[export]]
+link = "/usr/local/bin/keycap"
+target = "bin/keycap"
+
+[[export]]
+link = "/usr/local/bin/palmrest"
+target = "bin/palmrest"
+
+[[export]]
+link = "/usr/local/bin/anyview"
+target = "bin/anyview"
+
+[[export]]
+link = "/usr/local/bin/mailo"
+target = "bin/mailo"
+
+[[export]]
+link = "/usr/local/bin/slipway"
+target = "bin/slipway"

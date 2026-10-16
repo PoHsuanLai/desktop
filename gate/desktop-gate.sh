@@ -6,7 +6,7 @@
 #   desktop-gate.sh --phase P<n> [--only REPO] [--keep]
 #
 # --self    the jail's selftest (inside, 2 fabricated GPUs), its negative check (outside), the
-#           manifest's shape, install.sh against stub installers (gate/installer-check.sh), the distro helpers (gate/distro-check.sh), and every scenario in the jail (an unlisted SKIP fails).
+#           manifest's shape, install.sh against stub installers (gate/installer-check.sh), release/selftest.sh (a SKIP, exit 2, when minisign is missing), the distro helpers (gate/distro-check.sh), and every scenario in the jail (an unlisted SKIP fails).
 # --merge   --self, plus each manifest repo with `gate = "lane"` checked out at its manifest rev
 #           (a detached git worktree under $DESKTOP_GATE_DIR, siblings side by side so path
 #           dependencies resolve at the manifest's revs) and run through
@@ -188,6 +188,7 @@ step "selftest (jail, 2 fabricated GPUs)" "$JAIL" --fabricate-gpus 2 -- "$ROOT/h
 step "selftest negative (outside the jail)" "$ROOT/harness/selftest.sh" --negative || true
 step "manifest shape" "$HERE/manifest-check.sh" --syntax || true
 step "installer (dry run and stubs)" "$HERE/installer-check.sh" || true
+step "release (pack, verify, hostile releases; SKIP without minisign)" "$ROOT/release/selftest.sh" || true
 step "legacy-free check (generated trees)" "$HERE/legacy-free-selftest.sh" || true
 step "distro helpers (family, package table, check mode)" "$HERE/distro-check.sh" || true
 step "expected-skips resolve" skip_entries_resolve || true

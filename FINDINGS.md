@@ -1,0 +1,85 @@
+# Findings
+
+## Release bundle (lane desk-release, 2026-10-15)
+
+`release/build.sh` stages the whole desktop under `/opt/quire/current` with a destdir. Where a component's
+installer could stage, it is used (porter, detent, anyview, mailo, and this repo's session installer). The
+rest is staged by build.sh itself, marked INTERIM in the script, because the component's installer cannot
+stage without sudo or writes `$HOME`. What each installer must gain so the INTERIM block can go (all
+`--prefix DIR --destdir DIR`, no sudo, nothing under `$HOME` or `/etc` outside the destdir, `--no-build`
+and `--locked` builds, the installed path (never the destdir-prefixed one) inside any unit or service file):
+
+- casement: no installer at all. Needs one that installs `bin/casement`, `bin/casementctl` and
+  `dist/casement.service` with `ExecStart=<prefix>/bin/casement` (the unit says `/usr/bin/casement`; build.sh
+  rewrites it).
+- sill (`dist/install.sh`): fixed `/usr/local`, `/etc/pam.d/sill`, `~/.config/keycap`, sudo, and a build
+  inside the installer. Needs `--prefix/--destdir/--no-build/--bin`, no keycap layer copy into the home
+  (split the per-user copy into the session), and a place for the PAM service.
+- keycap (`install.sh`): stages under DESTDIR but at `/etc` and `/usr/local`, not under a prefix, and builds
+  unlocked. Needs `--prefix` so the binary, the unit (with `ExecStart` for that prefix), the udev and
+  polkit rules go under it.
+- palmrest (`install.sh`): writes `~/.local/bin` and `~/.config/systemd/user`, enables the service, builds
+  unlocked. Needs the same prefix/destdir staging and no `systemctl` in staging; the unit's `ExecStart` is
+  `%h/.local/bin/palmrest` (build.sh rewrites it).
+- mailo (`dist/install.sh`): `MAILO_PREFIX` as a destdir writes the destdir-prefixed path into
+  `org.quire.Mail.service` (build.sh seds it out). Needs a real `--destdir` beside the prefix.
+- porter (`scripts/install.sh`): fine, but builds without `--locked` (build.sh builds locked first and passes
+  `--no-build`); the top-level `install.sh` has no way to pass `--no-build`, so build.sh calls porter directly.
+- anyview (`dist/install.sh`): builds the mpv plugin's C plugin and fetches mpv-wgpu without `--locked`
+  (build.sh builds it locked and passes `ANYVIEW_MPV_CPLUGIN`); `--mpv PATH` cannot be passed through the
+  top-level `install.sh`, so the plugin manifest names the builder's `mpv` or `/usr/bin/mpv`.
+- slipway: its `scripts/install.sh` installs the helper, polkit action, unit, bus file and release key on a
+  machine (release/bootstrap.sh runs after it). The bundle carries only `bin/slipway`, built from the
+  manifest pin; `slipway-apply` is deliberately outside the release. build.sh's staging of `bin/slipway`
+  is INTERIM until slipway has a stageable installer for the user program.
+- transom: named in the brief, but no repo beside this one and no entry in `manifest.toml`; not built.
+  Add it to `ALL` and a `build_transom` in `release/build.sh` when it exists.
+
+What the bundle exports and places (lane distro-slip, 2026-10-16; slipway-core's allow-lists are the same
+lists as `release.py`'s):
+
+- Links (`[[export]]`, derived from the staged tree): everything staged under `share/wayland-sessions`,
+  `share/xdg-desktop-portal`, `share/dbus-1/services`, `lib/systemd/user`, `share/applications`,
+  `share/polkit-1/actions`, and now `share/quire` (intents, skills, settings schemas, helpers, icons),
+  `share/porter` (providers, client tables), `share/stoker` (the model catalog) and `share/fonts` (the desktop
+  lane ships `fonts/Noto-COLRv1.ttf` to `share/fonts/quire/`). Commands are `exports.toml` links in `/usr/local/bin`.
+  A distribution's own file at the same path is a conflict and is left alone.
+- Files (`[[system]]`, staged in `system/<absolute path>`): `/etc/pam.d/sill`, keycap's `keycap.service` (at
+  `/usr/lib/systemd/system`), `70-keycap.rules`, `keycap.polkit.rules` and `modules-load.d/keycap.conf` (`uinput`,
+  written by build.sh because keycap ships none), palmrest's `70-palmrest.rules` and `modprobe.d/99-palmrest.conf`,
+  and porter's `/etc/porter/callers.toml` (porter's installer is pointed at `<prefix>/system/etc`).
+- Still data only (no home on the system): `share/sill/keycap.toml` (the sill session's keycap layer, which sill's
+  installer copied into the home), `share/keycap/keycap.plasma.toml` (the Plasma overlay; not used by this
+  desktop).
+- Not staged yet: sill's DDC/CI udev rule and `i2c-dev` module list (`dist/udev`, `dist/modules-load.d`; sill's own
+  installer leaves them out on purpose, ddcutil's package ships the rule on Fedora; audit D7 decides) and
+  `/etc/keycap/keycap.toml` (keycap's machine layer; `/etc/keycap` is not an allowed system folder).
+
+Whether the release should write `/etc/pam.d` at all is slipway's open question 5; deleting the folder from
+both lists (`ALLOWED_SYSTEM_DIRS`, `SYSTEM_DIRS`) turns it off.
+
+Other choices: file modes are normalised to 0644 or 0755 (executable bit kept) so the bundle does not depend on
+the builder's umask; the date is the packing time (`SOURCE_DATE_EPOCH` overrides it); `release/release.pub`
+is committed by the owner and the CI refuses to publish without it.
+
+## Distro audit (lane 5, 2026-10-16)
+
+B3/D18: the workflow builds in `ubuntu:24.04` (was `fedora:44`), with `release/deps.sh debian build`, rustup with each
+repo's pinned toolchain, and Zig 0.16.0 from ziglang.org with its SHA-256 pinned; `check-glibc.sh` and `check-ldd.sh`
+run after every build. The smoke job installs the signed release with slipway-apply in `ubuntu:24.04`, `fedora:44` and
+`archlinux:latest`; publishing waits for it. B2: four more export folders (above). D17: the system step (above).
+N2: `lib.sh` gives the install hint per family. Not run (no compiler, minisign or runner here): the workflow, the
+package names marked `# unverified` in `deps.sh` (Ubuntu t64 and libdav1d names, Fedora libdav1d), the selftest's
+new cases, and `smoke.sh`. The smoke runs the helper as root against `/etc/slipway/config.toml` and the real
+`/opt/quire`, which is why it only runs with `--really` as root.
+
+## Round 2 (release.py aligned with slipway-core)
+
+Applied from slipway's FINDINGS "Release pipeline": `.slipway` reserved, mode rules (readable by owner, not
+group/other writable), semver.org regex, real date parse, the five size limits in pack and verify (the
+bundle-size and file-count limits are not forged in selftest: too big), DEL escaped in `toml_str`, prehashed
+(`ED`) signatures required (`minisign -S -H`; needs minisign 0.11 or later), exports must be bundle files
+(a folder target is refused by verify; pack derives only file exports). The README path is
+`scripts/install.sh`. slipway is in `manifest.toml` (`[repo.slipway]`, rev e8af08f4); the workflow's
+`slipway_ref` input is gone. polkit's action directory follows a link into /opt on a real machine only if
+polkit does; confirm on a machine.
