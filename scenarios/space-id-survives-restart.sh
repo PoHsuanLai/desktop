@@ -19,6 +19,7 @@ require_jail
 scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casement-probe" "$SCEN_TOOLS/bin/fake-logind"
 
 export CASEMENT_TOOLS="$SCEN_TOOLS" CASEMENT_REPO="$SCEN_SIB/casement"
+floor_make space-id-survives-restart   # the probe takes no power: an empty floor, so nothing waits on a question
 # shellcheck source=/dev/null
 source "$SCEN_SIB/casement/dev/lib/compositor.sh"
 OUT_DIR=$(scenario_out space-id-survives-restart)
@@ -49,7 +50,7 @@ for line in open(sys.argv[1]):
 }
 
 # up STATE: a headless casement on the two outputs with STATE as its state home.
-up() { start_compositor --outputs "$OUTPUTS" --state-home "$1"; }
+up() { start_compositor --outputs "$OUTPUTS" --state-home "$1" --system-dir "$FLOOR_DIR"; }
 
 step_first() {
   up "$STATE_A" || return 1

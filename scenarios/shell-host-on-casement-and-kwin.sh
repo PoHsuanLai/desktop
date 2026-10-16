@@ -28,7 +28,10 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
   "$EXAMPLES/demo_switcher" "$EXAMPLES/demo_drag" "$EXAMPLES/demo_lock" "$EXAMPLES/demo_popup_keys" \
   "$EXAMPLES/demo_window" "$EXAMPLES/probe_toplevel"
 
-export COMPOSITOR=casement CASEMENT_DIR="$SCEN_SIB/casement" CASEMENT_TOOLS="$SCEN_TOOLS"
+export COMPOSITOR=casement CASEMENT_TOOLS="$SCEN_TOOLS"
+# accept-ime runs fcitx5, which takes the input method and the virtual keyboard; accept-lock locks with demo_lock, built under build/, which
+# casement cannot vouch for and no floor row can allow (harness/lib/casement-floor.sh).
+floor_shim shell-host-on-casement fcitx5
 export SHELL_HOST_BACKEND=cpu FOOT="$SCEN_TOOLS/bin/foot"
 OUT_DIR=$(scenario_out shell-host-on-casement)
 

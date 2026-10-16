@@ -31,6 +31,7 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
   "$SCEN_TOOLS/bin/fake-logind"
 
 export CASEMENT_TOOLS="$SCEN_TOOLS" CASEMENT_REPO="$SCEN_SIB/casement"
+floor_make minimise-target-round-trip   # the probes take no power: an empty floor, so nothing waits on a question
 # shellcheck source=/dev/null
 source "$SCEN_SIB/casement/dev/lib/compositor.sh"
 # shellcheck source=/dev/null
@@ -81,7 +82,7 @@ turn() { probe_sync "$1"; }
 
 step_boot() {
   export CASEMENT_DEBUG_PEER_UNITS="casement-probe=sill.service"
-  start_compositor || return 1
+  start_compositor --system-dir "$FLOOR_DIR" || return 1
 }
 
 step_windows() {

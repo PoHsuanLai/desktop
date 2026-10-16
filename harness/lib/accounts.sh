@@ -28,10 +28,13 @@ acc_need() {
     "$SCEN_BUILD/pin/porter/providers/microsoft.toml" "$SCEN_BUILD/pin/porter/dist/callers.toml" "$@"
 }
 
-# acc_env NAME: the variables every accounts scenario sets before sourcing sill's lib.
+# acc_env: the variables every accounts scenario sets before sourcing sill's lib (CASEMENT_REPO and CASEMENT_DIR
+# become the stand-in checkout floor_shim makes).
 acc_env() {
   export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
-  export CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" CASEMENT_REPO="$SCEN_SIB/casement" CASEMENT_TOOLS="$SCEN_TOOLS"
+  export CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" CASEMENT_TOOLS="$SCEN_TOOLS"
+  # sill at its pin predates the floor: casement starts with the empty floor floor_shim writes (the rig's programs take no power), so nothing waits on a question.
+  floor_shim accounts || return 1
 }
 
 # Where the scenario keeps things; set by acc_dirs after scratch_new.

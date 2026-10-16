@@ -495,3 +495,30 @@ syntax check, and `gate/installer-check.sh`, `release/*.sh` and `install/system.
 | 7 | `/etc/keycap` ownership when `ConfigurationDirectory=keycap` meets `DynamicUser=yes` (keycap's own open item) and whether the daemon reads a root-owned `keycap.toml` there | a start of the real service |
 | 8 | The table check is not in CI: the pack job has no peephole checkout (peephole is not in `manifest.toml`); `--self` runs it where a peephole checkout is beside this repo | add peephole to the manifest or fetch its tag in the job |
 | 9 | `check-no-uinput-access.sh` reads rule text; a rule that reaches the node without naming `uinput` is not seen | `udevadm test /sys/devices/virtual/misc/uinput` per distribution, `getfacl /dev/uinput` |
+
+## dharn: casement asks per app, and the harness answers (lane dharn, 2026-10-17)
+
+casement asks the person the first time a program watches the screen, types, reads the clipboard, lists windows, uses an input method, locks the
+screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers inside a scenario.
+
+- **One helper writes the floor: `harness/lib/casement-floor.sh`** (sourced by `harness/lib/all.sh`). `floor_make NAME [TOOL...]` writes
+  `$JAIL_SCRATCH/casement-floor/NAME/privacy.toml` with an `allow` row per power of each installed tool (`floor_powers` is the table: grim and
+  wf-recorder `screen`, wl-copy/wl-paste/cliphist `clipboard`, wtype `keys`, fcitx5 `typing_help` and `keys`, wlr-randr `displays`, ...); an unknown
+  tool is an error, so a new tool is added in one place. `floor_shim` does that and points `CASEMENT_REPO` and `CASEMENT_DIR` at a stand-in checkout
+  whose `dev/up.sh` appends `--system-dir` (casement's own `dev/up.sh` passes it on), for the scripts that start casement themselves: sill's library
+  (its pin, `3fecef0`, has no floor of its own; its HEAD writes one with grim and wl-copy/wl-paste, which the appended flag overrides: no scenario here
+  runs those) and shell-host's.
+- **Every scenario that starts casement passes the flag:** the eleven accounts scenarios (through `acc_env`), `detent-on-casement-at-1.5`,
+  `launcher-p95-on-casement`, `appearance-reaches-apps`, `appearance-reaches-quire-apps`, `sill-boots-on-casement`, `portal-quire`,
+  `shell-host-on-casement-and-kwin` (floor: fcitx5, which accept-ime runs), `minimise-target-round-trip`, `space-id-survives-restart` and
+  `session-crash-guard` (through the session's backend arguments). `keycap-yields-and-regrabs` starts nothing (a skip). Most floors are empty on
+  purpose: the shell, detent and the rig take no power a row can name.
+- **Cannot be allowed by a floor row (casement judges the image, and a program under `build/` is writable, so it is "unverified" and asked every
+  time):** transom's screenshot and screencast in `portal-quire` (`screen`), `casement-probe workspaces` in `space-id-survives-restart` (`windows`:
+  `ext_workspace_manager`), and `demo_lock` in shell-host's `accept-lock` (`lock`). Not run, so not known to hang: they may wait and be refused at
+  the question's time-out. They need casement to let a debug-inject build's `--system-dir` floor name an image that is not root-owned (an interface
+  ask, in the lane report); until then these three steps may fail on the question.
+- **Display confirmation.** A change by a program (wlr-randr and the like) is asked ("keep the new settings?", 15 s, reverts unless kept). No
+  scenario changes outputs through a program: `set_scale` and the size changes go through `casementctl debug output set`. Whether that control is
+  exempt from the trial could not be read in the casement checkout beside this one (the trial is not in it yet); if it is not, the 1.5 scale in
+  `detent-on-casement-at-1.5` would go back after 15 s.

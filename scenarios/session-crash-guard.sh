@@ -64,6 +64,7 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
   "$HERE/../session/desktop-session"
 
 OUT_DIR=$(scenario_out session-crash-guard)
+floor_make session-crash-guard   # the stand-in casement runs no program that takes a power: an empty floor
 RUN="$OUT_DIR/run"
 mkdir -p "$RUN"
 chmod 700 "$RUN"
@@ -99,7 +100,7 @@ start_session() {
   env XDG_RUNTIME_DIR="$RUN" DESKTOP_SESSION_NESTED=1 DESKTOP_SESSION_STATE="$STATE" \
     DESKTOP_SESSION_QUICK_SECS=30 FAKE_CASEMENT_TOOLS="$SCEN_TOOLS" \
     DESKTOP_SESSION_CASEMENT_CMD="$SELF --fake-casement" \
-    DESKTOP_SESSION_BACKEND_ARGS="--backend headless --clock wall --outputs A-1:800x600@60000:120:0,0;B-1:800x600@60000:120:800,0" \
+    DESKTOP_SESSION_BACKEND_ARGS="--backend headless --clock wall --outputs A-1:800x600@60000:120:0,0;B-1:800x600@60000:120:800,0 --system-dir $FLOOR_DIR" \
     "$@" "$HERE/../session/desktop-session" >"$OUT_DIR/session-$name.log" 2>&1 &
   SESSION_PID=$!
 }

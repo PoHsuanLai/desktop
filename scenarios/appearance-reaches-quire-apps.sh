@@ -27,7 +27,8 @@ DETENT="$SCEN_BUILD/detent-target/debug/detent"
 scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" "$DETENT"
 
 export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
-export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_REPO="$SCEN_SIB/casement" CASEMENT_TOOLS="$SCEN_TOOLS"
+export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_TOOLS="$SCEN_TOOLS"
+floor_shim appearance-quire   # no program here takes a power a floor row can allow: casement starts with an empty floor, so nothing waits on a question
 # shellcheck source=/dev/null
 source "$SCEN_SRC/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out appearance-quire)

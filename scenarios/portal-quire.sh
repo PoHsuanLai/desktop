@@ -31,7 +31,9 @@ for tool in pipewire wireplumber gdbus gst-launch-1.0 /usr/libexec/xdg-desktop-p
 done
 
 export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
-export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_REPO="$SCEN_SIB/casement" CASEMENT_TOOLS="$SCEN_TOOLS"
+export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_TOOLS="$SCEN_TOOLS"
+# transom (built under build/, so casement cannot vouch for its image) takes the screen; no floor row can name it (harness/lib/casement-floor.sh).
+floor_shim portal-quire   # no program here takes a power a floor row can allow: casement starts with an empty floor, so nothing waits on a question
 # shellcheck source=/dev/null
 source "$SCEN_SRC/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out portal-quire)
