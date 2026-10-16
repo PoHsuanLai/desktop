@@ -212,7 +212,7 @@ packages_debian() {
     pc-libdrm) echo libdrm-dev ;;
     pc-gbm) echo libgbm-dev ;;
     pc-egl) echo libegl-dev ;;
-    pc-gl) echo libgl-dev ;; # unverified
+    pc-gl) echo libgl-dev ;;
     pc-pixman) echo libpixman-1-dev ;;
     pc-pipewire) echo libpipewire-0.3-dev ;;
     pc-libpulse) echo libpulse-dev ;;
@@ -292,7 +292,7 @@ packages_arch() {
     pc-dav1d) echo dav1d ;;
     pc-vulkan) echo vulkan-icd-loader ;;
     foot) echo foot ;;
-    lavapipe) echo vulkan-swrast ;; # unverified
+    lavapipe) echo vulkan-swrast ;;
     *) echo - ;;
   esac
 }

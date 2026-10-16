@@ -81,8 +81,8 @@ apt install build-essential cmake pkg-config libclang-dev perl git curl tar zstd
 pacman -S base-devel cmake pkgconf clang perl git curl tar zstd xz python3 wayland wayland-protocols libxkbcommon libinput seatd systemd-libs libdrm mesa libglvnd pixman pipewire libpulse pam alsa-lib fontconfig freetype2 harfbuzz libxml2 libpng dbus libx11 libxcb dav1d vulkan-icd-loader
 ```
 
-A few package names were written from memory and not checked on the distro (they carry `# unverified` in
-`install/packages.sh`): `libgl-dev` on Ubuntu and `vulkan-swrast` on Arch.
+Every package name above, and those in `release/deps.sh`, was looked up on 2026-10-16 in the `ubuntu:24.04`,
+`fedora:44` and `archlinux` images.
 
 ### X11 apps on Ubuntu
 
