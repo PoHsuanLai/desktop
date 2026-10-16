@@ -37,7 +37,7 @@ server and `quire-do`, with their units and the `/etc/quire/*-callers.toml` tabl
 after it), detent (`scripts/install.sh`: Settings, which
 porter's caller table knows as the unit `org.quire.Settings.service`), sill (`dist/install.sh`), transom
 (`scripts/install.sh`: the portal backend for screen sharing and screenshots, started by D-Bus activation), keycap,
-anyview, mailo, palmrest, then the session itself (`install/install.sh`: `desktop-session`, the user target, the login entry; it never runs sudo and prints the root command when a place is not writable) (casement, with its unit, goes between detent and sill; it is skipped with a message until casement's `scripts/install.sh` exists). porter always goes to `/usr`, whatever `--prefix` says. `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
+anyview, mailo, palmrest, then the session itself (`install/install.sh`: `desktop-session`, the user target, the login entry; it never runs sudo and prints the root command when a place is not writable) (casement, with its unit, goes between detent and sill; it is skipped with a message until casement's `scripts/install.sh` exists). `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
 installer takes; the first failure stops the run and names the component and what was installed before it.
 `--dry-run` prints the plan and runs and builds nothing.
 

@@ -144,3 +144,23 @@ What I found and decided:
 - The release workflow has a new job `agents` (almanac and docket together; both need perl and make, which
   `release/deps.sh` already installs). Not run here; it fails until the manifest carries almanac >= 6aade09 and
   docket >= e44112c.
+
+## desk-pprefix (2026-10-16)
+
+B1 is closed by porter 2e5cd74 (in the pinned de06006), so `install.sh` no longer forces porter to `/usr`: it gets
+the desktop `--prefix` (default `/usr/local`) and `--sysconfdir` (default `/etc`) like the other components, and the
+"porter goes to /usr" note is gone. Checked in porter's source at de06006, with `--prefix /usr/local --sysconfdir /etc`
+(`scripts/install.sh` puts providers, `clients.toml`, the tailnet drop-in under `$prefix/share/porter` and the caller
+tables at `$sysconfdir/porter`):
+
+- providers, `clients.toml` and the stoker catalog: accountd, syncd and inferd take `Xdg::shipped("porter/providers")`,
+  `("porter/clients.toml")` and `("stoker/catalog")` (`porter-core/src/xdg.rs`): the first `$XDG_DATA_DIRS` entry
+  (default `/usr/local/share:/usr/share`) that has the path, else `/usr/share/...`.
+- `callers.toml` and `inferd-callers.toml`: `/etc/porter/<file>` is searched first (`porter-daemon/src/system_callers.rs`,
+  `SYSTEM_CALLERS`, `INFERD_CALLERS`, `search`), so `--sysconfdir /etc` is found. Since 36f5014 the other places are a
+  fixed list (`TABLE_DIRS`), not `$XDG_*`, and a table counts only when root holds it (root-owned, no group or other
+  write along its real path), so it must be installed as root, as before.
+- Not verified: that the user session's `XDG_DATA_DIRS` keeps `/usr/local/share` (unset gives the default; a session that
+  sets it without that entry would not find an install under `/usr/local`), and the stoker catalog, which this
+  installer does not install (stoker's own `scripts/install.sh` puts it at `$PREFIX/share/stoker/catalog`). Nothing was
+  built or installed; `gate/installer-check.sh` and a dry run passed.

@@ -141,8 +141,8 @@ build_session() {
 build_porter() {
   local d; d=$(repo_dir porter)
   cargo_in "$d" porter -p accountd -p syncd -p inferd
-  # --sysconfdir under the bundle's system tree: the caller table lands at system/etc/porter/callers.toml, a
-  # system file slipway-apply places at /etc/porter/callers.toml (where porter reads it).
+  # --sysconfdir under the bundle's system tree: the caller tables land at system/etc/porter/callers.toml and
+  # system/etc/porter/inferd-callers.toml, system files slipway-apply places at /etc/porter/ (where porter reads them).
   (cd "$d" && CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/porter" \
     ./scripts/install.sh --no-build --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
 }

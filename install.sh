@@ -7,7 +7,7 @@
 #   --dry-run      print the plan (what runs, in which order, what is left to you), run nothing, build nothing
 #   --prefix DIR   where the software goes (default $PREFIX, else /usr/local)
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
-#   --sysconfdir   where porter's caller table goes (default $SYSCONFDIR, else /etc); almanac and docket always use /etc/quire
+#   --sysconfdir   where porter's caller tables go (default $SYSCONFDIR, else /etc); almanac and docket always use /etc/quire
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
@@ -29,9 +29,6 @@
 # The colour emoji font (fonts/Noto-COLRv1.ttf) goes to <prefix>/share/fonts/quire/ after the components, unless
 # fontconfig already has a COLRv1 Noto Color Emoji (Fedora does; Ubuntu and Arch ship a bitmap build our renderer
 # cannot draw). It is the step named "fonts".
-#
-# porter always goes to /usr, whatever --prefix says: its daemons read the data they ship (providers, the
-# client table, the model catalog) only from /usr/share for now.
 #
 # Builds. The repos pin Rust 1.98.1 and need rustup (a distro's rust package is the wrong version). Some
 # repos' cargo config asks for clang and mold, which is how they are worked on. An install never reads it
@@ -63,11 +60,6 @@ source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
 ORDER=(porter almanac docket detent casement sill transom keycap anyview mailo palmrest session)
-
-# Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
-# catalog only under /usr/share (finding B1). Remove this, and the --prefix /usr below, once porter searches
-# XDG_DATA_DIRS.
-PORTER_PREFIX=/usr
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -120,9 +112,9 @@ describe() {
   case "$1" in
     porter)
       script=scripts/install.sh
-      args=(--prefix "$PORTER_PREFIX" --sysconfdir "$sysconfdir")
+      args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
-      writes=("$destdir$PORTER_PREFIX" "$destdir$sysconfdir") ;;
+      writes=("$destdir$prefix" "$destdir$sysconfdir") ;;
     almanac)
       # memoryd and /etc/quire/memory-callers.toml. The installer has no --sysconfdir: /etc/quire is fixed.
       script=scripts/install.sh
@@ -303,9 +295,6 @@ if [ "$fonts_wanted" = 1 ]; then
     esac
   fi
 fi
-case " ${selected[*]} " in *" porter "*)
-  [ "$prefix" = "$PORTER_PREFIX" ] || echo "note: porter goes to $PORTER_PREFIX, not $prefix: its daemons read what they ship only from $PORTER_PREFIX/share" ;;
-esac
 command -v rustup >/dev/null || echo "note: rustup was not found. Building from source needs it (the repos pin Rust 1.98.1): $RUSTUP_LINE"
 [ "$dry" = 0 ] || exit 0
 

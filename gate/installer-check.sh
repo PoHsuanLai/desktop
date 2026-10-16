@@ -51,6 +51,7 @@ order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n'
 [ "$order" = "porter almanac docket detent casement sill transom keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
 printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
+printf '%s\n' "$plan" | grep -q 'porter .*runs .*scripts/install.sh --prefix /usr/local --sysconfdir /etc --destdir' || fail "porter does not get the desktop prefix and /etc: $plan"
 printf '%s\n' "$plan" | grep -q 'almanac .*runs .*scripts/install.sh --prefix /usr/local --destdir' || fail "almanac does not run into a staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'docket .*runs .*scripts/install.sh --prefix /usr/local --destdir' || fail "docket does not run into a staging root: $plan"
 ! printf '%s\n' "$plan" | grep -E 'almanac|docket' | grep -q -- '--sysconfdir' || fail "almanac or docket was given --sysconfdir, which they do not take"
@@ -74,10 +75,11 @@ done
 
 # 3. a real run into a staging root passes PREFIX and DESTDIR through, runs the stageable ones, never sudo.
 inst --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "staged run failed"; }
-# porter always goes to /usr (its data is read from /usr/share only), whatever the desktop prefix.
-grep -q "^porter/scripts/install.sh --prefix /usr --sysconfdir /etc --destdir $dest" "$log" || fail "porter did not get /usr and the destdir: $(cat "$log")"
+# porter goes under the same prefix as everything else (its daemons find what they ship under XDG_DATA_DIRS),
+# with the caller tables in --sysconfdir.
+grep -q "^porter/scripts/install.sh --prefix /opt/d --sysconfdir /etc --destdir $dest" "$log" || fail "porter did not get the prefix, /etc and the destdir: $(cat "$log")"
 grep -q "^casement/scripts/install.sh --prefix /opt/d --locked --destdir $dest" "$log" || fail "casement did not get the prefix and destdir: $(cat "$log")"
-grep -q 'note: porter goes to /usr, not /opt/d' "$tmp/out.log" || fail "the porter prefix note is missing"
+! grep -q 'note: porter goes to' "$tmp/out.log" || fail "a porter prefix note is still printed: $(cat "$tmp/out.log")"
 # the session step is this repo's own installer: really run, into the staging root
 [ -x "$dest/opt/d/bin/desktop-session" ] || fail "desktop-session was not staged under the prefix"
 [ -f "$dest/etc/systemd/user/desktop-session.target" ] || fail "the user target was not staged"
