@@ -33,7 +33,7 @@ done
 export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
 export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_TOOLS="$SCEN_TOOLS"
 # transom (built under build/) is the portal (a row in the caller list) and takes the screen (a floor row); both name its built image.
-floor_shim portal-quire transom
+floor_shim portal-quire transom xdg-desktop-portal fake-shell
 # shellcheck source=/dev/null
 source "$SCEN_SRC/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out portal-quire)
@@ -67,7 +67,7 @@ step_boot() {
 # accept NAME: transom's acceptance script NAME against this casement; its output is kept.
 accept() {
   local rc
-  TRANSOM_BIN="$TRANSOM_BIN" TRANSOM_DESKTOP="$SCEN_ROOT" TRANSOM_COMPOSITOR_ENV="$CHAIN_ENV" \
+  TRANSOM_BIN="$TRANSOM_BIN" TRANSOM_DEV_CALLERS="$FLOOR_DIR/desktop-callers.toml" TRANSOM_DESKTOP="$SCEN_ROOT" TRANSOM_COMPOSITOR_ENV="$CHAIN_ENV" \
     TRANSOM_OUTPUT=HEADLESS-1 TRANSOM_OUTPUT_SIZE="$SIZE" TRANSOM_STATE="$OUT_DIR/chain-$1" \
     bash "$TRANSOM_DIR/dev/accept/$1.sh" >"$OUT_DIR/$1.log" 2>&1
   rc=$?

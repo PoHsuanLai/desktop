@@ -22,7 +22,7 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
 
 export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
 export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_TOOLS="$SCEN_TOOLS"
-floor_shim sill-boots-on-casement   # no program here takes a power a floor row can allow: casement starts with an empty floor, so nothing waits on a question
+floor_shim sill-boots-on-casement sill   # sill takes no power a floor row can allow (no rows, nothing waits on a question); the caller list names it as the shell
 # shellcheck source=/dev/null
 source "$SCEN_SRC/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out sill-boots-on-casement)
@@ -48,6 +48,7 @@ step_boot() {
   start_compositor || return 1
   scratch_new
   build || return 1
+  floor_sill_callers
   launch_daemon
 }
 

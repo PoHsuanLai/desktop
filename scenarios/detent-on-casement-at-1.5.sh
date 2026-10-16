@@ -29,7 +29,7 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
 
 export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
 export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_TOOLS="$SCEN_TOOLS"
-floor_shim detent-1.5 casementctl detent   # casementctl shot watches the screen; detent is the Settings app (both run from build/)
+floor_shim detent-1.5 casementctl detent casement   # casementctl shot watches the screen; detent is the Settings app (both run from build/)
 # shellcheck source=/dev/null
 source "$SCEN_SRC/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out detent-1.5)
@@ -69,7 +69,7 @@ step_map() {
   mkdir -p "$SCRATCH/home" "$SCRATCH/data"
   LOG="$OUT_DIR/detent.log"
   nested env HOME="$SCRATCH/home" XDG_CONFIG_HOME="$SCRATCH/home/.config" XDG_DATA_HOME="$SCRATCH/data" \
-    XDG_DATA_DIRS="$SCRATCH/data" WAYLAND_DEBUG=1 "$DETENT" >"$LOG" 2>&1 &
+    XDG_DATA_DIRS="$SCRATCH/data" WAYLAND_DEBUG=1 "$DETENT" --dev-callers "$FLOOR_DIR/desktop-callers.toml" >"$LOG" 2>&1 &
   DETENT_PID=$!
   wait_size 900x640 || { kill -0 "$DETENT_PID" 2>/dev/null || tail -20 "$LOG" >&2; return 1; }
   wait_log '-> wl_shm_pool#[0-9]+\.create_buffer\(.*, 1350, 960, ' || return 1

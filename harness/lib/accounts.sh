@@ -33,8 +33,10 @@ acc_need() {
 acc_env() {
   export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
   export CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" CASEMENT_TOOLS="$SCEN_TOOLS"
-  # sill at its pin predates the floor: casement starts with the empty floor floor_shim writes (the rig's programs take no power), so nothing waits on a question.
-  floor_shim accounts || return 1
+  # The rig's programs take no power, so the floor has no rows and nothing waits on a question; its caller list names sill
+  # (at its pin) as the shell, detent as Settings and the porter daemons by their roles, for casement and for sill
+  # (floor_sill_callers before launch_daemon).
+  FLOOR_SILL_TARGET="$SCEN_BUILD/sill-pin-target" floor_shim accounts sill detent accountd inferd syncd casement || return 1
 }
 
 # Where the scenario keeps things; set by acc_dirs after scratch_new.
@@ -262,6 +264,7 @@ EOF
   # sill names itself to accountd within its first moments (its accounts service asks NeedingReauth as it connects, and a
   # refused first ask is not repeated), so its identity is written by the shell that execs it, before it exists.
   LAUNCH_PREFIX=(bash -c 'mkdir -p "$0/$$" "$0/units"; echo "0::/user.slice/user-1000.slice/user@1000.service/app.slice/sill.service" >"$0/$$/cgroup"; echo "$$" >"$0/units/sill.service"; exec "$@"' "$PROC")
+  floor_sill_callers
   launch_daemon || return 1
   NAME=$(output_name) || return 1
   SHEET="sill-accounts-sheet-$NAME"
@@ -613,7 +616,7 @@ detent_start() {
   # below must be for the process that holds the bus connection).
   PROBE_DIR="$SCRATCH/probe"; mkdir -p "$PROBE_DIR"
   env QUIRE_DEBUG_PROBE="$PROBE_DIR" WAYLAND_DISPLAY="$WL" XDG_RUNTIME_DIR="$(dirname "$WL")" HOME="$HOME_DIR" XDG_CONFIG_HOME="$CONFIG" XDG_DATA_HOME="$data" XDG_DATA_DIRS="$data" XDG_STATE_HOME="$STATE" \
-    XDG_CACHE_HOME="$CACHE" DBUS_SESSION_BUS_ADDRESS="$BUS" "$SCEN_BUILD/detent-target/debug/detent" >"$OUT_DIR/detent.log" 2>&1 &
+    XDG_CACHE_HOME="$CACHE" DBUS_SESSION_BUS_ADDRESS="$BUS" "$SCEN_BUILD/detent-target/debug/detent" --dev-callers "$FLOOR_DIR/desktop-callers.toml" >"$OUT_DIR/detent.log" 2>&1 &
   DETENT_PID=$!
   ACC_PIDS+=("$DETENT_PID")
   acc_app org.quire.Settings "$DETENT_PID"

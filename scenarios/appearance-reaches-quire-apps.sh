@@ -28,7 +28,7 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
 
 export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
 export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_TOOLS="$SCEN_TOOLS"
-floor_shim appearance-quire   # no program here takes a power a floor row can allow: casement starts with an empty floor, so nothing waits on a question
+floor_shim appearance-quire casementctl detent casement   # casementctl shot watches the screen; detent is the Settings app (both run from build/)
 # shellcheck source=/dev/null
 source "$SCEN_SRC/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out appearance-quire)
@@ -96,7 +96,7 @@ step_baseline() {
   mkdir -p "$SCRATCH/home" "$SCRATCH/data"
   write_theme light
   nested env HOME="$SCRATCH/home" XDG_CONFIG_HOME="$SCRATCH/home/.config" XDG_DATA_HOME="$SCRATCH/data" \
-    XDG_DATA_DIRS="$SCRATCH/data" "$DETENT" >"$OUT_DIR/detent.log" 2>&1 &
+    XDG_DATA_DIRS="$SCRATCH/data" "$DETENT" --dev-callers "$FLOOR_DIR/desktop-callers.toml" >"$OUT_DIR/detent.log" 2>&1 &
   DETENT_PID=$!
   local i
   for i in $(seq 100); do [ "$(frame 2>/dev/null | cut -d, -f3,4)" = 900,640 ] && break; sleep 0.1; done

@@ -45,12 +45,15 @@ floor_powers() {
     wlrctl | lswt | casement-probe) echo windows ;; # casement-probe: `workspaces` (ext_workspace_manager)
     swaylock | demo_lock) echo lock ;;
     sill | detent | demo_*) ;; # the desktop's programs and the demos: the role below, no power
+    accountd | inferd | syncd | xdg-desktop-portal | casement | fake-shell) ;; # services the desktop's programs check by role (sill, detent, transom)
     *) return 1 ;;
   esac
 }
 
 # floor_role TOOL: the role TOOL plays in the desktop's caller list (the roles casement checks: shell, settings,
-# portal); nothing for a program that is none. The shell-host demos stand in for the shell: they map the shell's
+# portal; and the services sill, detent and transom check by role: accounts, inference, sync, portal_frontend,
+# compositor); nothing
+# for a program that is none. The shell-host demos stand in for the shell: they map the shell's
 # surfaces (an exclusive keyboard, an overlay), which casement gives only to the shell. demo_lock is a screen locker,
 # a power a floor row allows, and is not the shell.
 floor_role() {
@@ -58,6 +61,12 @@ floor_role() {
     sill | demo_hover | demo_scroll | demo_ime | demo_swipe | demo_switcher | demo_drag | demo_popup_keys) echo shell ;;
     detent) echo settings ;;
     transom) echo portal ;;
+    accountd) echo accounts ;;
+    inferd) echo inference ;;
+    syncd) echo sync ;;
+    xdg-desktop-portal) echo portal_frontend ;;
+    casement) echo compositor ;;
+    fake-shell) echo shell ;; # transom's dev/lib fake shell (python3), which owns org.quire.Shell in portal-quire
     *) return 1 ;;
   esac
 }
@@ -68,6 +77,11 @@ floor_app() {
     shell) echo org.quire.Shell ;;
     settings) echo org.quire.Settings ;;
     portal) echo org.quire.Portal ;;
+    accounts) echo org.quire.Accounts ;;
+    inference) echo org.quire.Inference ;;
+    sync) echo org.quire.Sync ;;
+    portal_frontend) echo org.freedesktop.portal.Desktop ;;
+    compositor) echo org.quire.Compositor ;;
   esac
 }
 
@@ -78,7 +92,11 @@ floor_image() {
   case "$1" in
     casementctl | casement-probe) path="${SCEN_TOOLS:?floor_image: scenario.sh is not sourced}/bin/$1" ;;
     transom) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/transom-target/debug/transom" ;;
-    sill) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/sill-target/debug/sill" ;;
+    sill) path="${FLOOR_SILL_TARGET:-${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/sill-target}/debug/sill" ;; # FLOOR_SILL_TARGET: the accounts rig runs sill at its pin
+    accountd | inferd | syncd) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/porter-target/debug/$1" ;;
+    xdg-desktop-portal) path=/usr/libexec/xdg-desktop-portal ;;
+    casement) path="${SCEN_TOOLS:?floor_image: scenario.sh is not sourced}/bin/casement" ;;
+    fake-shell) path=$(command -v python3 2>/dev/null) || return 1 ;;
     detent) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/detent-target/debug/detent" ;;
     demo_*) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/shell-host-target/debug/examples/$1" ;;
     *) path=$(command -v "$1" 2>/dev/null) || return 1 ;;
@@ -104,7 +122,7 @@ floor_rows() {
 # plays a role.
 floor_callers() {
   local role tool path exes
-  for role in shell settings portal; do
+  for role in shell settings portal portal_frontend compositor accounts inference sync; do
     exes=
     for tool in "$@"; do
       [ "$(floor_role "$tool" 2>/dev/null)" = "$role" ] || continue
@@ -130,6 +148,14 @@ floor_make() {
   { echo "# The desktop's own programs in scenario $name, by the images the harness built (harness/lib/casement-floor.sh)."; echo "$callers"; } >"$dir/desktop-callers.toml" || return 1
   chmod 600 "$dir/privacy.toml" "$dir/desktop-callers.toml" || return 1
   FLOOR_DIR=$dir
+}
+
+# floor_sill_callers: sill (a `debug` build) takes the floor's desktop-callers.toml as the person's own rows
+# (`sill run --dev-callers FILE`, peephole's Proof::Dev), so the services and the portal it checks by role are known.
+# Call it after sourcing sill's dev/lib (which clears DEV_CALLERS_FLAGS) and before launch_daemon. detent (feature
+# dev-callers) takes the same file as `detent --dev-callers FILE` and transom (feature debug) as TRANSOM_DEV_CALLERS.
+floor_sill_callers() {
+  DEV_CALLERS_FLAGS=(--dev-callers "${FLOOR_DIR:?floor_sill_callers: call floor_make or floor_shim first}/desktop-callers.toml")
 }
 
 # floor_shim NAME [TOOL...]: floor_make, then the stand-in checkout (see the top of this file).

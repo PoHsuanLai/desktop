@@ -110,7 +110,7 @@ pinned() {
 # is untouched): with QUIRE_DEBUG_PROBE=<dir> set it lists its controls by role and name (harness/lib/accounts.sh,
 # detent_press). Never a release build.
 build_detent() {
-  (cd "$SCEN_BUILD/pin/detent" && CARGO_TARGET_DIR="$SCEN_BUILD/detent-target" cargo build -p detent --features ds-blitz/debug-probe)
+  (cd "$SCEN_BUILD/pin/detent" && CARGO_TARGET_DIR="$SCEN_BUILD/detent-target" cargo build -p detent --features ds-blitz/debug-probe,dev-callers)
 }
 
 build_sill() {
@@ -119,7 +119,7 @@ build_sill() {
 
 # transom from the sibling checkout, --locked (the sibling's Cargo.lock is never changed).
 build_transom() {
-  (cd "$SCEN_SIB/transom" && CARGO_TARGET_DIR="$SCEN_BUILD/transom-target" cargo build -p transom --locked)
+  (cd "$SCEN_SIB/transom" && CARGO_TARGET_DIR="$SCEN_BUILD/transom-target" cargo build -p transom --features debug --locked)
 }
 
 # The demos shell-host's accept scripts run, built the way those scripts build them (two cargo
