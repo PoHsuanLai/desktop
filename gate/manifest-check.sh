@@ -53,6 +53,16 @@ done
 
 norm() { sed -e 's/\.git$//' -e 's#/$##' <<<"$1"; }
 
+# waived <repo> <lock> <rev>: a lock listed in gate/stale-locks.txt for exactly this rev (an example
+# or tool lock outside the repo's own gate, stale at a release already pinned): neither its revs nor
+# its resolution are held against the manifest. A waiver names one
+# rev, so it lapses by itself as soon as the manifest moves the repo on.
+waived() {
+  local list; list="$(dirname "$0")/stale-locks.txt"
+  [ -f "$list" ] || return 1
+  grep -v '^#' "$list" | awk -v r="$1" -v l="$2" -v v="$3" '$1 == r && $2 == l && $3 == v { found = 1 } END { exit !found }'
+}
+
 shape_bad=$bad
 if [ "$syntax_only" = 0 ] && [ "$shape_bad" = 0 ]; then
   declare -A rev_of
@@ -67,20 +77,12 @@ if [ "$syntax_only" = 0 ] && [ "$shape_bad" = 0 ]; then
         hit=${rev_of[$(norm "$url")]:-}
         [ -n "$hit" ] || continue
         want=${hit#* }; name=${hit%% *}
-        [ "$sha" = "$want" ] || note "$r:$lock locks $name at ${sha:0:9}, the manifest says ${want:0:9}"
+        [ "$sha" = "$want" ] || waived "$r" "$lock" "$rev" \
+          || note "$r:$lock locks $name at ${sha:0:9}, the manifest says ${want:0:9}"
       done < <(git -C "$g" show "$rev:$lock" | sed -n 's/^source = "\(git+[^"]*\)"$/\1/p' | sort -u)
     done
   done
 fi
-
-# waived <repo> <lock> <rev>: a lock listed in gate/stale-locks.txt for exactly this rev (an example
-# or tool lock outside the repo's own gate, stale at a release already pinned). A waiver names one
-# rev, so it lapses by itself as soon as the manifest moves the repo on.
-waived() {
-  local list; list="$(dirname "$0")/stale-locks.txt"
-  [ -f "$list" ] || return 1
-  grep -v '^#' "$list" | awk -v r="$1" -v l="$2" -v v="$3" '$1 == r && $2 == l && $3 == v { found = 1 } END { exit !found }'
-}
 
 # resolve_pinned: export every repo at its rev side by side, then `cargo metadata --locked` in each
 # directory that has both a Cargo.toml and a Cargo.lock.
