@@ -136,6 +136,10 @@ jobs:
         if: matrix.name == 'small'
         run: desktop/release/check-system-list.sh --slipway "$GITHUB_WORKSPACE/slipway"
 
+      - name: No stand-in (the fake feature) in what is built or shipped
+        if: matrix.name == 'small'
+        run: desktop/gate/check-no-fake.sh --siblings "$GITHUB_WORKSPACE"
+
       - name: Cache cargo and the build output
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -253,6 +257,9 @@ jobs:
             git -C desktop for-each-ref --format='%(contents)' "refs/tags/$REF_NAME"
           fi >notes.txt
           [ -s notes.txt ] || printf 'Release %s\n' "$VERSION" >notes.txt
+
+      - name: Nothing in the stage opens /dev/uinput to the person or a group
+        run: desktop/gate/check-no-uinput-access.sh --siblings "$GITHUB_WORKSPACE/none" --stage desktop/build/release/stage
 
       - name: Pack and sign
         env:
