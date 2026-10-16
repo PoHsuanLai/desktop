@@ -74,7 +74,8 @@ content() {
 put() {
   local mode=$1 source=$2 dest=$destdir$3 owner=() staged
   if [ "$(id -u)" = 0 ]; then owner=(-o root -g root); fi
-  if [ -f "$dest" ] && content "$source" | cmp -s - "$dest" && [ "$(stat -c %a "$dest")" = "$mode" ]; then
+  if [ -f "$dest" ] && content "$source" | cmp -s - "$dest" && [ "$(stat -c %a "$dest")" = "$mode" ] \
+    && { [ "$(id -u)" != 0 ] || [ "$(stat -c %U:%G "$dest")" = root:root ]; }; then
     note "already in place: $dest"
     return 0
   fi
