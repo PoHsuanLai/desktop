@@ -522,3 +522,9 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   scenario changes outputs through a program: `set_scale` and the size changes go through `casementctl debug output set`. Whether that control is
   exempt from the trial could not be read in the casement checkout beside this one (the trial is not in it yet); if it is not, the 1.5 scale in
   `detent-on-casement-at-1.5` would go back after 15 s.
+- **Release notes and the floor file (lane dharn).** The repo had no standing release notes (they are typed into the workflow's notes box or the tag's
+  message); `docs/release-notes.md` now holds the next release's text, with the sentences about the first-use questions and the display confirmation,
+  and `release/README.md` points to it. No `/etc/quire/privacy.toml` is shipped by `install/`, `release/` or `dist/` (nothing names it), and a release
+  could not place one: slipway's list allows `/etc/quire` only for names ending `-callers.toml`. No gate script keeps a list of forbidden shipped
+  files (`check-no-uinput-access.sh` reads rule text), so no line was added; the administrator writes the floor, the person's own answers live in
+  `$XDG_STATE_HOME/casement/privacy.toml`.
