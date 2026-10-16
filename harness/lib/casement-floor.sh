@@ -37,7 +37,8 @@
 # power a row can name); fails for a tool not listed.
 floor_powers() {
   case "$1" in
-    grim | wf-recorder | wayshot | casementctl | transom) echo screen ;; # casementctl: `shot`
+    grim | wf-recorder | wayshot | transom) echo screen ;;
+    casementctl) echo screen windows ;; # `shot`: the capture, and the toplevel list it binds to name the windows
     wl-copy | wl-paste | cliphist) echo clipboard ;;
     wtype) echo keys ;;
     fcitx5) echo typing_help keys ;; # the input method, and the virtual keyboard it forwards keys through

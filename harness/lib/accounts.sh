@@ -33,10 +33,11 @@ acc_need() {
 acc_env() {
   export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
   export CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" CASEMENT_TOOLS="$SCEN_TOOLS"
-  # The rig's programs take no power, so the floor has no rows and nothing waits on a question; its caller list names sill
-  # (at its pin) as the shell, detent as Settings and the porter daemons by their roles, for casement and for sill
-  # (floor_sill_callers before launch_daemon).
-  FLOOR_SILL_TARGET="$SCEN_BUILD/sill-pin-target" floor_shim accounts sill detent accountd inferd syncd casement || return 1
+  # The rig's programs take no power; casementctl's `shot` (acc_shot) takes the screen and the window list, so those are the
+  # floor's only rows and nothing waits on a question (an unanswered ask stops the capture after ~29 s, and its dialog
+  # covers the page). The caller list names sill (at its pin) as the shell, detent as Settings and the porter daemons by
+  # their roles, for casement and for sill (floor_sill_callers before launch_daemon).
+  FLOOR_SILL_TARGET="$SCEN_BUILD/sill-pin-target" floor_shim accounts sill detent accountd inferd syncd casement casementctl || return 1
 }
 
 # Where the scenario keeps things; set by acc_dirs after scratch_new.
