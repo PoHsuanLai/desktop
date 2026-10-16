@@ -143,14 +143,14 @@ safe_stays_up_on_one_output() {
 
 safe_failing_ends_the_session() {
   local rc=0
-  start_session ends FAKE_CASEMENT_ALWAYS_PANIC=1 DESKTOP_SESSION_ROLLBACK_HELPER="$(command -v true)"
+  start_session ends FAKE_CASEMENT_ALWAYS_PANIC=1 DESKTOP_SESSION_ROLLBACK_HELPER="$(type -P true)"
   wait_for 600 bash -c "! kill -0 $SESSION_PID" || { echo "the session did not end" >&2; return 1; }
   wait "$SESSION_PID" || rc=$?
   SESSION_PID=
   [ "$rc" = 1 ] || { echo "exit $rc, expected 1" >&2; return 1; }
   grep -q 'casement --safe exited quickly' "$STATE/guard.log" || return 1
   grep -q 'the crash guard ends the session' "$STATE/guard.log" || return 1
-  grep -q "by hand.*pkexec $(command -v true)" "$STATE/guard.log" || { echo "no way back named:" >&2; cat "$STATE/guard.log" >&2; return 1; }
+  grep -q "by hand.*pkexec $(type -P true)" "$STATE/guard.log" || { echo "no way back named:" >&2; cat "$STATE/guard.log" >&2; return 1; }
 }
 
 # Without DESKTOP_SESSION_STATE the decisions go to the person's state folder, so they outlive the session.
