@@ -103,7 +103,9 @@ retarget() { sed -i "s|^ExecStart=$2|ExecStart=$P/bin/$(basename "$2")|" "$1"; g
 build_casement() {
   local d; d=$(repo_dir casement)
   cargo_in "$d" casement -p casement -p casementctl
-  # INTERIM: casement has no installer; it ships dist/casement.service with ExecStart=/usr/bin/casement.
+  # INTERIM: casement has no installer here; it ships dist/casement.service with ExecStart=/usr/bin/casement
+  # $CASEMENT_SESSION_ARGS (retarget keeps the arguments). The unit is root-held in the bundle's lib/systemd/user
+  # (exported to /usr/lib/systemd/user), as the account service requires of a fixed role.
   put 755 "$(tdir casement)/casement" bin/casement
   put 755 "$(tdir casement)/casementctl" bin/casementctl
   put 644 "$d/dist/casement.service" lib/systemd/user/casement.service
@@ -132,13 +134,17 @@ build_sill() {
   put_system 644 "$d/dist/udev/60-sill-ddc.rules" /etc/udev/rules.d/60-sill-ddc.rules
   put_system 644 "$d/dist/modules-load.d/sill-ddc.conf" /etc/modules-load.d/sill-ddc.conf
   put 644 "$d/dist/keycap/keycap.toml" share/sill/keycap.toml
+  # The shell's unit, root-held like casement's (the account service trusts fixed roles only from such units).
+  put 644 "$d/dist/sill.service" lib/systemd/user/sill.service
+  retarget "$root/lib/systemd/user/sill.service" /usr/bin/sill
 }
 
 build_session() {
   echo "desktop $(git -C "$ROOT" rev-parse HEAD)" >"$out/components.d/desktop.txt"
-  # The unit is casement's (staged by its component); the sessions entry lands in the exported directory,
-  # the user target in lib/systemd/user (this installer puts it under <sysconfdir>/systemd/user).
-  CASEMENT_UNIT_FILE=/nonexistent "$ROOT/install/install.sh" --prefix "$P" --destdir "$stage" \
+  # The units casement.service and sill.service are staged by their own components (the checkouts are not
+  # necessarily in this job); the sessions entry lands in the exported directory, the user target in
+  # lib/systemd/user (this installer puts it under <sysconfdir>/systemd/user).
+  "$ROOT/install/install.sh" --prefix "$P" --destdir "$stage" --siblings /nonexistent \
     --sysconfdir "$P/lib" --sessions-dir "$P/share/wayland-sessions"
   # The colour emoji font (install.sh puts the same two files in <prefix>/share/fonts/quire/): ubuntu and arch ship
   # a bitmap build our renderer cannot draw. share/fonts is exported to /usr/share/fonts, where quire's search
@@ -277,10 +283,12 @@ build_palmrest() {
 
 build_slipway() {
   local d; d=$(repo_dir slipway)
-  cargo_in "$d" slipway -p slipway
-  # INTERIM: slipway's scripts/install.sh installs the helper, polkit action, unit and bus file on a machine
-  # (first install, release/bootstrap.sh); the release carries only the user program. slipway-apply is not in
-  # the bundle: a release must not replace a binary that runs as root.
+  # slipway-root is the crate of the three programs that run as root (slipway-apply, slipway-rollback,
+  # slipway-health); they are built here, in the same target folder, so the workflow can hand them to the smoke job.
+  cargo_in "$d" slipway -p slipway -p slipway-root
+  # INTERIM: slipway's scripts/install.sh installs the helpers, polkit action, unit and bus file on a machine
+  # (first install, release/bootstrap.sh); the release carries only the user program. slipway-apply,
+  # slipway-rollback and slipway-health are not in the bundle: a release must not replace a binary that runs as root.
   put 755 "$(tdir slipway)/slipway" bin/slipway
 }
 

@@ -163,7 +163,7 @@ checks slipway's install with `check-helpers.sh`, and runs `pkexec /usr/libexec/
 
 ```
 cd slipway
-cargo build --release --locked -p slipway --bin slipway-apply --bin slipway-rollback --bin slipway-health
+cargo build --release --locked -p slipway-root
 sudo sh -c 'umask 022 && scripts/install.sh --bin-dir target/release --pubkey /path/to/release.pub'
 cd ../desktop && release/bootstrap.sh
 ```

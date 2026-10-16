@@ -156,7 +156,7 @@ jobs:
           tar -C desktop/build/release -cf "stage-${{ matrix.name }}.tar" stage components.d
           # slipway's three privileged programs are not in the bundle (a release must not replace a program that runs
           # as root), nor is its polkit file, but the smoke job needs the ones built from the same pin, on the same
-          # oldest base. The user program rides along for the start-and-rollback scenarios.
+          # oldest base (build.sh builds them with `-p slipway-root`). The user program rides along for the start-and-rollback scenarios.
           if [ "${{ matrix.name }}" = small ]; then
             mkdir helper
             for p in slipway-apply slipway-rollback slipway-health slipway; do
