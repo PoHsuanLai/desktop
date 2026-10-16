@@ -12,27 +12,34 @@
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: porter, stoker, almanac, docket, cua, detent, casement, sill, transom, keycap,
-#                  anyview, mailo, palmrest, session, fonts)
+#   --only NAMES   just these components (comma separated: callers, porter, stoker, almanac, docket, cua, detent, casement, sill,
+#                  transom, turnstile, keycap, anyview, mailo, palmrest, session, fonts)
 #
-# Order: porter (the account daemons and the caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
+# Order: callers (the list of the desktop's own programs, /etc/quire/desktop-callers.toml, this repo's dist/), porter (the account daemons and the caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
 # docket (the action router, the companion, the reader and the tool server, with their caller tables; they read
 # porter's accounts), cua (the computer-use daemon cuad, for apps that are not ours, and its caller table), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
-# scripts/install.sh builds it), keycap, anyview, mailo, palmrest, and last the session itself (this repo's
+# scripts/install.sh builds it), turnstile (the input service that makes virtual keyboards and pads, from install/system.sh), keycap (the
+# keyboard map, also from install/system.sh), anyview, mailo, palmrest, and last the session itself (this repo's
 # install/install.sh: the desktop-session script, the user target and the login entry "sill (casement)"). Each
 # component's installer is its
 # own: this script passes the prefix and the staging root through and nothing else, and stops at the first
-# one that fails. A component whose installer is not in its checkout yet (casement, until its scripts/install.sh
+# one that fails. "callers" is first on purpose: the update service (slipway) and the portal backend (transom) read the
+# list once, when they start, and refuse every caller without it, so it is in place before anything that installs or starts
+# them. turnstile comes before keycap and palmrest, which ask it for their virtual devices. A component whose installer is not in its checkout yet (casement, until its scripts/install.sh
 # lands) is reported and skipped; the others carry on.
 #
 # The colour emoji font (fonts/Noto-COLRv1.ttf) goes to <prefix>/share/fonts/quire/ after the components, unless
 # fontconfig already has a COLRv1 Noto Color Emoji (Fedora does; Ubuntu and Arch ship a bitmap build our renderer
 # cannot draw). It is the step named "fonts".
 #
+# keycap is not installed by keycap's own installer: that one gives the `input` group the device file /dev/uinput and the service a
+# drop-in to open it, which the desktop closes (the input service owns the node). install/system.sh puts the program, the service,
+# the restart rule and /etc/keycap/keycap.toml (only when there is none) instead.
+#
 # Builds. The repos pin Rust 1.98.1 and need rustup (a distro's rust package is the wrong version). Some
 # repos' cargo config asks for clang and mold, which is how they are worked on. An install never reads it
-# and never asks for a linker: what this script builds itself (detent) runs from / with --manifest-path
+# and never asks for a linker: what this script builds itself (detent, turnstile, keycap) runs from / with --manifest-path
 # (install/cargo.sh), and each component's own installer does the same for its own build.
 #
 # Root. This script never runs sudo and never writes under ~/.config or /etc itself. A component runs
@@ -40,8 +47,10 @@
 # listed as "yourself" with the exact command, to run with the privileges they need (sudo, doas or
 # pkexec, whichever is installed; $SUDO names another):
 #   - needs root: the destination is not writable by you (a system prefix, /etc/systemd/user, /etc)
-#   - sill, palmrest: installers with fixed destinations that ask for sudo or write your home themselves
-#   - keycap: its system files go to /etc and /usr/local; it stages only under --destdir
+#   - sill, palmrest: installers with fixed destinations that ask for sudo or write your home themselves (palmrest: the program in
+#     /usr/local/bin through sudo, its service in your home)
+#   - callers, turnstile, keycap: install/system.sh puts files in /etc, /usr/lib/systemd/system and /usr/local; it never runs sudo itself, so
+#     outside a --destdir the root command is printed
 #   - stoker: the catalogue goes under the prefix; its installer asks for sudo, doas or pkexec itself for a system
 #     prefix, so outside a --destdir it is left to you, run as yourself
 #   - almanac, docket, cua: their caller tables go to /etc/quire (always replaced) and docket's default settings to
@@ -61,7 +70,7 @@ source "$HERE/install/packages.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(porter stoker almanac docket cua detent casement sill transom keycap anyview mailo palmrest session)
+ORDER=(callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo palmrest session)
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -106,12 +115,21 @@ prefix=${prefix%/}
 
 # What a component is: its directory, its installer (relative), the command words after the installer, the
 # environment it takes, the places it writes, and why it is left to you (empty: it can run here).
-dir="" script="" args=() envs=() writes=() yourself="" optional=0
+dir="" script="" args=() envs=() writes=() yourself="" optional=0 blurb=""
 
 # describe NAME: fills the variables above for one component.
 describe() {
-  dir="$siblings/$1" args=() envs=() writes=() yourself="" optional=0
+  dir="$siblings/$1" args=() envs=() writes=() yourself="" optional=0 blurb=""
   case "$1" in
+    callers)
+      # The list of the desktop's own programs, a file of this repo (dist/desktop-callers.toml), placed at the fixed
+      # /etc/quire/desktop-callers.toml, root-owned. First on purpose (see the header).
+      dir="$HERE"
+      script=install/system.sh
+      blurb="the list of the desktop's own programs (/etc/quire/desktop-callers.toml): the update service and the screen-sharing service refuse everybody without it, so it goes in first"
+      args=(callers)
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir/etc/quire") ;;
     porter)
       script=scripts/install.sh
       args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
@@ -166,11 +184,24 @@ describe() {
       args=(--prefix "$prefix")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       writes=("$destdir$prefix") ;;
+    turnstile)
+      # The input service: its program (built here, as you), socket and service, the rule that closes /dev/uinput, the module list.
+      dir="$HERE"
+      script=install/system.sh
+      blurb="the input service: it alone makes virtual keyboards and pads, for the keyboard map and the touchpad program, and /dev/uinput is closed to everybody else"
+      args=(turnstile --prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      args+=(--siblings "$siblings")
+      writes=("$destdir$prefix" "$destdir/usr/lib/systemd/system" "$destdir/etc/udev/rules.d" "$destdir/etc/modules-load.d") ;;
     keycap)
-      script=install.sh
-      envs=("DESTDIR=$destdir")
-      writes=("$destdir/etc" "$destdir/usr/local")
-      [ -n "$destdir" ] || yourself="its system files go to /etc and /usr/local, which only root writes" ;;
+      # The keyboard map, installed by install/system.sh and not by keycap's own installer (see the header).
+      dir="$HERE"
+      script=install/system.sh
+      blurb="the keyboard map: its program and service, the rule that lets you restart it, and /etc/keycap/keycap.toml (Caps Lock switches the input method) when there is none"
+      args=(keycap --prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      args+=(--siblings "$siblings")
+      writes=("$destdir$prefix" "$destdir/usr/lib/systemd/system" "$destdir/etc/polkit-1/rules.d" "$destdir/etc/keycap") ;;
     anyview)
       script=dist/install.sh
       args=(--prefix "$prefix")
@@ -182,7 +213,7 @@ describe() {
       writes=("$destdir$prefix" "$destdir/etc/systemd/user") ;;
     palmrest)
       script=install.sh
-      yourself="it installs a user service under your home and prints root commands for the udev rules" ;;
+      yourself="it puts the program in /usr/local/bin (through sudo: the input service serves only a palmrest that only root can change), its service in your home, and prints the root commands for the device rules" ;;
     session)
       # This repo's own session installer (never sudo; it stops with the root command when a place is not writable).
       dir="$HERE"
@@ -293,6 +324,7 @@ for name in "${selected[@]}"; do
         *) printf '             cd %q && %s\n' "$dir" "$(command_text)" ;;
       esac ;;
   esac
+  [ -z "$blurb" ] || printf '             %s\n' "$blurb"
 done
 fonts_state=skipped fonts_root=""
 if [ "$fonts_wanted" = 1 ]; then
@@ -331,18 +363,33 @@ esac
 command -v rustup >/dev/null || echo "note: rustup was not found. Building from source needs it (the repos pin Rust 1.98.1): $RUSTUP_LINE"
 [ "$dry" = 0 ] || exit 0
 
+# build_if_needed NAME: for a component this script builds itself, as you (detent, turnstile, keycap): build its program when it
+# is not there, so the component's installer, which only copies, has it. Anything else: nothing to do. $DETENT_BIN, $TURNSTILE_BIN
+# and $KEYCAP_BIN name a program built elsewhere. The input service is built with no feature at all (its `fake` is for tests).
+build_if_needed() {
+  local name=$1 tree="$siblings/$1" var args=()
+  case "$name" in
+    detent) var=DETENT_BIN ;;
+    turnstile) var=TURNSTILE_BIN; args=(-p turnstile) ;;
+    keycap) var=KEYCAP_BIN ;;
+    *) return 0 ;;
+  esac
+  [ -z "${!var:-}" ] || return 0
+  [ ! -x "$tree/target/release/$name" ] || return 0
+  echo "== building $name, as yourself"
+  build_outside "$tree" ${args[@]+"${args[@]}"}
+}
+
 done_list=()
 for name in "${run[@]:-}"; do
   [ -n "$name" ] || continue
   describe "$name"
   echo "== $name"
-  # detent installs a built binary; build it first when it is not there.
-  if [ "$name" = detent ] && [ -z "${DETENT_BIN:-}" ] && [ ! -x "$dir/target/release/detent" ]; then
-    build_outside "$dir" || {
-      echo "install.sh: detent failed: its release build. Installed so far: ${done_list[*]:-nothing}. Not run: the rest." >&2
-      exit 1
-    }
-  fi
+  # These install a built program; build it first when it is not there.
+  build_if_needed "$name" || {
+    echo "install.sh: $name failed: its release build. Installed so far: ${done_list[*]:-nothing}. Not run: the rest." >&2
+    exit 1
+  }
   status=0
   (cd "$dir" && env "${envs[@]}" "./$script" "${args[@]}") || status=$?
   if [ "$status" != 0 ]; then
@@ -358,6 +405,16 @@ if [ "$fonts_state" = wanted ]; then
   install_emoji_font || { echo "install.sh: the colour emoji font was not installed. Installed so far: ${done_list[*]:-nothing}." >&2; exit 1; }
   done_list+=(fonts)
 fi
+
+# What is left to you may need a program built as yourself first (root must not run the compiler); build it now so the
+# commands printed above work as they stand.
+for name in "${left[@]:-}"; do
+  [ -n "$name" ] && [ "$name" != fonts ] || continue
+  build_if_needed "$name" || {
+    echo "install.sh: $name: its release build failed; the command printed above needs the program. Installed so far: ${done_list[*]:-nothing}." >&2
+    exit 1
+  }
+done
 
 echo "installed: ${done_list[*]:-nothing}"
 if [ "${#absent[@]}" -gt 0 ]; then

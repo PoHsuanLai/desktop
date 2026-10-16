@@ -43,6 +43,18 @@ mkdir -p "$sib/casement/dist" "$sib/sill/dist"
 printf '[Service]\nExecStart=/usr/bin/casement $CASEMENT_SESSION_ARGS\n' >"$sib/casement/dist/casement.service"
 printf '[Service]\nExecStart=/usr/bin/sill run\n' >"$sib/sill/dist/sill.service"
 mkdir -p "$sib/detent/target/release"; : >"$sib/detent/target/release/detent"; chmod +x "$sib/detent/target/release/detent"
+# The input service and the keyboard map: the files install/system.sh takes from their checkouts (the unit as each repo ships it),
+# and their programs, already built (so no compiler runs here). keycap's own installer, stubbed above, must never run.
+mkdir -p "$sib/turnstile/dist" "$sib/turnstile/target/release" "$sib/keycap/dist" "$sib/keycap/target/release"
+printf '[Socket]\nListenSequentialPacket=/run/turnstile/input.sock\nSocketMode=0666\n' >"$sib/turnstile/dist/turnstile.socket"
+printf '[Service]\nExecStart=/usr/local/bin/turnstile\nUser=root\n' >"$sib/turnstile/dist/turnstile.service"
+printf 'KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0600", GROUP="root", TAG-="uaccess", OPTIONS+="static_node=uinput"\n' >"$sib/turnstile/dist/72-turnstile.rules"
+printf 'uinput\n' >"$sib/turnstile/dist/turnstile-modules.conf"
+printf '[Service]\nExecStart=/usr/local/bin/keycap\nDynamicUser=yes\n' >"$sib/keycap/dist/keycap.service"
+printf '// polkit\n' >"$sib/keycap/dist/keycap.polkit.rules"
+printf 'KERNEL=="uinput", GROUP="input", MODE="0660"\n' >"$sib/keycap/dist/70-keycap.rules"
+printf '[Service]\nDeviceAllow=/dev/uinput rw\n' >"$sib/keycap/dist/keycap.uinput.conf"
+for b in turnstile keycap; do printf '#!/bin/sh\n' >"$sib/$b/target/release/$b"; chmod +x "$sib/$b/target/release/$b"; done
 # A sudo that fails the check when called.
 printf '#!/bin/sh\necho sudo >>"%s"\nexit 1\n' "$log" >"$tmp/bin/sudo"; chmod +x "$tmp/bin/sudo"
 export PATH="$tmp/bin:$PATH" HOME="$home" XDG_CONFIG_HOME="$home/.config"
@@ -54,7 +66,12 @@ inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot "$INSTA
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "porter stoker almanac docket cua detent casement sill transom keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
+[ "$order" = "callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
+printf '%s\n' "$plan" | grep -q 'callers .*runs .*install/system.sh callers --destdir' || fail "the callers table is not placed first, into the staging root: $plan"
+printf '%s\n' "$plan" | grep -q 'turnstile .*runs .*install/system.sh turnstile --prefix /usr/local --destdir' || fail "the input service does not run into a staging root: $plan"
+printf '%s\n' "$plan" | grep -q 'keycap .*runs .*install/system.sh keycap --prefix /usr/local --destdir' || fail "the keyboard map is not placed by the desktop's own script: $plan"
+printf '%s\n' "$plan" | grep -q 'palmrest .*yourself (it puts the program in /usr/local/bin' || fail "the palmrest text does not say what its installer does: $plan"
+! printf '%s\n' "$plan" | grep -i 'palmrest .*yourself' | grep -q 'under your home' || fail "palmrest is still said to be installed under the home: $plan"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
 printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
 printf '%s\n' "$plan" | grep -q 'porter .*runs .*scripts/install.sh --prefix /usr/local --sysconfdir /etc --destdir' || fail "porter does not get the desktop prefix and /etc: $plan"
@@ -72,6 +89,9 @@ printf '%s\n' "$plan" | grep -q 'porter .*yourself (needs root' || fail "a syste
 printf '%s\n' "$plan" | grep -q 'session .*yourself (needs root' || fail "the session step was not left to the person without root: $plan"
 printf '%s\n' "$plan" | grep -q '&& asroot .*install/install.sh --prefix /usr --sysconfdir /etc' || fail "the session root command does not go through the escalation program: $plan"
 printf '%s\n' "$plan" | grep -q 'cd .*porter && asroot .*scripts/install.sh --prefix /usr' || fail "the root command does not go through the escalation program: $plan"
+printf '%s\n' "$plan" | grep -q 'callers .*yourself (needs root: /etc/quire' || fail "the callers table was not left to the person without root: $plan"
+printf '%s\n' "$plan" | grep -q '&& asroot .*install/system.sh callers *$' || fail "the callers root command does not go through the escalation program: $plan"
+printf '%s\n' "$plan" | grep -q '&& asroot .*install/system.sh turnstile --prefix /usr --siblings' || fail "the input service root command is missing: $plan"
 
 # 2b. without a staging root almanac, docket and cua are left to the person, as themselves: their installers refuse to
 # run as root and ask for sudo for /etc/quire themselves, so no root command is printed for them.
@@ -121,7 +141,34 @@ grep -q "^cua/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail
 grep -q "^detent/scripts/install.sh  PREFIX=/opt/d DESTDIR=$dest" "$log" || fail "detent did not get PREFIX and DESTDIR"
 grep -q "^transom/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "transom did not get the prefix and destdir"
 grep -q "MAILO_PREFIX=$dest/opt/d" "$log" || fail "mailo did not get its prefix"
-grep -q "^keycap/install.sh" "$log" || fail "no component ran"
+! grep -q "^keycap/install.sh" "$log" || fail "keycap's own installer ran: it gives the input group /dev/uinput and the service a drop-in to open it"
+grep -q "^transom/scripts/install.sh" "$log" || fail "no component ran"
+# the desktop's own system files: the callers table (an exact copy, 644), the input service and the keyboard map
+cmp -s "$HERE/../dist/desktop-callers.toml" "$dest/etc/quire/desktop-callers.toml" || fail "the callers table was not staged as it is in dist/"
+[ "$(stat -c %a "$dest/etc/quire/desktop-callers.toml")" = 644 ] || fail "the callers table is not mode 644"
+for f in usr/lib/systemd/system/turnstile.socket usr/lib/systemd/system/turnstile.service etc/udev/rules.d/72-turnstile.rules etc/modules-load.d/turnstile.conf \
+  opt/d/bin/turnstile usr/lib/systemd/system/keycap.service etc/polkit-1/rules.d/keycap.polkit.rules opt/d/bin/keycap etc/keycap/keycap.toml; do
+  [ -f "$dest/$f" ] || fail "$f was not staged"
+done
+grep -q '^ExecStart=/opt/d/bin/turnstile$' "$dest/usr/lib/systemd/system/turnstile.service" || fail "turnstile.service does not start the installed program: $(cat "$dest/usr/lib/systemd/system/turnstile.service")"
+grep -q '^ExecStart=/opt/d/bin/keycap$' "$dest/usr/lib/systemd/system/keycap.service" || fail "keycap.service does not start the installed program"
+grep -q 'rules = \[ { when = "capslock", then = "ctrl+space" } \]\|when = "capslock", then = "ctrl+space"' "$dest/etc/keycap/keycap.toml" || fail "keycap.toml has no Caps Lock rule"
+# nothing gives the person, or a group, the device file; the old stand-alone pieces are not staged
+[ ! -e "$dest/etc/udev/rules.d/70-keycap.rules" ] || fail "keycap's group rule for /dev/uinput was staged"
+[ -z "$(find "$dest" -name '*uinput.conf' -o -name '10-uinput*')" ] || fail "a uinput drop-in was staged: $(find "$dest" -name '*uinput.conf' -o -name '10-uinput*')"
+if grep -rh 'uaccess' "$dest/etc/udev/rules.d" 2>/dev/null | grep -v 'TAG-="uaccess"' | grep -q .; then fail "a staged rule gives the person a device file"; fi
+# a second run keeps a keycap.toml the administrator changed, and says so
+printf '[profile.default]\nrules = []\n' >"$dest/etc/keycap/keycap.toml"
+inst --destdir "$dest" --prefix /opt/d --only keycap >"$tmp/out2.log" 2>&1 || { cat "$tmp/out2.log" >&2; fail "the keyboard map step failed the second time"; }
+grep -q 'rules = \[\]' "$dest/etc/keycap/keycap.toml" || fail "an existing keycap.toml was overwritten"
+grep -q 'kept your' "$tmp/out2.log" || fail "the kept keycap.toml was not said"
+# the removal takes away only what is unchanged, and keeps the changed keycap.toml
+"$HERE/../install/system.sh" --remove keycap --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out3.log" 2>&1 || { cat "$tmp/out3.log" >&2; fail "removing the keyboard map failed"; }
+[ ! -e "$dest/opt/d/bin/keycap" ] || fail "the keyboard map program was kept by the removal"
+[ -f "$dest/etc/keycap/keycap.toml" ] || fail "a changed keycap.toml was removed"
+"$HERE/../install/system.sh" --remove turnstile --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out3.log" 2>&1 || fail "removing the input service failed"
+[ ! -e "$dest/etc/udev/rules.d/72-turnstile.rules" ] || fail "the device rule was kept by the removal"
+inst --destdir "$dest" --prefix /opt/d --only keycap,turnstile >/dev/null 2>&1 || fail "the input steps did not run again"
 ! grep -q sudo "$log" || fail "sudo was called"
 [ ! -e "$home/.config" ] || fail "something wrote the scratch ~/.config"
 grep -q 'left to you.*sill' "$tmp/out.log" || fail "the summary does not name what is left"
