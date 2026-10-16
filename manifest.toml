@@ -131,7 +131,7 @@ gate = "none"
 # The portal backend (xdg-desktop-portal implementation "quire"): screen sharing, screenshots, remote desktop,
 # settings and the keep-awake inhibit; replaces the interim xdg-desktop-portal-wlr. Builds against libpipewire.
 url = "https://github.com/PoHsuanLai/transom.git"
-rev = "dd632290726ec1a5ee28d2bc92bf8377ebef5e8d"
+rev = "0a355ccda6808752f9837228cd4dedf8da5a8c96"
 branch = "master"
 gate = "lane"
 
