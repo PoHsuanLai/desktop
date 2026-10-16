@@ -108,3 +108,20 @@ What I found and decided:
   `build_almanac` and `build_docket` (build locked, `--no-build --bin-dir`). The manifest already lists both
   with gate rows; revs untouched.
 - `install/uninstall.sh` is the session's alone; no top-level uninstall lists components.
+
+## Release bundle: emoji font and monitor brightness (lane desk-callers, item 212, 2026-10-16)
+
+- The session component of `release/build.sh` now stages `fonts/Noto-COLRv1.ttf` and the licence
+  (`OFL-Noto-COLRv1.txt`, the name `install.sh` uses) at `share/fonts/quire/`. `share/fonts` is an automatic export,
+  so the bundle links `/usr/share/fonts/quire/Noto-COLRv1.ttf`; quire's `emoji_file.rs` looks for
+  `<data dir>/fonts/quire/Noto-COLRv1.ttf` over `XDG_DATA_DIRS` (default includes `/usr/share`), and fontconfig
+  reads `/usr/share/fonts` too. The bundle ships the font on every distro (Fedora's own copy is byte-identical,
+  harmless); `install.sh` skips it where fontconfig already has one, which a bundle cannot test.
+- sill ships both files (`dist/udev/60-sill-ddc.rules`, `dist/modules-load.d/sill-ddc.conf`), and slipway's system
+  folders (origin/master at b607414, `ALLOWED_SYSTEM_DIRS`) include `/etc/udev/rules.d` and `/etc/modules-load.d`, so
+  both are staged with `put_system` at those paths (the same folders keycap uses). No slipway follow-up needed. The
+  local ~/slipway checkout is five commits behind origin (its link list still has 7 folders); `release.py`'s lists
+  match origin. Same-tag duplicate with Fedora's `60-ddcutil-i2c.rules` is harmless (install.sh's "unless ddcutil
+  has it" test is not reproduced).
+- `pack.sh` needed no change: it lists whatever is staged. `release/selftest.sh` (the "release (pack, verify, hostile
+  releases)" check) now also stages a font and a modules-load file and asserts the font link and the system entry.

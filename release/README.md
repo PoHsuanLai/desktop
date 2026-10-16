@@ -43,7 +43,10 @@ file under `system/` must be listed and every listed path needs its file. The pa
 `/etc/udev/rules.d`, `/etc/modules-load.d`, `/etc/modprobe.d`, `/usr/lib/systemd/system`, `/etc/pam.d`,
 `/etc/polkit-1/rules.d`, `/etc/porter` or `/etc/quire`; anything else refuses the release (the same list is
 in `release.py` and slipway-core). `build.sh` stages keycap's unit, udev rule, polkit rule and module list,
-palmrest's udev rule and module options, sill's PAM service and porter's caller table there.
+palmrest's udev rule and module options, sill's PAM service and its external-monitor brightness files (the udev rule
+`60-sill-ddc.rules` and the `i2c-dev` module list) and porter's caller table there. The session component also
+stages the colour emoji font at `share/fonts/quire/Noto-COLRv1.ttf` (with its licence), which is exported to
+`/usr/share/fonts/quire/`, a folder quire's emoji search reads.
 
 ## What you do once
 

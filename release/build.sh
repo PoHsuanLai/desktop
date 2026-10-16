@@ -117,6 +117,11 @@ build_sill() {
   put 644 "$schema/sill.settings.toml" share/quire/settings/sill.settings.toml
   rm -rf "$schema"
   put_system 644 "$d/dist/pam.d/sill" /etc/pam.d/sill
+  # External-monitor brightness (distro audit D7): the uaccess rule for the i2c buses and the list that loads
+  # i2c-dev. Both folders are on slipway's list of system folders. Fedora's ddcutil package ships a rule with the
+  # same tag; two rules with the same tag are harmless, so the install.sh "unless ddcutil has it" test is not needed.
+  put_system 644 "$d/dist/udev/60-sill-ddc.rules" /etc/udev/rules.d/60-sill-ddc.rules
+  put_system 644 "$d/dist/modules-load.d/sill-ddc.conf" /etc/modules-load.d/sill-ddc.conf
   put 644 "$d/dist/keycap/keycap.toml" share/sill/keycap.toml
 }
 
@@ -126,6 +131,11 @@ build_session() {
   # the user target in lib/systemd/user (this installer puts it under <sysconfdir>/systemd/user).
   CASEMENT_UNIT_FILE=/nonexistent "$ROOT/install/install.sh" --prefix "$P" --destdir "$stage" \
     --sysconfdir "$P/lib" --sessions-dir "$P/share/wayland-sessions"
+  # The colour emoji font (install.sh puts the same two files in <prefix>/share/fonts/quire/): ubuntu and arch ship
+  # a bitmap build our renderer cannot draw. share/fonts is exported to /usr/share/fonts, where quire's search
+  # (ds-blitz emoji_file.rs: <data dir>/fonts/quire/Noto-COLRv1.ttf for each XDG data dir, /usr/share included) finds it.
+  put 644 "$ROOT/fonts/Noto-COLRv1.ttf" share/fonts/quire/Noto-COLRv1.ttf
+  put 644 "$ROOT/fonts/OFL.txt" share/fonts/quire/OFL-Noto-COLRv1.txt
 }
 
 build_porter() {

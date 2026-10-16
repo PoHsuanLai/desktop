@@ -23,12 +23,14 @@ fail=0
 check() { echo "FAIL release selftest: $*" >&2; fail=1; }
 
 top="$tmp/stage/opt/quire/current"
-mkdir -p "$top/bin" "$top/share/wayland-sessions" "$top/lib/systemd/user" "$top/share/quire" "$top/system/etc/udev/rules.d"
+mkdir -p "$top/bin" "$top/share/wayland-sessions" "$top/lib/systemd/user" "$top/share/quire" "$top/share/fonts/quire" "$top/system/etc/udev/rules.d" "$top/system/etc/modules-load.d"
 printf '#!/bin/sh\necho hi\n' >"$top/bin/tool"; chmod 755 "$top/bin/tool"
 printf '[Desktop Entry]\nName=Quire\n' >"$top/share/wayland-sessions/quire.desktop"
 printf '[Service]\nExecStart=/opt/quire/current/bin/tool\n' >"$top/lib/systemd/user/tool.service"
 printf 'data\n' >"$top/share/quire/data.txt"; chmod 600 "$top/share/quire/data.txt"
 printf 'ACTION=="add"\n' >"$top/system/etc/udev/rules.d/70-fake.rules"
+printf 'font\n' >"$top/share/fonts/quire/Noto-COLRv1.ttf"
+printf 'i2c-dev\n' >"$top/system/etc/modules-load.d/fake-ddc.conf"
 printf 'A fake release.\n' >"$tmp/notes.txt"
 printf '[[export]]\nlink = "/usr/local/bin/tool"\ntarget = "bin/tool"\n' >"$tmp/exports.toml"
 minisign -G -W -p "$tmp/key.pub" -s "$tmp/key.sec" >/dev/null
@@ -44,6 +46,8 @@ cmp -s "$tmp/a/bundle.tar.zst" "$tmp/b/bundle.tar.zst" || check "the bundle is n
 grep -q 'link = "/usr/share/wayland-sessions/quire.desktop"' "$tmp/a/release.toml" || check "the session entry is not exported"
 grep -q 'link = "/usr/lib/systemd/user/tool.service"' "$tmp/a/release.toml" || check "the unit is not exported"
 grep -q 'link = "/usr/share/quire/data.txt"' "$tmp/a/release.toml" || check "share/quire is not exported"
+grep -q 'link = "/usr/share/fonts/quire/Noto-COLRv1.ttf"' "$tmp/a/release.toml" || check "the emoji font is not exported"
+grep -q 'path = "/etc/modules-load.d/fake-ddc.conf"' "$tmp/a/release.toml" || check "the modules-load file is not listed as a system file"
 grep -q 'path = "/etc/udev/rules.d/70-fake.rules"' "$tmp/a/release.toml" || check "the system file is not listed"
 grep -q 'target = "system/' "$tmp/a/release.toml" && check "a system file was exported as a link"
 grep -q 'path = "share/quire/data.txt"' "$tmp/a/release.toml" && grep -q 'mode = 0o644' "$tmp/a/release.toml" || check "modes are not normalised"
