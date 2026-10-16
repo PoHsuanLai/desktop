@@ -14,14 +14,14 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "85f1e58656bd35c38210430f3635ec27527b4906"
+rev = "a781b8b23fd0856577f78df3505cae395a2bab31"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "d42103dfb72defccef50bf612e61b2f9bbbedc81"
+rev = "36952853844b85f92678fcd205601d271c1c8b95"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "82d9a8da670b879725898c049ea62cbca2811675"
+rev = "da9a2bdbe3d94b516af6104c3fc01218a4df2d10"
 branch = "master"
 gate = "lane"
 
@@ -64,14 +64,14 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "8a07b35769b6e2d0fbc59f5840a6436c20280200"
+rev = "7a6c18c2c95d4914ce57a46ab3cdbf23c0efae68"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "187751f3985a43deae44eda81de51d1ec69dab23"
+rev = "b98c539d87dca8ed4d989cfd92812bf661000089"
 branch = "master"
 gate = "lane"
 
@@ -109,13 +109,13 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "9d392c9a1329f7ad02a3ea6bfe8a3bb4d054353d"
+rev = "e5ff5a06670f0358de50fa96314254620caa8c64"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "2515d5526eddecafb9a356cfad9494a38b08ec88"
+rev = "9cd5db874231b16ea31c6288a653cdc471b0fb86"
 branch = "main"
 gate = "none"
 
@@ -145,7 +145,7 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "211fc644f9bb99b0fdd2c2e7c33a7f8d9a393f9f"
+rev = "384c9680abfed57b5aa56bb81a27dbe53acc3047"
 branch = "master"
 gate = "lane"
 

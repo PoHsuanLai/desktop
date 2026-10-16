@@ -53,12 +53,15 @@ step_boot() {
   secrets_start || return 1
   acc_config; acc_provider_openai_on_rig
   accountd_start || return 1
-  # The once-permit's use is a real session on the key: cloud models are allowed for the class the apps ask for.
+  # The once-permit's use is a real session on the key: cloud models are allowed for the class the apps ask for, and the
+  # person has picked the fast text model on that key (nothing is picked by default, so an unpicked tier is refused unread).
   inferd_write_config <<'TOML'
 [ai]
 local_only = "off"
 [ai.floor]
 files = "anywhere"
+[ai.model.text]
+fast = "openai-openai/gpt-6-luna"
 TOML
   inferd_start || return 1
   sill_start || return 1
