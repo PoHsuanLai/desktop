@@ -84,9 +84,30 @@ set -euo pipefail
 
 log() { printf 'desktop-session: %s\n' "$*" >&2; }
 
-# Everything below runs in the second stage, after one login shell so ~/.profile's PATH applies.
+# Everything below runs in the second stage, after one login shell so ~/.profile's PATH applies. The person's own
+# startup files run in that shell, and a file that waits for input or never ends would leave a black screen and a
+# session that never starts. So the shell gets no input (a read ends at once), and a watchdog ends the session with a
+# line in the log when the second stage has not begun within LOGIN_SHELL_SECS. The second stage marks that it began
+# with a file named after this script's PID, which the exec chain keeps.
+login_shell_secs=60
+login_marker="${XDG_RUNTIME_DIR:-/nonexistent}/desktop-session-login-shell.$$"
 if [ "${1:-}" != --in-login-shell ] && [ -n "${SHELL:-}" ] && [ -z "${DESKTOP_SESSION_NESTED:-}" ]; then
-    exec "$SHELL" -l -c "exec '$0' --in-login-shell"
+    session_pid=$$
+    (
+        sleep "$login_shell_secs"
+        [ ! -e "$login_marker" ] || exit 0
+        # Only if this is still the shell we started (a process number can be reused).
+        grep -qs -- --in-login-shell "/proc/$session_pid/cmdline" || exit 0
+        log "your login shell's startup files took more than ${login_shell_secs}s, so the session cannot start; check ~/.profile"
+        kill -TERM "$session_pid" 2>/dev/null || exit 0
+        sleep 2
+        kill -KILL "$session_pid" 2>/dev/null || true
+    ) &
+    exec "$SHELL" -l -c "exec '$0' --in-login-shell" </dev/null
+fi
+if [ "${1:-}" = --in-login-shell ]; then
+    # The runtime folder is needed from here on anyway; without the mark the watchdog would end a healthy session.
+    : >"$login_marker" || { log "cannot write $login_marker"; exit 1; }
 fi
 
 settings="${XDG_CONFIG_HOME:-$HOME/.config}/desktop-session/session.env"

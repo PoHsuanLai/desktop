@@ -405,3 +405,22 @@ check first is listed under "Not verified" at the end of this section.
   be their own package with only `slipway-core`, `tar`, `zstd` and `sha2` (today they share a package with zbus, tokio, ureq
   and rustls); the repository should run `cargo deny check advisories` in CI (`deny.toml` checks licences only). The desktop's
   workflow builds slipway from the manifest pin, so the helper's supply chain is whatever that package's dependencies are.
+
+### ROOT-14 (desktop half): a login shell that never finishes no longer leaves a black screen
+
+- The second stage of `desktop-session` is entered through one login shell so the person's `~/.profile` PATH applies.
+  That shell now gets no input (`</dev/null`, so a `read` in a startup file ends at once) and a watchdog started before it
+  ends the session after 60 s (`login_shell_secs`) if the second stage has not marked itself started
+  (`$XDG_RUNTIME_DIR/desktop-session-login-shell.<pid>`), after logging one line that names `~/.profile`. The kill happens
+  only if that PID's command line still has `--in-login-shell` (a PID can be reused). Tried here with a stand-in shell that
+  sleeps: the line is printed and the session ends with status 143; the healthy path (marker written, watchdog silent) is
+  read, not run, because stage two needs a real casement. Not covered by `session-crash-guard` (it runs nested, which skips
+  the login shell).
+- Not done: `exec '$0'` is still single-quoted (a path with a quote in it breaks, as before; the standard places do not
+  have one, and an escape that works in bash, zsh and fish alike was not found); the second stage still sources
+  `~/.config/desktop-session/session.env`, which decides the casement command line (a same-user process can already edit
+  `~/.profile`, so this adds little, as the verified row says).
+- **Interface ask for porter:** accountd should not accept a unit by name alone for the `compositor` and shell roles: check the
+  unit's fragment path and drop-in paths (`systemctl --user show -p FragmentPath -p DropInPaths`), since the drop-in that
+  decides what runs as `casement.service` is written under `$XDG_RUNTIME_DIR/systemd/user/`, which any process of the person
+  can write.
