@@ -25,6 +25,12 @@
 #   install_hint KEY...             the install line(s) for this machine's family: one line, or one per
 #                                   family when the family is not known
 
+# xwayland-satellite on Ubuntu (not in the archive): the tag the release bundle builds (release/build.sh SATELLITE_TAG; keep
+# them the same) and the two lines that give a source install the same program.
+XWAYLAND_SATELLITE_TAG=v0.8.3
+XWAYLAND_SATELLITE_CARGO_LINE="cargo install --locked --git https://github.com/Supreeeme/xwayland-satellite --tag $XWAYLAND_SATELLITE_TAG"
+XWAYLAND_SATELLITE_APT_LINE="sudo apt install clang pkg-config libxcb1-dev libxcb-composite0-dev libxcb-randr0-dev libxcb-res0-dev libxcb-cursor-dev"
+
 need_table() {
   cat <<'TABLE'
 runtime user-bus          deb:dbus-user-session
@@ -109,7 +115,7 @@ packages_fedora() {
     xdg-open) echo xdg-utils ;;
     vulkan-loader) echo vulkan-loader ;;
     vulkan-driver) echo mesa-vulkan-drivers ;;
-    xwayland-satellite) echo xwayland-satellite ;; # unverified
+    xwayland-satellite) echo xwayland-satellite ;; # packages.fedoraproject.org: 0.8.2 on Fedora 43, 44 and 45
     pipewire) echo pipewire ;;
     pipewire-pulse) echo pipewire-pulseaudio ;;
     wireplumber) echo wireplumber ;;
@@ -174,7 +180,7 @@ packages_debian() {
     xdg-open) echo xdg-utils ;;
     vulkan-loader) echo libvulkan1 ;;
     vulkan-driver) echo mesa-vulkan-drivers ;;
-    xwayland-satellite) echo '!xwayland-satellite is not in the Ubuntu archive; X11 apps need it built from github.com/Supreeeme/xwayland-satellite' ;;
+    xwayland-satellite) echo "!xwayland-satellite (older X11 apps) is not in the Ubuntu archive; the prebuilt release includes it. To build it yourself you need Rust from rustup (Ubuntu's is too old), and it lands in ~/.cargo/bin, which must be on your session's PATH. First: $XWAYLAND_SATELLITE_APT_LINE   Then: $XWAYLAND_SATELLITE_CARGO_LINE" ;;
     pipewire) echo pipewire ;;
     pipewire-pulse) echo pipewire-pulse ;;
     wireplumber) echo wireplumber ;;

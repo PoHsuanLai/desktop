@@ -59,6 +59,9 @@ expect fedora-no-user-bus "$(family_packages fedora user-bus)" ""
 expect debian-user-bus "$(family_packages debian user-bus)" dbus-user-session
 contains debian-note "$(family_notes debian xwayland-satellite)" "not in the Ubuntu archive"
 expect no-note "$(family_notes arch xwayland-satellite)" ""
+contains debian-note-cargo "$(family_notes debian xwayland-satellite)" "cargo install --locked --git https://github.com/Supreeeme/xwayland-satellite --tag $XWAYLAND_SATELLITE_TAG"
+# the source-install tag and the release bundle's tag are the same.
+expect satellite-tag "$(sed -n 's/^SATELLITE_TAG=//p' "$HERE/../release/build.sh")" "$XWAYLAND_SATELLITE_TAG"
 # every need in the table has an answer (a package, "-" or a note) on all three families.
 while read -r _ key _; do
   for fam in fedora debian arch; do

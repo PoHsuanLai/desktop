@@ -206,3 +206,32 @@ tables at `$sysconfdir/porter`):
   needed. The CI `agents` job builds `almanac,docket,stoker,cua`. cua's own build config needs no
   `net.git-fetch-with-cli` entry in `install/cargo.sh` (its config file has none, like docket's).
 - Not run: the CI job and `build_cua` (no build here). `gate/installer-check.sh` and a dry run passed.
+
+## desk-cua: xwayland-satellite on every distribution (D5, 2026-10-16)
+
+- Facts, read on GitHub today: licence MPL-2.0 (`LICENSE`; Cargo.toml `license = "MPL-2.0"`), which is fine for a
+  separate program; latest release v0.8.3 (2026-09-24, not a prerelease), with a committed `Cargo.lock` (so `--locked`
+  works), edition 2024, `rust-version` 1.85.0, no `rust-toolchain`. Dependencies by its README: Xwayland >= 23.1, xcb,
+  xcb-util-cursor; cargo, clang and optional git to build. Its manifest also uses the xcb extensions composite, randr and
+  res. casement's own memo (`docs/xwayland-decision.md`) already says MPL-2.0 and "a separate process". Fedora packages it
+  (0.8.2 on Fedora 43, 44 and 45, packages.fedoraproject.org); Arch packages it (the audit verified 0.8.3).
+- Release bundle: `release/build.sh` has a `satellite` component (`cargo install --locked --git <url> --tag v0.8.3 --root
+  <scratch>`, run from `/` with `RUSTUP_TOOLCHAIN` 1.98.1, then only the program is copied), staged at `bin/xwayland-satellite`
+  with an MPL notice (version, licence, source address) at `share/licenses/xwayland-satellite/NOTICE.txt`, recorded as
+  `xwayland-satellite v0.8.3` in the release's component list. `release/exports.toml` links it to
+  `/usr/local/bin/xwayland-satellite` (on the user manager's default PATH, ahead of a distro's `/usr/bin` copy, so the
+  bundle's wins), which is how casement finds it. The CI `small` job builds it with the other small components.
+- Build dependencies in `release/deps.sh` (the CI image installs them): Ubuntu `libxcb-composite0-dev libxcb-randr0-dev
+  libxcb-res0-dev libxcb-cursor-dev` (the last two checked on packages.ubuntu.com for noble; the first two written from
+  memory), Fedora `xcb-util-cursor-devel` (libxcb-devel already has the extensions; unverified), Arch `xcb-util-cursor`
+  (libxcb has them). clang, pkg-config and libxcb are already in the lists. Runtime lists (the smoke jobs): the same
+  libraries without `-dev`, and the Xwayland package on all three (`xwayland`, `xorg-x11-server-Xwayland`, `xorg-xwayland`).
+- Source install: `install/packages.sh` keeps `xwayland-satellite` for Fedora and Arch (the Fedora `# unverified` mark is
+  gone) and the Ubuntu note now carries the apt build line and the exact `cargo install --locked --git ... --tag v0.8.3`
+  line, in plain words; `docs/distros.md` has the same under "X11 apps on Ubuntu". Not run. The `--check` note is one
+  line, because notes are printed that way.
+- Not verified: that `cargo install --git ... xwayland-satellite` builds with the package list above (no build here);
+  the first CI run shows. That a satellite in `~/.cargo/bin` is on the PATH casement's unit sees: the unit gets the user
+  manager's PATH, which on many setups does not include `~/.cargo/bin`; the note says so but nothing sets it. A
+  `--root /usr/local` install would avoid that and would need root, which the note does not ask for.
+- `gate/distro-check.sh` checks that the Ubuntu note carries the cargo line and that the tag matches `release/build.sh`.

@@ -7,7 +7,7 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway); the
+#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway satellite); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
@@ -27,7 +27,13 @@ ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
 # shellcheck source=../install/cargo.sh
 source "$ROOT/install/cargo.sh"
-ALL=(casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway)
+ALL=(casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway satellite)
+# xwayland-satellite (MPL-2.0; a separate program casement starts for X11 apps), built from its own public repository at
+# a release tag, locked. Ubuntu 24.04 does not package it. Bump the tag here; release/README.md and docs/distros.md name it.
+SATELLITE_URL=https://github.com/Supreeeme/xwayland-satellite
+SATELLITE_TAG=v0.8.3
+# The Rust it is built with: the channel the repos pin (the workflow installs it); satellite itself needs 1.85 or later.
+SATELLITE_RUST=1.98.1
 
 version="" out="$ROOT/build/release" sib="$(dirname "$ROOT")" only=""
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -273,6 +279,25 @@ build_slipway() {
   # (first install, release/bootstrap.sh); the release carries only the user program. slipway-apply is not in
   # the bundle: a release must not replace a binary that runs as root.
   put 755 "$(tdir slipway)/slipway" bin/slipway
+}
+
+build_satellite() {
+  # No checkout beside the repos: cargo fetches the tag. Installed into a scratch root and only the program is copied, so
+  # cargo's own bookkeeping files stay out of the bundle. Run from / so no tree's cargo config is read. It lands in bin/
+  # and is exported to /usr/local/bin (exports.toml) so casement finds it on the session's PATH. The notice is the MPL-2.0
+  # "where to get the source" statement; the program is unmodified.
+  local croot; croot=$(mktemp -d)
+  echo "== cargo install --locked --git $SATELLITE_URL --tag $SATELLITE_TAG (xwayland-satellite)"
+  (cd / && RUSTUP_TOOLCHAIN="$SATELLITE_RUST" CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/satellite" \
+    cargo install --locked --git "$SATELLITE_URL" --tag "$SATELLITE_TAG" --root "$croot" xwayland-satellite)
+  put 755 "$croot/bin/xwayland-satellite" bin/xwayland-satellite
+  rm -rf "$croot"
+  local notice; notice=$(mktemp)
+  printf 'xwayland-satellite %s, licence MPL-2.0, shipped unmodified as a separate program.\nSource and licence text: %s/tree/%s\n' \
+    "$SATELLITE_TAG" "$SATELLITE_URL" "$SATELLITE_TAG" >"$notice"
+  put 644 "$notice" share/licenses/xwayland-satellite/NOTICE.txt
+  rm -f "$notice"
+  echo "xwayland-satellite $SATELLITE_TAG" >"$out/components.d/xwayland-satellite.txt"
 }
 
 for name in "${selected[@]}"; do

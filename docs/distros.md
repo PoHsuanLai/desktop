@@ -32,7 +32,8 @@ It looks for:
   its PulseAudio layer and WirePlumber (sound, screen sharing), ddcutil (brightness of external monitors),
   at-spi2-core (reading other apps' windows, which the assistant's helper for apps that are not ours needs; the installer
   tells you when it is missing), an input method (fcitx5 or ibus), PackageKit and CJK fonts.
-  `xwayland-satellite` runs older X11 apps; casement starts it by itself when it is installed.
+  `xwayland-satellite` runs older X11 apps; casement starts it by itself when it is installed. The prebuilt release
+  includes it on every distribution. Fedora and Arch package it; Ubuntu 24.04 does not (see below).
 
 Everything the check prints comes from one file, `install/packages.sh`. The harness and the gate use it for their
 own hints.
@@ -81,9 +82,25 @@ pacman -S base-devel cmake pkgconf clang perl git curl tar zstd xz python3 wayla
 ```
 
 A few package names were written from memory and not checked on the distro (they carry `# unverified` in
-`install/packages.sh`): `xwayland-satellite` on Fedora, `libgl-dev` on Ubuntu, `vulkan-swrast` on Arch.
-Ubuntu does not package `xwayland-satellite` at all; build it from
-`github.com/Supreeeme/xwayland-satellite` if you want X11 apps there.
+`install/packages.sh`): `libgl-dev` on Ubuntu and `vulkan-swrast` on Arch.
+
+### X11 apps on Ubuntu
+
+`xwayland-satellite` (MPL-2.0, from `github.com/Supreeeme/xwayland-satellite`) is a separate program that
+casement starts when it is installed. Fedora (`xwayland-satellite`, 0.8.2 on Fedora 43 to 45) and Arch
+(`xwayland-satellite`) package it; Ubuntu 24.04 does not, and `--check` says so. The prebuilt release has it, so a
+bundle install needs nothing more. For a source install on Ubuntu, you build it yourself, once. It needs Rust from
+rustup (Ubuntu's own Rust is older than the 1.85 it asks for), the Xwayland package from the table above (it needs
+Xwayland 23.1 or newer, and 24.04 has 23.2) and these build packages:
+
+```
+sudo apt install clang pkg-config libxcb1-dev libxcb-composite0-dev libxcb-randr0-dev libxcb-res0-dev libxcb-cursor-dev
+cargo install --locked --git https://github.com/Supreeeme/xwayland-satellite --tag v0.8.3
+```
+
+That puts `xwayland-satellite` in `~/.cargo/bin`, which has to be on the PATH of your session for casement to find it.
+The installer never runs these two lines. v0.8.3 is the tag the release bundle builds as well
+(`SATELLITE_TAG` in `release/build.sh`; `gate/distro-check.sh` checks it matches `install/packages.sh`).
 
 ## Colour emoji
 

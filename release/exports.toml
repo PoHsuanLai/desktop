@@ -43,3 +43,7 @@ target = "bin/mailo"
 [[export]]
 link = "/usr/local/bin/slipway"
 target = "bin/slipway"
+
+[[export]]
+link = "/usr/local/bin/xwayland-satellite"
+target = "bin/xwayland-satellite"
