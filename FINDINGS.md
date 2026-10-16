@@ -274,3 +274,15 @@ check first is listed under "Not verified" at the end of this section.
 - The scenario `session-crash-guard` checks the way-back line and that guard.log is in the state folder while casement.log
   stays in the runtime folder. The `slipway recover` call itself is not testable there (it is skipped when nested, which is
   the only way that scenario runs); see the release scenarios below.
+
+### ROOT-02: the update service starts in every login; sill confirms the start
+
+- `session/desktop-session.target` now has `Wants=slipway.service`, so the daily check runs without anyone enabling the
+  unit (slipway's `scripts/install.sh` deliberately does not enable it: that would write under the home folder). A computer
+  without slipway has no such unit and the line is ignored. `gate/installer-check.sh` checks the staged target has the line.
+- The session does **not** run `slipway confirm`: sill does, about 30 s after the shell answers (sill lane, landing
+  separately). **Landing order matters:** with `slipway recover` in the session and no `slipway confirm` anywhere, every
+  update would be put back after its third restart of the computer. Land (and pin in `manifest.toml`) the sill revision that
+  confirms before or together with this commit. Nothing in this repo can check that; it is the release gate's job.
+- slipway also installs a D-Bus activation file for the update service, so a call to it (Settings, `slipway status`)
+  starts the unit in a login that does not have the target; the target line makes it deterministic.

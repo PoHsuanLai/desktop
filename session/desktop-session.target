@@ -1,5 +1,11 @@
 # The user target desktop-session starts: it brings graphical-session.target (portals, units that
 # want a graphical session) and XDG autostart with it. Installed by install/install.sh.
+#
+# slipway.service, the software update service (the daily check, the notice, the Software Update page),
+# is wanted here so it runs in every login without anyone enabling it: its own [Install] section is
+# never acted on by a person's install, and nothing else starts it. A computer without slipway has no such
+# unit and the line does nothing. The service orders itself after graphical-session.target, so it starts once
+# this session is up. It is not what confirms a good start: the shell does that by running `slipway confirm`.
 [Unit]
 Description=sill (casement) session
 Documentation=man:systemd.special(7)
@@ -7,5 +13,6 @@ BindsTo=graphical-session.target
 Before=graphical-session.target
 Wants=graphical-session-pre.target
 After=graphical-session-pre.target
+Wants=slipway.service
 Wants=xdg-desktop-autostart.target
 Before=xdg-desktop-autostart.target

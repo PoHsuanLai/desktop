@@ -106,6 +106,7 @@ grep -q "^casement/scripts/install.sh --prefix /opt/d --locked --destdir $dest" 
 # the session step is this repo's own installer: really run, into the staging root
 [ -x "$dest/opt/d/bin/desktop-session" ] || fail "desktop-session was not staged under the prefix"
 [ -f "$dest/etc/systemd/user/desktop-session.target" ] || fail "the user target was not staged"
+grep -q '^Wants=slipway.service$' "$dest/etc/systemd/user/desktop-session.target" || fail "the user target does not want the update service"
 [ -f "$dest/usr/share/wayland-sessions/sill-casement.desktop" ] || fail "the login entry was not staged"
 [ ! -e "$dest/etc/systemd/user/casement.service" ] || fail "the session installer copied casement.service"
 grep -q "^almanac/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "almanac did not get the prefix and destdir: $(cat "$log")"
