@@ -45,12 +45,16 @@ and `exports.toml` adds the rest.
 `[[system]]` (`path`): a file slipway's helper copies, as root, to an absolute path on the computer. Its
 contents are the bundle file `system/<path>` (so `system/etc/pam.d/sill` lands at `/etc/pam.d/sill`); every
 file under `system/` must be listed and every listed path needs its file. The path must be named by a rule of
-`system-files.list`, which is slipway's `ALLOWED_SYSTEM_FILES` word for word: thirteen rules, each a folder and either an
+`system-files.list`, which is slipway's `ALLOWED_SYSTEM_FILES` word for word: seventeen rules, each a folder and either an
 exact file name or a name ending (`/etc/quire/*-callers.toml`, `/etc/xdg/quire/*.toml`). A path no rule names
 refuses the whole release, at `pack`, at `verify` and in the helper. Because the helper is installed by hand and is
 never replaced by a release, adding a system file means changing slipway's list, installing the new helper on every
 computer, and changing `system-files.list` in the same step (`check-system-list.sh` fails the build if the two differ).
-`build.sh` stages keycap's unit, udev rule, polkit rule and module list,
+`build.sh` stages keycap's unit and polkit rule (no device rule and no module list of its own: the input service owns `/dev/uinput`),
+the input service's `turnstile.socket`, `turnstile.service`, `72-turnstile.rules` (the node becomes root-only and loses the `uaccess` tag)
+and `turnstile.conf` (loads `uinput`), with its `/usr/local/bin/turnstile` export (`exports.toml`), the table of the desktop's own programs
+`/etc/quire/desktop-callers.toml` (from `dist/`; the update service, the screen-sharing service and the input service refuse every caller
+without it),
 palmrest's udev rule and module options, sill's PAM service and its external-monitor brightness files (the udev rule
 `60-sill-ddc.rules` and the `i2c-dev` module list) porter's, almanac's, docket's and cua's caller tables (`/etc/quire`) and docket's default settings (`/etc/xdg/quire`) there. The session component also
 stages the colour emoji font at `share/fonts/quire/Noto-COLRv1.ttf` (with its licence), which is exported to
@@ -180,6 +184,19 @@ without installing. The way back by hand, from a text console, is `pkexec /usr/l
 From then on the session does the rest: `desktop-session.target` wants the update service, `desktop-session` runs
 `slipway recover` before the compositor starts, and the shell runs `slipway confirm` about half a minute after it
 answers. CI covers the install on three distributions (`smoke.sh`) and the two start-check cases (`health-scenarios.sh`).
+
+### Before the first release that carries the input service
+
+Release N is the first to carry the four turnstile files. slipway's privileged helper is never replaced by a release, and an older one refuses
+a release that lists a file its rule list does not name, so **everyone re-runs slipway's install by hand before that release** (the
+`cd slipway && cargo build ... && sudo sh -c 'umask 022 && scripts/install.sh ...'` lines above, with a slipway that has the four rules and, in
+`apply/settle.rs`, the step that reloads systemd and the device rules and starts `turnstile.socket`). A computer that skips it keeps working
+at the version it has: the release is refused whole and says why. `release/system-files.list` and slipway's pin in `manifest.toml` move in
+the same step; until then `release/check-system-list.sh` fails against the old pin, on purpose.
+
+Not carried by a release: `/etc/keycap/keycap.toml` (Caps Lock switches the input method), because slipway's list names no file in `/etc/keycap`.
+`./install.sh` places it (`install/system.sh keycap`, never over a file that is there); on a machine installed from a release alone it is missing
+until slipway's list gains a rule for it (FINDINGS, pa2-desk).
 
 ## Local trial
 

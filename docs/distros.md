@@ -228,3 +228,15 @@ first `$XDG_DATA_DIRS` entry that has them (default `/usr/local/share:/usr/share
 are installed by `install/install.sh`, which `./install.sh` runs last. casement and its user unit are installed by
 casement's own installer, which `./install.sh` runs too. Both print the exact command to run as root when they
 cannot write a place (`/etc`, `/usr/share/wayland-sessions`) themselves.
+
+### The input service and the list of programs
+
+The same on Ubuntu, Fedora and Arch (all three run systemd and udev; no package is needed, so there are no apt, dnf or pacman lines).
+`/dev/uinput` is the file a program writes to make a keyboard or a mouse, and with it any program of yours could type into any window. The
+desktop closes it: the device rule `72-turnstile.rules` makes it root-only and takes off the tag (`uaccess`) that some distributions and
+game packages add, and one small service (`turnstile`, started when something asks for it) makes the virtual devices for the keyboard map
+and the touchpad program, and for nobody else. Its socket accepts any local program; who gets a device is decided by which program is asking,
+from `/etc/quire/desktop-callers.toml`. Nothing in the desktop gives that file to a group, so a keyboard-map install left over from before
+(`/etc/udev/rules.d/70-keycap.rules`, `/etc/systemd/system/keycap.service.d/10-uinput.conf`) should be removed; `install/system.sh keycap`
+says so when it finds them. On Fedora the files are labelled with `restorecon` when SELinux is on. On Ubuntu no AppArmor profile is placed.
+Services that were running before the list of programs was installed read it only when they start: log out and in once.

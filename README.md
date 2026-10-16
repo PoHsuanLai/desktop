@@ -6,9 +6,12 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | Path | What |
 |---|---|
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
-| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, stoker, almanac, docket, cua, detent, casement, sill, transom, keycap, anyview, mailo, palmrest, session) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
+| `install.sh` | installs the desktop: runs each component repo's own installer in order (callers, porter, stoker, almanac, docket, cua, detent, casement, sill, transom, turnstile, keycap, anyview, mailo, palmrest, session; callers, turnstile and keycap are this repo's `install/system.sh`) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
 | `docs/distros.md` | Ubuntu 24.04+, Fedora and Arch: what is checked, the install lines, picking the session at login, the Ubuntu AppArmor note |
 | `install/` (helpers) | `distro.sh` (family from os-release, sudo/doas/pkexec), `packages.sh` (the one package table), `check.sh`, `cargo.sh` (builds a tree from `/` with `--manifest-path`, so the system linker is used), `fonts.sh` |
+| `dist/` | `desktop-callers.toml` (the table of the desktop's own programs, one row per role, installed as `/etc/quire/desktop-callers.toml`; the update service, the screen-sharing service and the input service refuse every caller without it) and `keycap.toml` (the machine file for the keyboard map: Caps Lock switches the input method) |
+| `install/system.sh` | `callers`, `turnstile` and `keycap` parts: the table; the input service (program, socket, service, the rule that makes `/dev/uinput` root-only, the module list) and the keyboard map's program, service, restart rule and `/etc/keycap/keycap.toml` (an existing one is kept). Never runs sudo, prints the root command; `--remove PART` takes back only what is unchanged. It replaces keycap's own installer, which would give the `input` group the device file and the service a drop-in to open it |
+| `gate/check-callers-table.sh`, `gate/check-no-fake.sh`, `gate/check-no-uinput-access.sh` | the table has a row for every role of peephole's list and the units' paths agree with it; no build command, manifest key or crate turns the `fake` feature on; nothing shipped opens `/dev/uinput` to the person or a group. `gate/input-checks-selftest.sh` tests the three on generated trees; all four run in `gate/desktop-gate.sh --self` |
 | `fonts/` | `Noto-COLRv1.ttf` (OFL) with its source and sha256: Ubuntu and Arch ship a bitmap emoji font our renderer cannot draw |
 | `gate/distro-check.sh` | the family detection, package table, escalation, the cargo helper and `--check` against made-up machines |
 | `harness/jail.sh` | the one jail: a bubblewrap namespace with no input devices, no GPU, no session, no network |
@@ -30,7 +33,8 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 ## Installing
 
 `./install.sh [--dry-run] [--prefix DIR] [--destdir DIR] [--sysconfdir DIR] [--siblings DIR] [--only NAME,...]`
-runs each component's own installer, siblings checked out side by side, in this order: porter
+runs each component's own installer, siblings checked out side by side, in this order: callers
+(`install/system.sh callers`: `/etc/quire/desktop-callers.toml`, first because the update service and the portal backend read it when they start and refuse every caller without it), porter
 (`scripts/install.sh`: the daemons and the caller table), stoker (`scripts/install.sh`: the model catalogue inferd reads;
 nothing is built), almanac (`scripts/install.sh`: the memory daemon, its unit
 and `/etc/quire/memory-callers.toml`), docket (`scripts/install.sh`: the action router, the companion, the reader, the tool
@@ -38,15 +42,17 @@ server and `quire-do`, with their units and the `/etc/quire/*-callers.toml` tabl
 after it), cua (`scripts/install.sh`: the helper that lets the assistant use apps that are not ours, its unit and
 `/etc/quire/cuad-callers.toml`; it needs at-spi2-core at run time), detent (`scripts/install.sh`: Settings, which
 porter's caller table knows as the unit `org.quire.Settings.service`), sill (`dist/install.sh`), transom
-(`scripts/install.sh`: the portal backend for screen sharing and screenshots, started by D-Bus activation), keycap,
-anyview, mailo, palmrest, then the session itself (`install/install.sh`: `desktop-session`, the user target, the login entry; it never runs sudo and prints the root command when a place is not writable) (casement, with its unit, goes between detent and sill; it is skipped with a message until casement's `scripts/install.sh` exists). `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
+(`scripts/install.sh`: the portal backend for screen sharing and screenshots, started by D-Bus activation), turnstile
+(`install/system.sh turnstile`: the input service, the only maker of virtual keyboards and pads, with `/dev/uinput` closed to everybody
+else), keycap (`install/system.sh keycap`, not keycap's own installer), anyview, mailo, palmrest (its installer: the program in
+`/usr/local/bin` through sudo, its service in your home, and the root commands for the device rules printed), then the session itself (`install/install.sh`: `desktop-session`, the user target, the login entry; it never runs sudo and prints the root command when a place is not writable) (casement, with its unit, goes between detent and sill; it is skipped with a message until casement's `scripts/install.sh` exists). `--prefix` (default `/usr/local`) and `--destdir` are passed through in the form each
 installer takes; the first failure stops the run and names the component and what was installed before it.
 `--dry-run` prints the plan and runs and builds nothing.
 
 It never runs sudo and never writes under `~/.config` or `/etc` itself. A component runs only when every place
 it writes is writable by you (a user prefix, or a `--destdir`); the rest are printed as "yourself", with the
 command, to run with the right privileges: a system prefix, sill and palmrest (fixed destinations, their own
-sudo or home files), keycap outside a `--destdir`, stoker outside a `--destdir` (its installer asks for sudo itself), and almanac, docket and cua outside a `--destdir` (their caller tables go to the
+sudo or home files), callers, turnstile and keycap outside a `--destdir` (`install/system.sh`, which you run with sudo), stoker outside a `--destdir` (its installer asks for sudo itself), and almanac, docket and cua outside a `--destdir` (their caller tables go to the
 fixed `/etc/quire`; their installers refuse to run as root and ask for sudo for just those steps, so the command is
 printed to run as yourself). Neither takes `--sysconfdir`. `gate/installer-check.sh` tests all of this against stub
 installers.
