@@ -14,83 +14,91 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "f42f88966a5b93bd28afca79880dc915f2956a2d"
+rev = "b9ced242eaf1f1777de2c8c4d7823e7499ac4e13"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "3fecef0bcfffb10b434b9b0c4a2e7b264fbc2d0a"
+rev = "8c5d863cba43e1628c727cb473a834940d5db015"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "5230090aad51aa9d157173c924371e426b188dc0"
+rev = "b6ffed48ff98467af463488463ca4960c685a3e9"
 branch = "master"
 gate = "lane"
 
 [repo.blitz-kit]
 url = "https://github.com/PoHsuanLai/blitz-kit.git"
-rev = "009232ce6eabe768dc9dfc2b46a464acfa865c48"
+rev = "0ba642e76f3c7edca77b228f05e0399af46e2ec3"
 branch = "master"
 gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "b45d4c22ec22be1117ce451dcc0b4a1f63764515"
+rev = "be632d80546928860197eaae8ef4e350641b08f5"
 branch = "main"
 gate = "lane"
 
 [repo.palmrest]
 url = "https://github.com/PoHsuanLai/palmrest.git"
-rev = "50f5bb7fb4655673c91dea4301b531f1ce8fb141"
+rev = "213b974788cead54a8bc9a1426918761e2b1be37"
+branch = "master"
+gate = "lane"
+
+[repo.turnstile]
+# The root input service: owns /dev/uinput and hands keycap and palmrest their virtual devices over a socket
+# (caller identity through peephole). Socket-activated system unit; the daemon is exported to /usr/local/bin.
+url = "https://github.com/PoHsuanLai/turnstile.git"
+rev = "a5301c56a363536f1767ad9943c62e045853895d"
 branch = "master"
 gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "4b48f043e4579ee11d197530f2041918d42f5c88"
+rev = "475dd65b8a289f3836b12cd90e367763f6c9e13f"
 branch = "master"
 gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "3ae12111f208f6d53cf17ca920908d630f60e36a"
+rev = "45c5a8947f2caa735688ef55f8be012d5fe346a9"
 branch = "master"
 gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "583073bc168284d4a75075e63ed50d2a3148235d"
+rev = "1963cb55d4ba90a54460ee510b5aabddceeedbb4"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "ac27f4c88d8a9725104b963492fc212fa2059650"
+rev = "c67929dd060609ce5c039ce87ff0f43507c935a6"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "c43e02c48f3aff040129d42c99e49460cb092eb4"
+rev = "016d0882fd3076f180b5e222c6c8ccf153dcb101"
 branch = "master"
 gate = "lane"
 
 [repo.latchkey]
 url = "https://github.com/PoHsuanLai/latchkey.git"
-rev = "ef0117ada46854702057c79515516da43b271455"
+rev = "99cc9deb198860293253c534c4d26b382ec8b87e"
 branch = "master"
 gate = "lane"
 
 [repo.bulkhead]
 # The sandbox docket runs agent tools in (public); its kill takes the whole sandbox.
 url = "https://github.com/PoHsuanLai/bulkhead.git"
-rev = "0467c14c9d92dd224091629f4c4e4912ae612a3d"
+rev = "30d2b993b1510ad9490c1d754c387521cdc9c352"
 branch = "master"
 gate = "lane"
 
@@ -103,19 +111,19 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "c0124dd206a0b52306331315c4336f257e37ee7d"
+rev = "442a1a1227f3fb485d023a440197cf6784605d03"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "203c484e390395cc26ea9816687eddde6f5f041a"
+rev = "f3dc931a5ad13d1b68c544f267a41e3643bc6b39"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "c765e4c43c23cd32312347e315829d8cf322f20f"
+rev = "4a8071a011fcae85aeb226d50fb81e640bb80882"
 branch = "main"
 gate = "none"
 
@@ -123,7 +131,7 @@ gate = "none"
 # The portal backend (xdg-desktop-portal implementation "quire"): screen sharing, screenshots, remote desktop,
 # settings and the keep-awake inhibit; replaces the interim xdg-desktop-portal-wlr. Builds against libpipewire.
 url = "https://github.com/PoHsuanLai/transom.git"
-rev = "7a18f0c7c9847f9513c24a69cf75731d518ada39"
+rev = "f48f69b66080d1473c02b2a01cecbbde8ec6708b"
 branch = "master"
 gate = "lane"
 
@@ -137,7 +145,7 @@ gate = "none"
 
 [repo.casement-protocols]
 url = "https://github.com/PoHsuanLai/casement-protocols.git"
-rev = "7473020256a0b8ed23d1140bf2ffc8668d2a2820"
+rev = "8cebc9b498e4e5d5b9ec1b1d7b52e2641d5c094b"
 branch = "master"
 gate = "none"
 
@@ -145,13 +153,13 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "5ea8b422db462a5d56b7a06f48a1cbf1f66cf415"
+rev = "c239528d3b08e5feafdb4be450d29b37bc6570ac"
 branch = "master"
 gate = "lane"
 
 [repo.slipway]
 # The updater: installs and switches signed release bundles (release/ in this repo builds them).
 url = "https://github.com/PoHsuanLai/slipway.git"
-rev = "5c3380926d351e854d2056b7ec08226be90b9026"
+rev = "6aed2b21b1f64354c45d8cc6da8f9c941ce5e382"
 branch = "master"
 gate = "none"
