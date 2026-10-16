@@ -181,3 +181,28 @@ tables at `$sysconfdir/porter`):
   `lib/systemd/user`, `share/porter`, `share/stoker` and the other folders in `AUTO_EXPORT_DIRS` as links into `/usr/share`
   and `/usr/lib/systemd/user`, and the caller tables go to `/etc/porter` as system files. `release/build.sh` is unchanged
   apart from the stoker step.
+
+## desk-cua: the helper for apps that are not ours (B6, 2026-10-16)
+
+- `install.sh` has a `cua` step right after docket (`scripts/install.sh --prefix P [--destdir D]`, cua f6fe8bc, the
+  manifest rev). It builds the daemon `cuad` from source (release, locked) unless the programs are given, and writes
+  `<prefix>/libexec/quire/cuad`, `<prefix>/lib/systemd/user/cuad.service` with its `.service.d/sandbox.conf`, the two
+  D-Bus activation files and the interface XML under `<prefix>/share/dbus-1`, the Settings schema under
+  `<prefix>/share/quire/settings`, and `/etc/quire/cuad-callers.toml`. Read in full: nothing else is written, and
+  `CONF_DIR` (`/etc/xdg/quire`) is computed but never used.
+- No `--sysconfdir` is passed, as for almanac and docket: cuad reads `/etc/quire/cuad-callers.toml` and the person's file
+  only (`crates/cuad/src/callers.rs`), so a table placed elsewhere would be ignored. Outside a `--destdir` the step is left
+  to the person, as themselves (the installer refuses root and escalates per step). `gate/installer-check.sh` checks the
+  stub, the order, the arguments, the no-`--sysconfdir` rule and the left-to-you case.
+- Build prerequisites: its installer wants cargo, a C compiler, pkg-config and git, and the dependencies build sqlite with a
+  vendored openssl (perl and make). All are already in `install/packages.sh` (build group) and `release/deps.sh`; no new
+  package is needed. Run-time: at-spi2-core (already the `at-spi` row, a recommended need); the cua installer prints a
+  note when the accessibility service is missing. No runtime library beyond the ones the other programs already load,
+  so `release/deps.sh` is unchanged (the CI check of linked libraries will say if that is wrong).
+- Release: `release/build.sh` has `build_cua` (`cargo build -p cuad`, then the installer with `--bin-dir`, `--prefix
+  /opt/quire/current`, `--destdir <stage>`, `--sysconfdir /opt/quire/current/system/etc`). Everything it stages is in an
+  exported folder (`libexec/quire` and `share/dbus-1/interfaces` stay in the bundle without links, as docket's do) or is
+  the one system file `system/etc/quire/cuad-callers.toml`, in `/etc/quire`, an allowed system folder; no new folder is
+  needed. The CI `agents` job builds `almanac,docket,stoker,cua`. cua's own build config needs no
+  `net.git-fetch-with-cli` entry in `install/cargo.sh` (its config file has none, like docket's).
+- Not run: the CI job and `build_cua` (no build here). `gate/installer-check.sh` and a dry run passed.

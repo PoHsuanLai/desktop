@@ -7,12 +7,12 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter stoker almanac docket detent transom keycap palmrest anyview mailo slipway); the
+#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
 # /opt/quire/current under the destdir OUT/stage, through the component's own installer where it can stage
-# (porter, stoker, almanac, docket, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
+# (porter, stoker, almanac, docket, cua, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
 # palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
@@ -27,7 +27,7 @@ ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
 # shellcheck source=../install/cargo.sh
 source "$ROOT/install/cargo.sh"
-ALL=(casement sill session porter stoker almanac docket detent transom keycap palmrest anyview mailo slipway)
+ALL=(casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway)
 
 version="" out="$ROOT/build/release" sib="$(dirname "$ROOT")" only=""
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -171,6 +171,18 @@ build_docket() {
   # and the default settings at system/etc/xdg/quire/, both system files slipway places (/etc/xdg/quire needs
   # slipway >= aa427f2). Not built with --with-voice (the voice daemon needs the sound and clang development packages).
   (cd "$d" && ./scripts/install.sh --bin-dir "$(tdir docket)" --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
+}
+
+build_cua() {
+  local d; d=$(repo_dir cua)
+  cargo_in "$d" cua -p cuad
+  # Needs cua >= f6fe8bc (--sysconfdir and --bin-dir; the manifest rev). Its porter, docket, almanac, stoker and keycap crates
+  # come by git at the revs its Cargo.lock pins, like docket's. The daemon lands in libexec/quire, the unit (with its
+  # protections) in lib/systemd/user, the activation files in share/dbus-1/services and the Settings schema in
+  # share/quire/settings, all exported folders; the interface XML in share/dbus-1/interfaces stays in the bundle
+  # unlinked (nothing reads it at run time). The caller table lands at system/etc/quire/cuad-callers.toml, a system file
+  # slipway places at /etc/quire. Its dependencies build sqlite with a vendored openssl, which needs perl and make (deps.sh has them).
+  (cd "$d" && ./scripts/install.sh --bin-dir "$(tdir cua)" --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
 }
 
 build_detent() {

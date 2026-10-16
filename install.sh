@@ -7,17 +7,17 @@
 #   --dry-run      print the plan (what runs, in which order, what is left to you), run nothing, build nothing
 #   --prefix DIR   where the software goes (default $PREFIX, else /usr/local)
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
-#   --sysconfdir   where porter's caller tables go (default $SYSCONFDIR, else /etc); almanac and docket always use /etc/quire; stoker writes nothing there
+#   --sysconfdir   where porter's caller tables go (default $SYSCONFDIR, else /etc); almanac, docket and cua always use /etc/quire; stoker writes nothing there
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: porter, stoker, almanac, docket, detent, casement, sill, transom, keycap,
+#   --only NAMES   just these components (comma separated: porter, stoker, almanac, docket, cua, detent, casement, sill, transom, keycap,
 #                  anyview, mailo, palmrest, session, fonts)
 #
 # Order: porter (the account daemons and the caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
 # docket (the action router, the companion, the reader and the tool server, with their caller tables; they read
-# porter's accounts), detent (Settings), casement (the compositor and
+# porter's accounts), cua (the computer-use daemon cuad, for apps that are not ours, and its caller table), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
 # scripts/install.sh builds it), keycap, anyview, mailo, palmrest, and last the session itself (this repo's
 # install/install.sh: the desktop-session script, the user target and the login entry "sill (casement)"). Each
@@ -44,7 +44,7 @@
 #   - keycap: its system files go to /etc and /usr/local; it stages only under --destdir
 #   - stoker: the catalogue goes under the prefix; its installer asks for sudo, doas or pkexec itself for a system
 #     prefix, so outside a --destdir it is left to you, run as yourself
-#   - almanac, docket: their caller tables go to /etc/quire (always replaced) and docket's default settings to
+#   - almanac, docket, cua: their caller tables go to /etc/quire (always replaced) and docket's default settings to
 #     /etc/xdg/quire. Their installers refuse to run as root and ask for sudo, doas or pkexec themselves for
 #     just those steps, so outside a --destdir they are left to you, run as yourself (never under sudo)
 # Exit: 0 done (or the plan printed), 1 a component failed, 2 bad usage or a missing component.
@@ -61,7 +61,7 @@ source "$HERE/install/packages.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(porter stoker almanac docket detent casement sill transom keycap anyview mailo palmrest session)
+ORDER=(porter stoker almanac docket cua detent casement sill transom keycap anyview mailo palmrest session)
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -139,6 +139,15 @@ describe() {
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       writes=("$destdir$prefix" "$destdir/etc/quire" "$destdir/etc/xdg/quire")
       [ -n "$destdir" ] || yourself="its caller tables go to /etc/quire; its installer asks for sudo itself and must not be run as root" ;;
+    cua)
+      # cuad (<prefix>/libexec/quire), its unit, the D-Bus activation files, the Settings schema and
+      # /etc/quire/cuad-callers.toml (fixed, like almanac's: cuad reads that path only). Needs at-spi2-core at run time
+      # (its installer prints a note when that is missing).
+      script=scripts/install.sh
+      args=(--prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix" "$destdir/etc/quire")
+      [ -n "$destdir" ] || yourself="its caller table goes to /etc/quire; its installer asks for sudo itself and must not be run as root" ;;
     detent)
       script=scripts/install.sh
       envs=("PREFIX=$prefix" "DESTDIR=$destdir")

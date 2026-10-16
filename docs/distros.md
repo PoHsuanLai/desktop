@@ -30,7 +30,8 @@ It looks for:
 - **Recommended**: NetworkManager, BlueZ, UPower, power-profiles-daemon and AccountsService (Wi-Fi,
   Bluetooth, battery, power mode, your picture; each simply stays empty without its service), PipeWire with
   its PulseAudio layer and WirePlumber (sound, screen sharing), ddcutil (brightness of external monitors),
-  at-spi2-core (reading other apps' windows), an input method (fcitx5 or ibus), PackageKit and CJK fonts.
+  at-spi2-core (reading other apps' windows, which the assistant's helper for apps that are not ours needs; the installer
+  tells you when it is missing), an input method (fcitx5 or ibus), PackageKit and CJK fonts.
   `xwayland-satellite` runs older X11 apps; casement starts it by itself when it is installed.
 
 Everything the check prints comes from one file, `install/packages.sh`. The harness and the gate use it for their

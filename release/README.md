@@ -44,7 +44,7 @@ file under `system/` must be listed and every listed path needs its file. The pa
 `/etc/polkit-1/rules.d`, `/etc/porter`, `/etc/quire` or `/etc/xdg/quire`; anything else refuses the release (the same list is
 in `release.py` and slipway-core). `build.sh` stages keycap's unit, udev rule, polkit rule and module list,
 palmrest's udev rule and module options, sill's PAM service and its external-monitor brightness files (the udev rule
-`60-sill-ddc.rules` and the `i2c-dev` module list) porter's, almanac's and docket's caller tables (`/etc/quire`) and docket's default settings (`/etc/xdg/quire`) there. The session component also
+`60-sill-ddc.rules` and the `i2c-dev` module list) porter's, almanac's, docket's and cua's caller tables (`/etc/quire`) and docket's default settings (`/etc/xdg/quire`) there. The session component also
 stages the colour emoji font at `share/fonts/quire/Noto-COLRv1.ttf` (with its licence), which is exported to
 `/usr/share/fonts/quire/`, a folder quire's emoji search reads.
 
@@ -99,7 +99,7 @@ gh workflow run release.yml --repo PoHsuanLai/desktop -f version=0.2.0 -f notes=
 ```
 
 or tag: `git tag -a v0.2.0 -m "What changed" && git push origin v0.2.0` (the tag's message is the notes).
-The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket and stoker, and the small
+The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket, stoker and cua, and the small
 ones together) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
 Arch as well), checks their glibc and library needs, packs and signs, verifies, installs the signed release with
 slipway's helper in clean Ubuntu 24.04, Fedora 44 and Arch containers, and only then creates the release
