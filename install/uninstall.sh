@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Remove exactly what install/install.sh put in place, and nothing else. A file is removed only
-# when it is still what the installer wrote; one you changed is kept and named. Directories are
-# left alone. An old /etc/systemd/user/casement.service (copied by an earlier version of this installer, before
-# casement's own installer took over the unit) is removed only when it is byte for byte what that version shipped;
-# any other file there is kept and named. Same flags as install.sh (give the same --prefix, --destdir, --sysconfdir and
-# --sessions-dir you installed with).
+# when it is still what the installer wrote; one you changed is kept and named. That includes casement.service
+# and sill.service in <sysconfdir>/systemd/user, compared with the checkouts they came from (give the same --siblings; a
+# unit whose checkout is gone is kept and named). Directories are left alone. Same flags as install.sh (give the same
+# --prefix, --destdir, --sysconfdir, --sessions-dir and --siblings you installed with).
 #
 #   install/uninstall.sh --dry-run    print every step, change nothing
 #   install/uninstall.sh              do it
@@ -18,21 +17,14 @@ parse_flags "$@"
 
 step "1/2 the files"
 dests=()
-while read -r _ _ dest; do [ ! -e "$destdir$dest" ] || dests+=("$dest"); done < <(files)
-# The old casement.service: ours to remove only if unchanged.
-old_unit=$(old_casement_unit)
-old_unit_ours=0
-if [ -f "$destdir$old_unit" ]; then
-  if [ "$(sha256sum "$destdir$old_unit" | cut -d' ' -f1)" = "$OLD_CASEMENT_UNIT_SHA256" ]; then
-    old_unit_ours=1
-    dests+=("$old_unit")
-  fi
-fi
+while read -r _ _ dest; do if [ -e "$destdir$dest" ]; then dests+=("$dest"); fi; done < <(files)
 [ "${#dests[@]}" = 0 ] || need_write "${dests[@]}"
 while read -r _ source dest; do
   target="$destdir$dest"
   if [ ! -e "$target" ]; then
     note "absent: $target"
+  elif [ ! -f "$source" ]; then
+    note "kept (its source $source is not here to compare with): $target"
   elif content "$source" | cmp -s - "$target"; then
     note "remove: $target"
     [ "$dry" = 1 ] || rm -f -- "$target"
@@ -40,15 +32,6 @@ while read -r _ source dest; do
     note "kept (not what the installer wrote): $target"
   fi
 done < <(files)
-
-if [ -e "$destdir$old_unit" ]; then
-  if [ "$old_unit_ours" = 1 ]; then
-    note "remove: $destdir$old_unit (the copy an earlier installer made; casement's installer puts the unit under its prefix)"
-    [ "$dry" = 1 ] || rm -f -- "$destdir$old_unit"
-  else
-    note "kept (not what the earlier installer copied): $destdir$old_unit"
-  fi
-fi
 
 step "2/2 the user manager"
 if [ -n "$destdir" ]; then

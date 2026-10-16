@@ -423,4 +423,6 @@ check first is listed under "Not verified" at the end of this section.
 - **Interface ask for porter:** accountd should not accept a unit by name alone for the `compositor` and shell roles: check the
   unit's fragment path and drop-in paths (`systemctl --user show -p FragmentPath -p DropInPaths`), since the drop-in that
   decides what runs as `casement.service` is written under `$XDG_RUNTIME_DIR/systemd/user/`, which any process of the person
-  can write.
+  can write. (Done on the session side, lane pa-units: casement.service and sill.service are installed root-held in
+  `/etc/systemd/user` and carry `UnsetEnvironment` for the loader variables; the session passes its arguments as
+  `CASEMENT_SESSION_ARGS` in the user manager's environment, writes no drop-in, and removes the old runtime one at start.)

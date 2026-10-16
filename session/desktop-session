@@ -11,18 +11,26 @@
 # (a TERM to this script) stops the unit. With DESKTOP_SESSION_NESTED=1 (tests: no systemd) casement is
 # instead this script's direct child, with the same guard.
 #
-# How the unit is driven, nothing under ~/.config or /etc: the session environment is imported into
-# the user manager first; the command line (DESKTOP_SESSION_CASEMENT_CMD, the backend args, --safe) goes
-# in a drop-in written to $XDG_RUNTIME_DIR/systemd/user/casement.service.d/session.conf that replaces
-# ExecStart, turns Restart off (the guard decides) and appends the unit's stderr to $STATE/casement.log.
-# That log file is where the socket name is read from ("casement: listening on wayland-1"), the same
-# file as on the direct-child path. The drop-in is removed when the session ends.
+# How the unit is driven, nothing under ~/.config or /etc, and no drop-in at all: casement.service and sill.service are
+# installed root-held under the system user-unit folder (/etc/systemd/user or /usr/lib/systemd/user; install/install.sh puts
+# them there), because porter's accountd gives the compositor and shell roles only to a unit whose file and every drop-in
+# sit in such folders (a drop-in under $XDG_RUNTIME_DIR, which any program of the person can write, would make it
+# distrust the unit). So the session imports its environment into the user manager first, then passes this run's
+# arguments to the unit through the manager's environment: `systemctl --user set-environment CASEMENT_SESSION_ARGS=...`
+# (the backend args, --safe), which the unit's ExecStart reads as $CASEMENT_SESSION_ARGS. The variable is unset again when
+# the session ends, on every way out. The unit restarts itself on a failure (Restart=on-failure); this script watches it
+# and stops it the moment it leaves the running state, before the restart fires, so the guard below stays the only
+# thing that decides. Where casement's socket is: the unit's STATUS= text ("listening on wayland-1"); its log is in the
+# journal (`journalctl --user -u casement`), and the direct-child path keeps writing $STATE/casement.log.
+# A drop-in left by an earlier version of this script ($XDG_RUNTIME_DIR/systemd/user/casement.service.d/session.conf) is
+# removed once at the start, so it cannot shadow the unit.
 # What runs beside it, once casement's socket exists, and why each:
 #   sill run                      bar, dock, launcher, control centre, notifications, lock, polkit; as the
-#                                 transient user service sill.service (systemd-run, Type=exec): porter's
-#                                 accountd, the companion's daemons (memoryd, intentd) and casement admit
-#                                 the shell only as that unit's main process. A stale sill.service is
-#                                 stopped first; if it cannot start, the session stays up without a shell
+#                                 installed user service sill.service (`systemctl --user start sill.service`,
+#                                 Type=exec): porter's accountd, the companion's daemons (memoryd, intentd)
+#                                 and casement admit the shell only as that unit's main process. A stale
+#                                 sill.service is stopped first; if the unit is missing or cannot start, the
+#                                 session stays up without a shell
 #   (no portal process: xdg-desktop-portal and transom, the quire desktop's portal backend, are
 #                                 started by D-Bus activation on the first portal call, as transom.service;
 #                                 quire-portals.conf routes ScreenCast, Screenshot, Settings, RemoteDesktop
@@ -40,8 +48,8 @@
 #                                 once when it has run); not respawned
 # sill, ksecretd, ibus and the inhibitor are restarted when they exit (five exits within ten
 # seconds each, then given up). ksecretd, ibus and the inhibitor are children of this script,
-# ended by PID when casement ends; sill is watched as its unit (restarted by the same guard) and ended
-# with `systemctl --user stop sill.service`, our own transient unit. All start again with the next
+# ended by PID when casement ends; sill is watched as its unit (the unit restarts it on a failure, and it is started
+# again here when it ends cleanly) and ended with `systemctl --user stop sill.service`. All start again with the next
 # casement. Nothing is looked up or killed by name.
 #
 # The crash-loop guard. A casement run that lasts less than QUICK seconds (default 20) is a quick
@@ -59,8 +67,10 @@
 #
 # Settings a person may change: ~/.config/desktop-session/session.env (sh syntax, read first), for
 # instance DESKTOP_SESSION_QUICK_SECS. The same variables are how the harness drives this script:
-#   DESKTOP_SESSION_CASEMENT_CMD   the casement command (default: casement); words, no quoting
-#   DESKTOP_SESSION_BACKEND_ARGS   its arguments before --safe (default: --backend tty)
+#   DESKTOP_SESSION_CASEMENT_CMD   the casement command (default: casement); words, no quoting. Only the nested,
+#                                  direct-child path uses it: the unit's program is fixed in casement.service
+#   DESKTOP_SESSION_BACKEND_ARGS   its arguments before --safe (default: --backend tty); the unit gets them as
+#                                  CASEMENT_SESSION_ARGS in the user manager's environment
 #   DESKTOP_SESSION_QUICK_SECS     the quick-exit limit (default 20)
 #   DESKTOP_SESSION_STATE          where guard.log and casement.log both go (tests; default: guard.log in
 #                                  ${XDG_STATE_HOME:-$HOME/.local/state}/desktop-session, casement.log in
@@ -68,17 +78,18 @@
 #   DESKTOP_SESSION_ROLLBACK_HELPER  the program that goes back to the previous version, named in the notice
 #                                  when the guard ends the session (default /usr/libexec/slipway-rollback)
 #   DESKTOP_SESSION_STUBS          a directory of stand-in programs (sill, pam_kwallet_init,
-#                                  busctl, ksecretd, gnome-keyring-daemon, ibus-daemon, systemd-inhibit, systemd-run,
+#                                  busctl, ksecretd, gnome-keyring-daemon, ibus-daemon, systemd-inhibit,
 #                                  systemctl, detent) that, with
 #                                  DESKTOP_SESSION_NESTED=1, makes the components start from there (tests)
 #   DESKTOP_SESSION_FIRST_RUN_DELAY  seconds before detent --first-run (default 5)
 #   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill (tests)
 #   DESKTOP_SESSION_UNIT           the casement unit (default casement.service)
+# Set by this script in the user manager (not by you): CASEMENT_SESSION_ARGS, the arguments of the casement run now
+# starting; unset when the session ends.
 #   DESKTOP_SESSION_OS_RELEASE     the os-release file read for the wallet hint (default /etc/os-release; tests)
 #
-# casement.service itself is installed by casement's own installer under its prefix (../install.sh runs it); this
-# script only writes the session drop-in that sets the command line, and gives it casement's full path (the
-# directory this script is in, else PATH), because systemd looks a bare name up only in its own fixed directories.
+# casement.service and sill.service come from their repos (dist/); install/install.sh renders them for the prefix and
+# puts them in the system user-unit folder. This script writes no unit file and no drop-in.
 # X11 apps: casement starts xwayland-satellite itself when it is installed (its default), so nothing is passed.
 set -euo pipefail
 
@@ -130,21 +141,11 @@ rollback_helper="${DESKTOP_SESSION_ROLLBACK_HELPER:-/usr/libexec/slipway-rollbac
 read -r -a casement_cmd <<<"${DESKTOP_SESSION_CASEMENT_CMD:-casement}"
 read -r -a backend_args <<<"${DESKTOP_SESSION_BACKEND_ARGS---backend tty}"
 unit="${DESKTOP_SESSION_UNIT:-casement.service}"
-unit_dir="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/systemd/user/$unit.d"
-# The unit's ExecStart is the drop-in below, and systemd finds a bare program name only in its own directories
-# (/usr/bin, /usr/local/bin ...): a casement under another prefix would not be found. Give it the full path.
-if [ -z "$nested" ]; then
-    case "${casement_cmd[0]}" in
-        */*) ;;
-        *)
-            if [ -x "$(dirname "$0")/${casement_cmd[0]}" ]; then
-                casement_cmd[0]="$(cd "$(dirname "$0")" && pwd)/${casement_cmd[0]}"
-            elif found=$(command -v "${casement_cmd[0]}"); then
-                casement_cmd[0]=$found
-            fi
-            ;;
-    esac
-fi
+# The arguments of this run, which casement.service reads as $CASEMENT_SESSION_ARGS from the user manager's environment.
+session_args_var=CASEMENT_SESSION_ARGS
+# What an earlier version of this script wrote: a drop-in in the runtime folder. It would shadow the unit's ExecStart
+# and make accountd distrust the unit, so it is removed at the start (remove_old_dropin).
+old_dropin_dir="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/systemd/user/$unit.d"
 mkdir -p "$state" "$guard_state"
 guard_log="$guard_state/guard.log"
 if [ -f "$guard_log" ] && [ "$(($(wc -c <"$guard_log")))" -gt "$guard_log_max" ]; then
@@ -330,27 +331,25 @@ wallet() {
     log "nothing keeps saved passwords here and no program for it is installed: $(secrets_hint)"
 }
 
-# sill as the transient user service sill.service (systemd-run, Type=exec, so it has a real main
-# process). Porter's accountd and the companion's daemons (memoryd, intentd) admit the shell, and
+# sill as the user service sill.service (installed root-held beside casement.service, Type=exec, so it has a
+# real main process). Porter's accountd and the companion's daemons (memoryd, intentd) admit the shell, and
 # casement gives it the Shell role, only as the main process of that unit; a scope has no main process
 # to check, so it could not be proved. A sill.service left over from a crashed session is stopped first;
-# if the unit cannot be started that is logged and the session carries on without a shell: sill never
-# runs without its unit identity. The environment: the user manager already holds the session variables
-# (import_unit_environment, publish_environment); WAYLAND_DISPLAY and PATH are passed again with -E
-# because a systemd-run service does not inherit this script's environment. This function runs as the
-# respawn loop's child: it returns when the unit ends (the loop restarts it with its exit guard), and
-# a TERM stops the unit.
+# if the unit is not installed or cannot be started that is logged and the session carries on without a shell:
+# sill never runs without its unit identity. The environment: the user manager already holds the session variables
+# (import_unit_environment: PATH among them; publish_environment: WAYLAND_DISPLAY), and a user service gets the
+# manager's environment. This function runs as the respawn loop's child: it returns when the unit ends cleanly (the
+# loop restarts it with its exit guard; the unit restarts itself after a failure and is waited on through that),
+# and a TERM stops the unit.
 sill_unit=sill.service
 sill_ctl() { "$(bin systemctl)" --user "$@"; }
 sill_state() { sill_ctl show -p ActiveState --value "$sill_unit" 2>/dev/null || true; }
 stop_shell() {
     [ -z "$nested" ] || [ -n "$stubs" ] || return 0
-    have systemd-run || return 0
+    have systemctl || return 0
     sill_ctl stop "$sill_unit" 2>/dev/null || true
 }
 sill_shell() {
-    local sill
-    sill=$(bin sill)
     case "$(sill_state)" in
         "" | inactive) ;;
         *)
@@ -359,8 +358,11 @@ sill_shell() {
             sill_ctl reset-failed "$sill_unit" 2>/dev/null || true
             ;;
     esac
-    if ! "$(bin systemd-run)" --user --unit="${sill_unit%.service}" --slice=app.slice --collect --quiet -p Type=exec \
-        -E "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" -E "PATH=$PATH" -- "$sill" run; then
+    if [ "$(sill_ctl show -p LoadState --value "$sill_unit" 2>/dev/null || true)" = not-found ]; then
+        log "$sill_unit is not installed (the desktop installer puts it beside casement.service); the session stays up without a shell"
+        return 0
+    fi
+    if ! sill_ctl start "$sill_unit"; then
         log "could not start $sill_unit; the session stays up without a shell"
         return 0
     fi
@@ -385,7 +387,7 @@ start_components() {
     keep_running power-key "$(bin systemd-inhibit)" --what=handle-power-key --who=desktop-session \
         --why="the power key opens sill's power menu" --mode=block sleep infinity
     if [ -n "$ibus_daemon" ] && have ibus-daemon; then keep_running ibus "$(bin ibus-daemon)" --xim --replace; fi
-    if have systemd-run; then
+    if have systemctl; then
         keep_running sill sill_shell
     else
         keep_running sill "$(bin sill)" run
@@ -395,10 +397,23 @@ start_components() {
 
 # --- casement as the unit casement.service (the real session) ---------------------------------------
 
-# Stop the unit and take the drop-in away (also run at logout; harmless when nothing runs).
+# Take this run's arguments out of the user manager's environment (harmless when they are not there).
+unset_session_args() {
+    systemctl --user unset-environment "$session_args_var" 2>/dev/null || true
+}
+
+# Stop the unit and drop the arguments (also run at logout; harmless when nothing runs).
 stop_unit() {
     systemctl --user stop "$unit" 2>/dev/null || true
-    rm -rf -- "$unit_dir"
+    unset_session_args
+}
+
+# A drop-in an earlier version of this script left in the runtime folder; once, before the first start.
+remove_old_dropin() {
+    [ -z "$nested" ] || return 0
+    [ -e "$old_dropin_dir/session.conf" ] || return 0
+    rm -f -- "$old_dropin_dir/session.conf"
+    rmdir "$old_dropin_dir" 2>/dev/null || true
     systemctl --user daemon-reload 2>/dev/null || true
 }
 
@@ -407,7 +422,7 @@ stop_unit() {
 import_unit_environment() {
     local vars="XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE MOZ_ENABLE_WAYLAND \
 QT_QPA_PLATFORM GDK_BACKEND XMODIFIERS GTK_IM_MODULE QT_IM_MODULE XDG_DATA_DIRS XDG_SEAT XDG_VTNR XDG_SESSION_ID \
-XDG_SESSION_CLASS"
+XDG_SESSION_CLASS PATH"
     local var set=() unset=(WAYLAND_DISPLAY DISPLAY)
     for var in $vars; do
         [ -z "${!var:-}" ] || set+=("$var=${!var}")
@@ -420,42 +435,49 @@ XDG_SESSION_CLASS"
     systemctl --user unset-environment "${unset[@]}" 2>/dev/null || true
 }
 
-# Write the drop-in for one run (extra args "$@") and make the manager read it.
-write_dropin() {
-    mkdir -p "$unit_dir"
-    {
-        echo "[Service]"
-        echo "Restart=no"
-        echo "ExecStart="
-        echo "ExecStart=${casement_cmd[*]} ${backend_args[*]} $*"
-        echo "StandardError=append:$state/casement.log"
-    } >"$unit_dir/session.conf"
-    systemctl --user daemon-reload
+# Hand the unit this run's arguments (extra args "$@"): the backend args and --safe, in the user manager's
+# environment, where the unit's ExecStart reads them as $CASEMENT_SESSION_ARGS.
+set_session_args() {
+    systemctl --user set-environment "$session_args_var=${backend_args[*]} $*"
+}
+
+# The socket casement announced in the unit's STATUS= text ("listening on wayland-1"); empty if it has not yet.
+unit_socket() {
+    systemctl --user show "$unit" -p StatusText --value 2>/dev/null | sed -n 's/^listening on \([^ ]*\).*/\1/p' | head -n 1
 }
 
 # Run the casement unit (extra args "$@") to its end; sets run_status. The unit's Result and
-# ExecMainStatus say how it ended; a signal or a start that failed is a nonzero status.
+# ExecMainStatus say how it ended; a signal or a start that failed is a nonzero status. The unit restarts itself
+# after a failure, so the moment it is no longer active it is stopped (which cancels that restart) and the
+# guard decides what runs next.
 run_unit_to_end() {
-    local socket="" key value result="" mainstatus=0 tries=0
-    write_dropin "$@" || { run_status=1; return; }
+    local socket="" key value active="" result="" mainstatus=0 tries=0
+    set_session_args "$@" || { run_status=1; return; }
     systemctl --user reset-failed "$unit" 2>/dev/null || true
     # Blocks until casement has said READY=1 (Type=notify), or fails if it never does.
     if ! systemctl --user start "$unit"; then
+        systemctl --user stop "$unit" 2>/dev/null || true
         run_status=1
         return
     fi
     while [ -z "$socket" ] && [ "$tries" -lt 50 ]; do
-        socket=$(socket_of "$state/casement.log")
+        socket=$(unit_socket)
         [ -n "$socket" ] || { sleep 0.1; tries=$((tries + 1)); }
     done
     [ -z "$socket" ] || start_components "$socket"
-    until [ "$(systemctl --user show "$unit" -p ActiveState --value)" != active ]; do sleep 0.5; done
-    while IFS== read -r key value; do
-        case "$key" in
-            Result) result=$value ;;
-            ExecMainStatus) mainstatus=$value ;;
-        esac
-    done < <(systemctl --user show "$unit" -p Result -p ExecMainStatus)
+    while :; do
+        active="" result="" mainstatus=0
+        while IFS== read -r key value; do
+            case "$key" in
+                ActiveState) active=$value ;;
+                Result) result=$value ;;
+                ExecMainStatus) mainstatus=$value ;;
+            esac
+        done < <(systemctl --user show "$unit" -p ActiveState -p Result -p ExecMainStatus)
+        [ "$active" != active ] || { sleep 0.5; continue; }
+        break
+    done
+    systemctl --user stop "$unit" 2>/dev/null || true
     run_status=$mainstatus
     [ "$result" = success ] || [ "$run_status" != 0 ] || run_status=1
 }
@@ -490,7 +512,11 @@ run_casement() {
     fi
     run_secs=$(($(date +%s) - started))
     stop_components
-    cat "$state/casement.log" >&2
+    if [ -n "$nested" ]; then
+        cat "$state/casement.log" >&2
+    else
+        journalctl --user -u "$unit" --since "@$started" --no-pager -o cat >&2 2>/dev/null || true
+    fi
 }
 
 # Before any casement starts: if the latest update has failed to start in several different restarts of the
@@ -519,6 +545,9 @@ manual_way_back() {
 }
 
 recover_update
+remove_old_dropin
+# Whatever way the session ends, this run's arguments do not stay in the user manager.
+[ -n "$nested" ] || trap unset_session_args EXIT
 quick=0
 mode=normal
 while :; do

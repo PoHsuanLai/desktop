@@ -38,6 +38,10 @@ stub keycap/install.sh keycap
 stub anyview/dist/install.sh anyview
 stub mailo/dist/install.sh mailo
 stub palmrest/install.sh palmrest
+# The two units the session installer puts in /etc/systemd/user, as the casement and sill checkouts ship them.
+mkdir -p "$sib/casement/dist" "$sib/sill/dist"
+printf '[Service]\nExecStart=/usr/bin/casement $CASEMENT_SESSION_ARGS\n' >"$sib/casement/dist/casement.service"
+printf '[Service]\nExecStart=/usr/bin/sill run\n' >"$sib/sill/dist/sill.service"
 mkdir -p "$sib/detent/target/release"; : >"$sib/detent/target/release/detent"; chmod +x "$sib/detent/target/release/detent"
 # A sudo that fails the check when called.
 printf '#!/bin/sh\necho sudo >>"%s"\nexit 1\n' "$log" >"$tmp/bin/sudo"; chmod +x "$tmp/bin/sudo"
@@ -108,7 +112,9 @@ grep -q "^casement/scripts/install.sh --prefix /opt/d --locked --destdir $dest" 
 [ -f "$dest/etc/systemd/user/desktop-session.target" ] || fail "the user target was not staged"
 grep -q '^Wants=slipway.service$' "$dest/etc/systemd/user/desktop-session.target" || fail "the user target does not want the update service"
 [ -f "$dest/usr/share/wayland-sessions/sill-casement.desktop" ] || fail "the login entry was not staged"
-[ ! -e "$dest/etc/systemd/user/casement.service" ] || fail "the session installer copied casement.service"
+grep -q '^ExecStart=/opt/d/bin/casement \$CASEMENT_SESSION_ARGS$' "$dest/etc/systemd/user/casement.service" || fail "casement.service was not staged with the prefix and the session arguments: $(cat "$dest/etc/systemd/user/casement.service" 2>&1)"
+grep -q '^ExecStart=/opt/d/bin/sill run$' "$dest/etc/systemd/user/sill.service" || fail "sill.service was not staged with the prefix: $(cat "$dest/etc/systemd/user/sill.service" 2>&1)"
+[ "$(stat -c %a "$dest/etc/systemd/user/casement.service")" = 644 ] || fail "casement.service is not mode 644"
 grep -q "^almanac/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "almanac did not get the prefix and destdir: $(cat "$log")"
 grep -q "^docket/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "docket did not get the prefix and destdir: $(cat "$log")"
 grep -q "^cua/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "cua did not get the prefix and destdir: $(cat "$log")"
@@ -170,18 +176,23 @@ rm -f -- "$sib/casement/scripts/install.sh"
 plan=$(inst --dry-run --destdir "$dest") || fail "a missing optional installer failed the dry run"
 printf '%s\n' "$plan" | grep -q 'casement .*skipped' || fail "the missing casement installer was not reported: $plan"
 
-# 4c. the session uninstall removes the old casement.service only when it is what the old installer shipped.
-old="$dest/etc/systemd/user/casement.service"
-mkdir -p "$(dirname "$old")"
-printf '[Service]\nExecStart=/usr/bin/casement\n' >"$old"
-sum=$(sha256sum "$old" | cut -d' ' -f1)
-OLD_CASEMENT_UNIT_SHA256=$sum "$HERE/../install/uninstall.sh" --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "uninstall failed"; }
-[ ! -e "$old" ] || fail "an unchanged old casement.service was kept"
+# 4c. the session uninstall removes the two units only while they are still what the installer wrote.
+units="$dest/etc/systemd/user"
+"$HERE/../install/uninstall.sh" --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "uninstall failed"; }
+[ ! -e "$units/casement.service" ] || fail "an unchanged casement.service was kept"
+[ ! -e "$units/sill.service" ] || fail "an unchanged sill.service was kept"
 [ ! -e "$dest/opt/d/bin/desktop-session" ] || fail "the uninstall left desktop-session"
-printf '[Service]\nExecStart=/opt/mine/casement\n' >"$old"
-OLD_CASEMENT_UNIT_SHA256=$sum "$HERE/../install/uninstall.sh" --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || fail "uninstall failed (changed unit)"
-[ -f "$old" ] || fail "a changed casement.service was removed"
-grep -q 'kept (not what the earlier installer copied)' "$tmp/out.log" || fail "the kept unit was not reported"
+inst --destdir "$dest" --prefix /opt/d --only session >/dev/null 2>&1 || fail "the session step did not run again"
+printf '[Service]\nExecStart=/opt/mine/casement\n' >"$units/casement.service"
+"$HERE/../install/uninstall.sh" --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out.log" 2>&1 || fail "uninstall failed (changed unit)"
+[ -f "$units/casement.service" ] || fail "a changed casement.service was removed"
+grep -q 'kept (not what the installer wrote)' "$tmp/out.log" || fail "the kept unit was not reported"
+[ ! -e "$units/sill.service" ] || fail "an unchanged sill.service was kept (second run)"
+
+# 4d. a unit whose checkout is missing is warned about and skipped, not an error.
+rm -f -- "$sib/sill/dist/sill.service"
+out=$("$HERE/../install/install.sh" --dry-run --destdir "$dest" --prefix /opt/d --siblings "$sib" 2>&1) || fail "a missing unit source failed the session installer"
+printf '%s\n' "$out" | grep -q 'WARNING: .*sill.service is missing' || fail "the missing sill.service was not warned about: $out"
 
 # 5. a missing component repo is exit 2 with its path.
 rm -rf -- "${sib:?}/mailo"

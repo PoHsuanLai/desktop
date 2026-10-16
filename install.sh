@@ -187,8 +187,10 @@ describe() {
       # This repo's own session installer (never sudo; it stops with the root command when a place is not writable).
       dir="$HERE"
       script=install/install.sh
+      # It also puts casement.service and sill.service, root-held, in <sysconfdir>/systemd/user, from the checkouts in --siblings.
       args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      args+=(--siblings "$siblings")
       writes=("$destdir$prefix" "$destdir$sysconfdir" "$destdir/usr/share/wayland-sessions") ;;
     *) die "no component named $1 (known: ${ORDER[*]})" ;;
   esac

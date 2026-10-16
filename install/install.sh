@@ -7,9 +7,11 @@
 #   install/install.sh              do it
 #   (flags: see install/lib.sh)
 #
-# Not installed here: casement (and its casement.service, which casement's own installer puts under its prefix),
-# sill and transom (the portal backend) themselves (their own installers and packages), other sessions (left
-# untouched), and
+# Also installed, root-held, in <sysconfdir>/systemd/user (/etc/systemd/user): casement.service and sill.service, from the
+# casement and sill checkouts beside this one (--siblings), so the account service can trust the compositor and the
+# shell as fixed roles (it accepts units only from root-held places, never ~/.config).
+# Not installed here: the casement, sill and transom (the portal backend) programs themselves (their own installers and
+# packages), other sessions (left untouched), and
 # anything under $HOME. install/uninstall.sh removes exactly the files listed below.
 set -euo pipefail
 ORIG_ARGS=("$@")
@@ -23,14 +25,13 @@ step "1/3 checks"
 for tool in casement sill; do
   command -v "$tool" >/dev/null || note "WARNING: $tool is not on PATH; the session cannot start without it"
 done
-unit_found=0
-for unit_dir in "$prefix/lib/systemd/user" /usr/local/lib/systemd/user /usr/lib/systemd/user; do
-  [ ! -f "$destdir$unit_dir/casement.service" ] || unit_found=1
+for name in casement sill; do
+  [ -f "$(unit_source "$name")" ] || note "WARNING: $(unit_source "$name") is missing; the session needs $name.service and cannot start $name without it (keep the $name checkout beside this one or pass --siblings)"
+  # A copy in the person's own folder wins over the installed one and is not trusted by the account service.
+  if [ -z "$destdir" ] && [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$name.service" ]; then
+    note "WARNING: ${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/$name.service hides the installed unit and is not trusted by the account service; remove it"
+  fi
 done
-[ "$unit_found" = 1 ] || note "WARNING: no casement.service in $prefix/lib/systemd/user; the session needs it and cannot start casement without it (../install.sh installs casement with its unit)"
-if [ -f "$destdir$sysconfdir/systemd/user/casement.service" ]; then
-  note "WARNING: $sysconfdir/systemd/user/casement.service is an older copy and hides the one casement's installer puts under $prefix/lib/systemd/user; remove it: $(as_root_hint rm -f "$sysconfdir/systemd/user/casement.service")"
-fi
 [ -x "$prefix/libexec/transom" ] || [ -x /usr/libexec/transom ] || note "WARNING: transom is not installed (the repo's scripts/install.sh, or the top-level ./install.sh --only transom); screen sharing and screenshots need it"
 portal_found=0
 for portal in /usr/libexec/xdg-desktop-portal /usr/lib/xdg-desktop-portal /usr/lib/*/xdg-desktop-portal; do
@@ -40,9 +41,10 @@ done
 
 step "2/3 the files"
 dests=()
-while read -r _ _ dest; do dests+=("$dest"); done < <(files)
+while read -r _ source dest; do if [ -f "$source" ]; then dests+=("$dest"); fi; done < <(files)
 need_write "${dests[@]}"
 while read -r mode source dest; do
+  [ -f "$source" ] || { note "skipped: $destdir$dest (no $source)"; continue; }
   note "$destdir$dest ($mode)"
   [ "$dry" = 1 ] || {
     install -d "$(dirname "$destdir$dest")"
@@ -61,5 +63,5 @@ fi
 
 step "done"
 note "Pick \"sill (casement)\" at the login screen. First-login checks (not testable without a login):"
-note "  the guard's real tty path, sill and transom against the real casement, the target, casement.service"
+note "  the guard's real tty path, sill and transom against the real casement, the target, casement.service and sill.service"
 note "  the activation environment, a screen share through transom (a browser, OBS), logout through sill's power menu."

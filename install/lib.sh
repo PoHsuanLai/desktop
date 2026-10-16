@@ -5,13 +5,18 @@
 #   --dry-run          print every step, change nothing
 #   --prefix DIR       where the script and its data go (default $PREFIX, else /usr/local)
 #   --destdir DIR      a staging root put in front of every path (default $DESTDIR, else none)
-#   --sysconfdir DIR   where the user target goes (default $SYSCONFDIR, else /etc)
+#   --sysconfdir DIR   where the user target and the casement and sill units go, in DIR/systemd/user (default $SYSCONFDIR, else /etc)
 #   --sessions-dir DIR the display manager's wayland-sessions directory (default /usr/share/wayland-sessions)
+#   --siblings DIR     where the casement and sill checkouts are (default $SIBLINGS, else the parent of this repo): their
+#                      dist/casement.service and dist/sill.service are the units installed
 #
 # Never runs sudo and never writes to $HOME: a destination you cannot write is printed with the
 # command to run as root (through sudo, doas or pkexec, whichever this machine has), and the script stops there.
-# casement's own unit is not installed here: casement's installer (scripts/install.sh, which ../install.sh runs)
-# puts casement.service under its prefix.
+# casement.service and sill.service are installed here, root-held, in DIR/systemd/user (/etc/systemd/user by default): the
+# account service trusts the compositor and the shell as fixed roles only when their unit files, and any drop-in, sit in
+# /etc/systemd/user, /usr/lib/systemd/user or /usr/local/lib/systemd/user, so never under ~/.config. Each is rendered with
+# the prefix's bin folder in ExecStart. casement's own installer also puts casement.service under its prefix; the copy in
+# DIR/systemd/user wins over it and is the same file.
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../session" && pwd)"
 # shellcheck source=distro.sh
@@ -22,6 +27,7 @@ prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
 sysconfdir=${SYSCONFDIR:-/etc}
 sessions_dir=/usr/share/wayland-sessions
+siblings=${SIBLINGS:-$(dirname "$(dirname "$SRC")")}
 dry=0
 
 die() { echo "$(basename "$0"): $*" >&2; exit "${2:-2}"; }
@@ -34,25 +40,24 @@ parse_flags() {
       --destdir) destdir=${2:?--destdir needs a directory}; shift ;;
       --sysconfdir) sysconfdir=${2:?--sysconfdir needs a directory}; shift ;;
       --sessions-dir) sessions_dir=${2:?--sessions-dir needs a directory}; shift ;;
+      --siblings) siblings=${2:?--siblings needs a directory}; shift ;;
       -h|--help) usage; exit 0 ;;
       *) usage >&2; die "unknown argument $1" ;;
     esac
     shift
   done
-  for dir in "$prefix" "$sysconfdir" "$sessions_dir"; do
+  for dir in "$prefix" "$sysconfdir" "$sessions_dir" "$siblings"; do
     case "$dir" in /*) ;; *) die "$dir: paths must be absolute" ;; esac
   done
   prefix=${prefix%/}
   destdir=${destdir%/}
   sysconfdir=${sysconfdir%/}
   sessions_dir=${sessions_dir%/}
+  siblings=${siblings%/}
 }
 
-# The casement.service this installer used to copy into SYSCONFDIR/systemd/user (casement's dist/casement.service
-# at 124c674, ExecStart=/usr/bin/casement; the only version that ever existed), as a sha256. The uninstall removes
-# an old copy only when it still has exactly this content.
-OLD_CASEMENT_UNIT_SHA256=${OLD_CASEMENT_UNIT_SHA256:-1a903fa4f61a72ae75b851e05cdf28e5ed155027f333b2b3f32b4c091d781e21}  # overridable for tests
-old_casement_unit() { echo "$sysconfdir/systemd/user/casement.service"; }
+# unit_source NAME: the unit file of the repo NAME (casement, sill) in the sibling checkouts.
+unit_source() { echo "$siblings/$1/dist/$1.service"; }
 
 # files: "MODE SOURCE DEST" per line, DEST without the destdir. The desktop entry's SOURCE is
 # rendered (Exec filled in) by render_entry; the others are copied as they are.
@@ -60,13 +65,17 @@ files() {
   echo "755 $SRC/desktop-session $prefix/bin/desktop-session"
   echo "644 $SRC/quire-portals.conf $prefix/share/xdg-desktop-portal/quire-portals.conf"
   echo "644 $SRC/desktop-session.target $sysconfdir/systemd/user/desktop-session.target"
+  echo "644 $(unit_source casement) $sysconfdir/systemd/user/casement.service"
+  echo "644 $(unit_source sill) $sysconfdir/systemd/user/sill.service"
   echo "644 $SRC/sill-casement.desktop $sessions_dir/sill-casement.desktop"
 }
 
-# content SOURCE: what is installed from SOURCE (the entry gets its Exec path).
+# content SOURCE: what is installed from SOURCE (the entry gets its Exec path, a unit its program's installed path;
+# the rest of the ExecStart line, such as the session's arguments, stays).
 content() {
   case "$1" in
     */sill-casement.desktop) sed "s|@BINDIR@|$prefix/bin|" "$1" ;;
+    */casement.service|*/sill.service) sed -E "s|^ExecStart=[^ ]*/([^/ ]+)|ExecStart=$prefix/bin/\\1|" "$1" ;;
     *) cat "$1" ;;
   esac
 }
