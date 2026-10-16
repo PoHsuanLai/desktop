@@ -29,7 +29,7 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
 
 export SILL_COMPOSITOR=casement SILL_PREBUILT=1 SILL_PROFILE=debug
 export CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" CASEMENT_TOOLS="$SCEN_TOOLS"
-floor_shim detent-1.5   # no program here takes a power a floor row can allow: casement starts with an empty floor, so nothing waits on a question
+floor_shim detent-1.5 casementctl detent   # casementctl shot watches the screen; detent is the Settings app (both run from build/)
 # shellcheck source=/dev/null
 source "$SCEN_SRC/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out detent-1.5)

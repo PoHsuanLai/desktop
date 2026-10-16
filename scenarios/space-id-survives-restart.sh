@@ -19,7 +19,7 @@ require_jail
 scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casement-probe" "$SCEN_TOOLS/bin/fake-logind"
 
 export CASEMENT_TOOLS="$SCEN_TOOLS" CASEMENT_REPO="$SCEN_SIB/casement"
-floor_make space-id-survives-restart   # the probe takes no power: an empty floor, so nothing waits on a question
+floor_make space-id-survives-restart casement-probe   # the probe lists the workspaces (ext_workspace_manager): a floor row for the built probe
 # shellcheck source=/dev/null
 source "$SCEN_SIB/casement/dev/lib/compositor.sh"
 OUT_DIR=$(scenario_out space-id-survives-restart)

@@ -513,11 +513,22 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   `shell-host-on-casement-and-kwin` (floor: fcitx5, which accept-ime runs), `minimise-target-round-trip`, `space-id-survives-restart` and
   `session-crash-guard` (through the session's backend arguments). `keycap-yields-and-regrabs` starts nothing (a skip). Most floors are empty on
   purpose: the shell, detent and the rig take no power a row can name.
-- **Cannot be allowed by a floor row (casement judges the image, and a program under `build/` is writable, so it is "unverified" and asked every
-  time):** transom's screenshot and screencast in `portal-quire` (`screen`), `casement-probe workspaces` in `space-id-survives-restart` (`windows`:
-  `ext_workspace_manager`), and `demo_lock` in shell-host's `accept-lock` (`lock`). Not run, so not known to hang: they may wait and be refused at
-  the question's time-out. They need casement to let a debug-inject build's `--system-dir` floor name an image that is not root-owned (an interface
-  ask, in the lane report); until then these three steps may fail on the question.
+- **Programs run from `build/` (lane dharn, second pass).** casement judges a program by its image, and a program under `build/` is writable by the
+  person, so it is "unverified" and asked every time, whatever the floor says; and without `/etc/quire/desktop-callers.toml` (the jail has none) sill,
+  detent and transom are nobody and the shell cannot connect. casement 679e93d (cas12) lets a debug-inject build's `--system-dir` floor name such a
+  program by its `readlink -f` path; the cas13 lane makes the same build read `DIR/desktop-callers.toml` (owned by the person, not group or world
+  writable, not a link) as test caller rows in peephole's format (`app`, `role`, `exe`, no `unit`). `floor_make NAME [TOOL...]` now writes both files,
+  mode 600, from one list of TOOLs: `floor_powers` (the powers a row allows), `floor_role` (the role in the caller list: sill and the shell-host demos that
+  map the shell's surfaces `shell`, detent `settings`, transom `portal`; the caller list keeps `dist/desktop-callers.toml`'s app ids) and `floor_image`
+  (where the harness built it: `build/tools/bin`, `build/transom-target`, `build/sill-target`, `build/detent-target`, `build/shell-host-target/debug/examples`,
+  else PATH; a program not built is left out and its step says so). The stale rule "a floor cannot name a `build/` program" is gone from the header.
+  Per scenario: `detent-on-casement-at-1.5` `casementctl detent` (the `shot` is `screen`; detent is `settings`); `portal-quire` `transom` (`screen` and
+  `portal`); `space-id-survives-restart` `casement-probe` (`windows`); `shell-host-on-casement-and-kwin` `fcitx5` (`typing_help keys`), `demo_lock` (`lock`)
+  and the seven demos that take an exclusive keyboard or an overlay (hover, scroll, ime, swipe, switcher, drag, popup_keys) as `shell`: casement gives
+  the exclusive keyboard only to the shell (CASC-02), which is why accept-modifiers and accept-ime failed. Not run (lane rules), and cas13 was not in
+  casement yet when this was written: the file name, the `[[peer]]` keys and the role names are from the lane brief. Not changed: `sill-boots-on-casement`,
+  `launcher-p95-on-casement`, `appearance-reaches-*` (they pass without the shell role; giving sill the row is the real shape and a later edit once this
+  one is green) and the accounts scenarios (they run sill and detent at their pins, a different image from `build/sill-target`).
 - **Display confirmation.** A change by a program (wlr-randr and the like) is asked ("keep the new settings?", 15 s, reverts unless kept). No
   scenario changes outputs through a program: `set_scale` and the size changes go through `casementctl debug output set`. Whether that control is
   exempt from the trial could not be read in the casement checkout beside this one (the trial is not in it yet); if it is not, the 1.5 scale in
