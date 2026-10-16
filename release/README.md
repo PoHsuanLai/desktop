@@ -162,12 +162,17 @@ Then `release/bootstrap.sh` fetches the latest release from desktop-releases, ch
 checks slipway's install with `check-helpers.sh`, and runs `pkexec /usr/libexec/slipway-apply` on it:
 
 ```
-cd slipway && sudo scripts/install.sh --pubkey /path/to/release.pub
+cd slipway
+cargo build --release --locked -p slipway --bin slipway-apply --bin slipway-rollback --bin slipway-health
+sudo sh -c 'umask 022 && scripts/install.sh --bin-dir target/release --pubkey /path/to/release.pub'
 cd ../desktop && release/bootstrap.sh
 ```
 
-(`scripts/install.sh` builds as whoever runs it unless it is given `--bin-dir` with the programs already built; build them
-as yourself first, so no build step runs as root, then give it `--bin-dir`.) None of the three programs is part of any
+The build runs as yourself, so no build step of the dependency tree runs as root, and the install gets the finished
+programs with `--bin-dir`; without `--bin-dir` slipway's script builds them itself, as whoever runs it, which under `sudo`
+means as root. The `umask 022` keeps `/etc/slipway` and `/usr/share/slipway` readable by your own session when root's umask is
+stricter (the script writes with the umask it is run under, and the update service could not then read its settings or the
+key). None of the three programs is part of any
 release (a release must not replace a program that runs as root); later releases arrive through slipway's daily check, and a
 change to a helper is a new run of slipway's install by hand. `release/bootstrap.sh --verify-only` downloads and checks
 without installing. The way back by hand, from a text console, is `pkexec /usr/libexec/slipway-rollback`.

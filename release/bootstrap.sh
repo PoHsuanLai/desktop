@@ -44,7 +44,7 @@ if [ "$verify_only" = 0 ]; then
   command -v pkexec >/dev/null || { echo "bootstrap.sh: pkexec is not installed ($(install_hint polkit))" >&2; exit 2; }
   if ! complete=$("$HERE/check-helpers.sh" 2>&1); then
     echo "$complete" >&2
-    echo "bootstrap.sh: slipway's install is not complete: run its scripts/install.sh --pubkey FILE again" >&2
+    echo "bootstrap.sh: slipway's install is not complete: run its scripts/install.sh --bin-dir DIR --pubkey FILE again (release/README.md, First install)" >&2
     exit 2
   fi
 fi

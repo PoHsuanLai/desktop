@@ -393,3 +393,15 @@ check first is listed under "Not verified" at the end of this section.
   helper) need a change in slipway's `PublicKey` and a new helper on every computer. Not done.
 - Limits: environment rules protect the secrets from a pushed branch, not from someone who can change the default branch or
   push a `v*` tag; approvals are a click by the owner, who is also the only reviewer.
+
+### ROOT-17 (desktop half)
+
+- The desktop's "First install" no longer says `sudo scripts/install.sh --pubkey` (which compiles slipway's whole dependency
+  tree as root and, with a strict root umask, leaves `/etc/slipway` and `/usr/share/slipway` unreadable to the update
+  service). It builds the three programs as the person, installs them with `--bin-dir`, and runs the install under
+  `umask 022`; the CI never used the script (`smoke.sh` and `health-scenarios.sh` `install -m` the programs).
+- **Left to slipway (interface asks):** `scripts/install.sh` should use `install -d -m755` and `install -m` instead of `mkdir -p`
+  and the caller's umask, and refuse to build when run as root; `slipway-apply`, `slipway-rollback` and `slipway-health` should
+  be their own package with only `slipway-core`, `tar`, `zstd` and `sha2` (today they share a package with zbus, tokio, ureq
+  and rustls); the repository should run `cargo deny check advisories` in CI (`deny.toml` checks licences only). The desktop's
+  workflow builds slipway from the manifest pin, so the helper's supply chain is whatever that package's dependencies are.
