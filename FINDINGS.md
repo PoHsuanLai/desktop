@@ -144,3 +144,40 @@ What I found and decided:
 - The release workflow has a new job `agents` (almanac and docket together; both need perl and make, which
   `release/deps.sh` already installs). Not run here; it fails until the manifest carries almanac >= 6aade09 and
   docket >= e44112c.
+
+## desk-pprefix (2026-10-16)
+
+B1 is closed by porter 2e5cd74 (in the pinned de06006), so `install.sh` no longer forces porter to `/usr`: it gets
+the desktop `--prefix` (default `/usr/local`) and `--sysconfdir` (default `/etc`) like the other components, and the
+"porter goes to /usr" note is gone. Checked in porter's source at de06006, with `--prefix /usr/local --sysconfdir /etc`
+(`scripts/install.sh` puts providers, `clients.toml`, the tailnet drop-in under `$prefix/share/porter` and the caller
+tables at `$sysconfdir/porter`):
+
+- providers, `clients.toml` and the stoker catalog: accountd, syncd and inferd take `Xdg::shipped("porter/providers")`,
+  `("porter/clients.toml")` and `("stoker/catalog")` (`porter-core/src/xdg.rs`): the first `$XDG_DATA_DIRS` entry
+  (default `/usr/local/share:/usr/share`) that has the path, else `/usr/share/...`.
+- `callers.toml` and `inferd-callers.toml`: `/etc/porter/<file>` is searched first (`porter-daemon/src/system_callers.rs`,
+  `SYSTEM_CALLERS`, `INFERD_CALLERS`, `search`), so `--sysconfdir /etc` is found. Since 36f5014 the other places are a
+  fixed list (`TABLE_DIRS`), not `$XDG_*`, and a table counts only when root holds it (root-owned, no group or other
+  write along its real path), so it must be installed as root, as before.
+- Not verified: that the user session's `XDG_DATA_DIRS` keeps `/usr/local/share` (unset gives the default; a session that
+  sets it without that entry would not find an install under `/usr/local`). Nothing was built or installed;
+  `gate/installer-check.sh` and a dry run passed.
+- The stoker catalog was installed by nothing on this repo's master, so inferd had no model catalogue on a fresh install.
+  `install.sh` now has a `stoker` step right after porter (`scripts/install.sh --prefix P --sysconfdir S [--destdir D]`,
+  stoker 3ae1211; it builds nothing and writes only `<prefix>/share/stoker/catalog`). Outside a `--destdir` it is left to
+  the person like almanac (its installer escalates itself). `release/build.sh` has `build_stoker` (`--no-build`, staged
+  under `share/stoker`, an auto-exported folder in `release.py`) and the CI `agents` job builds `almanac,docket,stoker`.
+  Not run: the CI job and `build_stoker` (no build here; the stoker installer's dry run lists the catalog files).
+- A prefix other than `/usr` and `/usr/local` is on no search path the session has. The plan now prints (never writes)
+  an `environment.d` line `XDG_DATA_DIRS=<prefix>/share:/usr/local/share:/usr/share` for the D-Bus service files and the
+  shipped data. Units are a separate matter: systemd's user manager reads `/usr/lib`, `/usr/local/lib` and
+  `$XDG_DATA_DIRS/systemd/user`, never `<prefix>/lib/systemd/user`, so `XDG_DATA_DIRS` alone does not find them; the note
+  also prints a root `ln -sf <prefix>/lib/systemd/user/* /usr/local/lib/systemd/user/`. That link command and the
+  systemd search-path claim come from systemd's documented behaviour and were not tried on a machine. The session
+  installer's casement.service check (`install/install.sh`) only tests that the file exists under the prefix, so it
+  does not catch this.
+- The release bundle is not affected: it lives under `/opt/quire/current` but `release.py` exports `share/dbus-1/services`,
+  `lib/systemd/user`, `share/porter`, `share/stoker` and the other folders in `AUTO_EXPORT_DIRS` as links into `/usr/share`
+  and `/usr/lib/systemd/user`, and the caller tables go to `/etc/porter` as system files. `release/build.sh` is unchanged
+  apart from the stoker step.

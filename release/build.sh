@@ -7,12 +7,12 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter almanac docket detent transom keycap palmrest anyview mailo slipway); the
+#   --only NAMES    just these (casement sill session porter stoker almanac docket detent transom keycap palmrest anyview mailo slipway); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
 # /opt/quire/current under the destdir OUT/stage, through the component's own installer where it can stage
-# (porter, almanac, docket, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
+# (porter, stoker, almanac, docket, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
 # palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
@@ -27,7 +27,7 @@ ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
 # shellcheck source=../install/cargo.sh
 source "$ROOT/install/cargo.sh"
-ALL=(casement sill session porter almanac docket detent transom keycap palmrest anyview mailo slipway)
+ALL=(casement sill session porter stoker almanac docket detent transom keycap palmrest anyview mailo slipway)
 
 version="" out="$ROOT/build/release" sib="$(dirname "$ROOT")" only=""
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -141,10 +141,17 @@ build_session() {
 build_porter() {
   local d; d=$(repo_dir porter)
   cargo_in "$d" porter -p accountd -p syncd -p inferd
-  # --sysconfdir under the bundle's system tree: the caller table lands at system/etc/porter/callers.toml, a
-  # system file slipway-apply places at /etc/porter/callers.toml (where porter reads it).
+  # --sysconfdir under the bundle's system tree: the caller tables land at system/etc/porter/callers.toml and
+  # system/etc/porter/inferd-callers.toml, system files slipway-apply places at /etc/porter/ (where porter reads them).
   (cd "$d" && CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/porter" \
     ./scripts/install.sh --no-build --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
+}
+
+build_stoker() {
+  local d; d=$(repo_dir stoker)
+  # Needs stoker >= 3ae1211 (--sysconfdir; the manifest rev). Nothing is built: the installer copies the model catalogue to
+  # share/stoker/catalog, an exported folder (pack.sh links it under /usr/share/stoker), so --no-build.
+  (cd "$d" && ./scripts/install.sh --no-build --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
 }
 
 build_almanac() {

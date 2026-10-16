@@ -7,15 +7,15 @@
 #   --dry-run      print the plan (what runs, in which order, what is left to you), run nothing, build nothing
 #   --prefix DIR   where the software goes (default $PREFIX, else /usr/local)
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
-#   --sysconfdir   where porter's caller table goes (default $SYSCONFDIR, else /etc); almanac and docket always use /etc/quire
+#   --sysconfdir   where porter's caller tables go (default $SYSCONFDIR, else /etc); almanac and docket always use /etc/quire; stoker writes nothing there
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: porter, almanac, docket, detent, casement, sill, transom, keycap,
+#   --only NAMES   just these components (comma separated: porter, stoker, almanac, docket, detent, casement, sill, transom, keycap,
 #                  anyview, mailo, palmrest, session, fonts)
 #
-# Order: porter (the account daemons and the caller table), almanac (the memory daemon and its caller table),
+# Order: porter (the account daemons and the caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
 # docket (the action router, the companion, the reader and the tool server, with their caller tables; they read
 # porter's accounts), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
@@ -30,9 +30,6 @@
 # fontconfig already has a COLRv1 Noto Color Emoji (Fedora does; Ubuntu and Arch ship a bitmap build our renderer
 # cannot draw). It is the step named "fonts".
 #
-# porter always goes to /usr, whatever --prefix says: its daemons read the data they ship (providers, the
-# client table, the model catalog) only from /usr/share for now.
-#
 # Builds. The repos pin Rust 1.98.1 and need rustup (a distro's rust package is the wrong version). Some
 # repos' cargo config asks for clang and mold, which is how they are worked on. An install never reads it
 # and never asks for a linker: what this script builds itself (detent) runs from / with --manifest-path
@@ -45,6 +42,8 @@
 #   - needs root: the destination is not writable by you (a system prefix, /etc/systemd/user, /etc)
 #   - sill, palmrest: installers with fixed destinations that ask for sudo or write your home themselves
 #   - keycap: its system files go to /etc and /usr/local; it stages only under --destdir
+#   - stoker: the catalogue goes under the prefix; its installer asks for sudo, doas or pkexec itself for a system
+#     prefix, so outside a --destdir it is left to you, run as yourself
 #   - almanac, docket: their caller tables go to /etc/quire (always replaced) and docket's default settings to
 #     /etc/xdg/quire. Their installers refuse to run as root and ask for sudo, doas or pkexec themselves for
 #     just those steps, so outside a --destdir they are left to you, run as yourself (never under sudo)
@@ -62,12 +61,7 @@ source "$HERE/install/packages.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(porter almanac docket detent casement sill transom keycap anyview mailo palmrest session)
-
-# Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
-# catalog only under /usr/share (finding B1). Remove this, and the --prefix /usr below, once porter searches
-# XDG_DATA_DIRS.
-PORTER_PREFIX=/usr
+ORDER=(porter stoker almanac docket detent casement sill transom keycap anyview mailo palmrest session)
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -120,9 +114,17 @@ describe() {
   case "$1" in
     porter)
       script=scripts/install.sh
-      args=(--prefix "$PORTER_PREFIX" --sysconfdir "$sysconfdir")
+      args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
-      writes=("$destdir$PORTER_PREFIX" "$destdir$sysconfdir") ;;
+      writes=("$destdir$prefix" "$destdir$sysconfdir") ;;
+    stoker)
+      # The model catalogue (<prefix>/share/stoker/catalog), which inferd reads from the first XDG_DATA_DIRS entry that has it.
+      # Nothing to build. Its installer takes --sysconfdir but writes nothing under it for the catalogue.
+      script=scripts/install.sh
+      args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix")
+      [ -n "$destdir" ] || yourself="its installer asks for sudo, doas or pkexec itself for a system prefix; run it as yourself" ;;
     almanac)
       # memoryd and /etc/quire/memory-callers.toml. The installer has no --sysconfdir: /etc/quire is fixed.
       script=scripts/install.sh
@@ -303,8 +305,17 @@ if [ "$fonts_wanted" = 1 ]; then
     esac
   fi
 fi
-case " ${selected[*]} " in *" porter "*)
-  [ "$prefix" = "$PORTER_PREFIX" ] || echo "note: porter goes to $PORTER_PREFIX, not $prefix: its daemons read what they ship only from $PORTER_PREFIX/share" ;;
+# A prefix other than /usr and /usr/local is on no search path the session has: the D-Bus service files and the data
+# porter, stoker and the rest ship are read from XDG_DATA_DIRS, and systemd's user manager reads units from
+# /usr/lib, /usr/local/lib and XDG_DATA_DIRS/systemd/user, never <prefix>/lib/systemd/user. Printed, never written.
+case "$prefix" in
+  /usr | /usr/local) ;;
+  *)
+    echo "note: $prefix is not on the session's search paths, so what is installed under it is found only if you tell the session:"
+    echo "        data and D-Bus services: put its share folder in the user manager's XDG_DATA_DIRS, e.g. one line in ~/.config/environment.d/50-quire.conf, then log in again:"
+    echo "          XDG_DATA_DIRS=$prefix/share:/usr/local/share:/usr/share"
+    echo "        user units: systemd's user manager does not read $prefix/lib/systemd/user at all; link them where it does, as root:"
+    echo "          mkdir -p /usr/local/lib/systemd/user && ln -sf $prefix/lib/systemd/user/* /usr/local/lib/systemd/user/" ;;
 esac
 command -v rustup >/dev/null || echo "note: rustup was not found. Building from source needs it (the repos pin Rust 1.98.1): $RUSTUP_LINE"
 [ "$dry" = 0 ] || exit 0
