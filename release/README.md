@@ -12,6 +12,7 @@ slipway, the updater, reads it.
 | `system-files.list` | the system files a release may place, one rule each (a committed copy of slipway's `ALLOWED_SYSTEM_FILES`); `release.py` reads it, so `pack` and `verify` refuse a `system/` path no rule names |
 | `check-system-list.sh` | fails unless that list equals slipway's own (the workflow runs it against the pinned slipway checkout) |
 | `check-helpers.sh` | fails unless slipway's own install is complete: `slipway-apply`, `slipway-rollback` and `slipway-health` in `/usr/libexec`, and the one polkit file with its three actions (installing and the good-start note need no password at the keyboard, going back asks for the administrator's); `smoke.sh` and `bootstrap.sh` run it |
+| `health-scenarios.sh` | two scenarios with slipway's real programs on a throwaway computer: two logins that run `recover` and `confirm` keep the newest release, and restarts that never confirm put the previous release back on the third; the workflow's `health` job runs it in a privileged container, and publishing waits for it |
 | `selftest.sh` | packs a fake stage with a throwaway key, verifies it, and checks that hostile releases are refused; a SKIP (exit 2) without minisign; run by `gate/desktop-gate.sh --self` |
 | `check-glibc.sh` | fails if a program in the stage needs a newer glibc (default 2.39), libstdc++ (GCC 13) or libgcc ABI than Ubuntu 24.04 has; the workflow runs it after each build |
 | `check-ldd.sh` | fails if `ldd` reports a library "not found" for any program in a tree; run after the build and again inside each distribution |
@@ -141,7 +142,7 @@ without installing. The way back by hand, from a text console, is `pkexec /usr/l
 
 From then on the session does the rest: `desktop-session.target` wants the update service, `desktop-session` runs
 `slipway recover` before the compositor starts, and the shell runs `slipway confirm` about half a minute after it
-answers. CI covers the install on three distributions (`smoke.sh`).
+answers. CI covers the install on three distributions (`smoke.sh`) and the two start-check cases (`health-scenarios.sh`).
 
 ## Local trial
 

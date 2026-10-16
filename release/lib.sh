@@ -26,6 +26,8 @@ package_for() {
   case "$1:$2" in
     arch:python3) echo python ;;
     arch:polkit|fedora:polkit) echo polkit ;;
+    debian:mount|debian:umount) echo mount ;;
+    *:mount|*:umount) echo util-linux ;;
     debian:polkit) echo "polkitd pkexec" ;;
     *:minisign) echo minisign ;;  # Ubuntu 24.04 has it in universe (unverified); Fedora and Arch in the main repos
     *) echo "$2" ;;

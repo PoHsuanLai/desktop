@@ -320,3 +320,24 @@ check first is listed under "Not verified" at the end of this section.
 - `docs/distros.md` has a short "Updates" section (what is installed where, the password rules, the by-hand way back).
 - Not verified: `scripts/install.sh --bin-dir` flow on a real machine; that polkit follows the policy file's `exec.path`
   to `/usr/libexec/slipway-*` on Fedora and Arch as on Ubuntu (it reads the path, not the distro).
+
+### CI scenarios for the start check (ROOT-02, ROOT-03)
+
+- `release/health-scenarios.sh` and the workflow job `health` (publishing waits for it). Scenario 1: install two signed
+  releases, two logins each running `slipway recover` then `slipway confirm`, four more restarts: the newest release stays.
+  Scenario 2: install two, six starts inside one restart (not counted), then restarts that never confirm: the third makes
+  `slipway recover` exit 5 and say the previous version came back; the next three leave it alone; a newer release starts
+  its own count. The releases are made with the repo's own `pack.sh` and a throwaway key; the programs are slipway's real
+  ones.
+- **The gap:** `slipway-health` reads the boot id from a fixed path and the settings from `/etc/slipway/config.toml`, and
+  pkexec clears the environment, so no variable can stand in for them. The scenario therefore needs root and the right
+  to mount: it binds a made-up boot id over `/proc/sys/kernel/random/boot_id` (a `--privileged` container job) and puts a
+  stand-in `pkexec` (runs its arguments; the container is already root) first on the path. It cannot run in the jail
+  (`scenarios/` is unprivileged, with no mounts) and so is not part of `desktop-gate.sh`; the gate's checks of it are
+  `bash -n` only. The jail-run `session-crash-guard` cannot cover `slipway recover` because the session skips it when nested.
+  A seam in slipway (a boot-id file and a settings path taken from an environment variable that only a non-setuid run
+  honours) would let it run unprivileged; it is not asked for, since a root helper must not read either from its caller.
+- Not verified: that a hosted runner starts a container with `--privileged` and allows `mount --bind` over a procfs file
+  (Docker mounts `/proc/sys` read-only without `--privileged`); that `slipway confirm` creates its state folders under the
+  scratch home; the exact words of `slipway recover` when it restores (the scenario looks for "previous version").
+  If `mount` is refused the script exits 2 and the job fails; that is the signal, not a pass.

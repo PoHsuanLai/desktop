@@ -7,11 +7,11 @@
 # 2.39, GCC 13's libstdc++, noble's libinput, wayland, pipewire), so they load on Fedora and Arch too; a build
 # on a newer base would not load on Ubuntu. After the build, release/check-glibc.sh and check-ldd.sh fail the job
 # if a program asks for a newer C library than that or a library that is not there. The signed result is then
-# installed by slipway's helper in clean ubuntu:24.04, fedora:44 and archlinux:latest containers (job smoke)
-# before anything is published.
+# installed by slipway's helper in clean ubuntu:24.04, fedora:44 and archlinux:latest containers (job smoke),
+# and the start check's two scenarios run (job health), before anything is published.
 #
 # Jobs: prepare -> build (parallel, per component group) -> pack (merge, sign, verify) -> smoke (three
-# distributions) -> publish (create the release in desktop-releases).
+# distributions) and health (start check scenarios) -> publish (create the release in desktop-releases).
 name: release
 
 on:
@@ -320,9 +320,48 @@ jobs:
           desktop/release/smoke.sh --really --release in/release/out \
             --pubkey desktop/release/release.pub --helpers in/helper --policy in/helper/org.quire.slipway.policy
 
-  # Only a release that installed on all three distributions is published.
+  # Two scenarios for the start check, with slipway's real programs: two good logins keep the newest release,
+  # and restarts that never reach a confirmed start put the previous release back. A privileged container, because
+  # the scenarios bind a made-up boot id over /proc (release/health-scenarios.sh says why); hosted runners are
+  # expected to allow `--privileged` for a container job (unverified).
+  health:
+    needs: [build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: ubuntu:24.04
+      options: --privileged
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Git and certificates (the checkout needs them)
+        run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates
+
+      - name: Checkout desktop
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: desktop
+
+      - name: Tools
+        run: |
+          set -euo pipefail
+          apt-get install -y --no-install-recommends $(desktop/release/deps.sh debian tools) mount
+
+      - name: Download slipway's programs and polkit file
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: helper
+          path: in/helper
+
+      - name: Good starts are kept, failed starts restore the previous version
+        run: |
+          set -euo pipefail
+          chmod 755 in/helper/slipway*
+          desktop/release/health-scenarios.sh --really --helpers in/helper --policy in/helper/org.quire.slipway.policy
+
+  # Only a release that installed on all three distributions, and whose start check works, is published.
   publish:
-    needs: [prepare, smoke]
+    needs: [prepare, smoke, health]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
