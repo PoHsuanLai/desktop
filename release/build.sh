@@ -284,11 +284,13 @@ build_keycap() {
   # stays the administrator's). On the desktop the input service (turnstile) owns /dev/uinput and hands keycap each
   # device, so none of keycap's standalone pieces for that node ship: not its 70-keycap.rules (the `input` group may
   # write the node), not the drop-in dist/keycap.uinput.conf (DeviceAllow=/dev/uinput), and not a module list of its own
-  # (turnstile's turnstile.conf loads uinput). The desktop's Caps Lock rule travels as keycap's vendor file,
+  # (turnstile's turnstile.conf loads uinput). The unit is staged as keycap ships it, starting /usr/local/bin/keycap, the
+  # link exports.toml makes to bin/keycap (turnstile's unit does the same): that is also what install/system.sh writes at
+  # the default prefix, so slipway sees the same file from a release and from install.sh (it replaces a system file only
+  # when it is absent, equal or its own earlier one). The desktop's Caps Lock rule travels as keycap's vendor file,
   # /usr/lib/keycap/keycap.toml; /etc/keycap stays the administrator's, so no release writes a file there.
   put 755 "$(tdir keycap)/keycap" bin/keycap
   put_system 644 "$d/dist/keycap.service" /usr/lib/systemd/system/keycap.service
-  retarget "$root/system/usr/lib/systemd/system/keycap.service" /usr/local/bin/keycap
   put_system 644 "$d/dist/keycap.polkit.rules" /etc/polkit-1/rules.d/keycap.polkit.rules
   put_system 644 "$ROOT/dist/keycap.toml" /usr/lib/keycap/keycap.toml
   put 644 "$d/dist/keycap.plasma.toml" share/keycap/keycap.plasma.toml

@@ -473,8 +473,8 @@ rules (it equals slipway origin/master, 17 rules, `check-system-list.sh` says so
   restarts a running service when it changed any file, which covers a first install.
 - **A table or a unit placed by `install.sh` and a later release can conflict.** slipway replaces a system file only if it is absent, equal, or what
   an earlier release placed; anything else it leaves and reports (`plan_system`, `Conflict`). `desktop-callers.toml`, `turnstile.*` and the
-  rules come from the same sources in both paths, so they are equal when the desktop checkout is the release's. `keycap.service` is not: the
-  release starts `/opt/quire/current/bin/keycap`, `install.sh` starts `<prefix>/bin/keycap`. Not tried.
+  rules come from the same sources in both paths, so they are equal when the desktop checkout is the release's. `keycap.service` was not (the
+  release started `/opt/quire/current/bin/keycap`, `install.sh` started `<prefix>/bin/keycap`): fixed by lane dharn, see its section below.
 - **Before the first release that carries turnstile**, everyone re-runs slipway's install by hand (a helper with the four rules and the step that
   reloads systemd and the device rules and starts `turnstile.socket`); an older helper refuses that release whole (slipway FINDINGS 25).
   `release/README.md` says so. `release/check-system-list.sh` fails against the manifest's current slipway pin (5c33809, 13 rules) until the pin
@@ -528,3 +528,12 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   could not place one: slipway's list allows `/etc/quire` only for names ending `-callers.toml`. No gate script keeps a list of forbidden shipped
   files (`check-no-uinput-access.sh` reads rule text), so no line was added; the administrator writes the floor, the person's own answers live in
   `$XDG_STATE_HOME/casement/privacy.toml`.
+- **keycap.service is one file from `install.sh` and from a release (lane dharn).** Both already put it at `/usr/lib/systemd/system/keycap.service`
+  (slipway's list, 4th rule); what differed was its `ExecStart`: the release rewrote it to `/opt/quire/current/bin/keycap` (`retarget`),
+  `install/system.sh` writes `<prefix>/bin/keycap`. The release now stages the unit as keycap ships it, `ExecStart=/usr/local/bin/keycap`, the link
+  `release/exports.toml` makes to `bin/keycap` (what turnstile's unit already did), so at the default prefix `/usr/local` the two files are equal
+  byte for byte and slipway never sees a conflict. `dist/desktop-callers.toml` already lists `/usr/local/bin/keycap` and the release paths, and the
+  link resolves to the release's program for the identity check. A non-default `--prefix` still writes its own path: that install is not a release's.
+  `gate/installer-check.sh` asserts the list rule, the byte-equal unit at the default prefix, that `build.sh` stages the unit at that path without
+  `retarget`, and the export link. Not run here (lane rules); the byte-for-byte case was tried by hand with `system.sh keycap --destdir` in a scratch folder.
+  A computer that already holds the previous release's unit (`/opt/quire/current/bin/keycap`) gets the new one as that release's own earlier file.

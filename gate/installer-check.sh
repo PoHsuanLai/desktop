@@ -155,6 +155,15 @@ grep -q '^ExecStart=/opt/d/bin/keycap$' "$dest/usr/lib/systemd/system/keycap.ser
 grep -q 'rules = \[ { when = "capslock", then = "ctrl+space" } \]\|when = "capslock", then = "ctrl+space"' "$dest/usr/lib/keycap/keycap.toml" || fail "the vendor keycap.toml has no Caps Lock rule"
 cmp -s "$HERE/../dist/keycap.toml" "$dest/usr/lib/keycap/keycap.toml" || fail "the vendor keycap.toml was not staged as it is in dist/"
 [ "$(stat -c %a "$dest/usr/lib/keycap/keycap.toml")" = 644 ] || fail "the vendor keycap.toml is not mode 644"
+# keycap.service is the same file from install.sh and from a release (slipway replaces a system file only when it is absent, equal or its own
+# earlier one): the path is the one slipway's list names, and at the default prefix the installed unit is the checkout's unit byte for byte,
+# which is what build.sh stages (no retarget; /usr/local/bin/keycap is the link exports.toml makes to bin/keycap)
+grep -qE '^/usr/lib/systemd/system +exact +keycap\.service$' "$HERE/../release/system-files.list" || fail "slipway's list (release/system-files.list) does not name /usr/lib/systemd/system/keycap.service"
+inst --destdir "$tmp/dest-default" --prefix /usr/local --only keycap >"$tmp/out-default.log" 2>&1 || { cat "$tmp/out-default.log" >&2; fail "the keyboard map step failed at the default prefix"; }
+cmp -s "$sib/keycap/dist/keycap.service" "$tmp/dest-default/usr/lib/systemd/system/keycap.service" || fail "keycap.service from install.sh at the default prefix is not the unit a release stages: $(cat "$tmp/dest-default/usr/lib/systemd/system/keycap.service" 2>&1)"
+grep -qF 'put_system 644 "$d/dist/keycap.service" /usr/lib/systemd/system/keycap.service' "$HERE/../release/build.sh" || fail "release/build.sh does not stage keycap.service at /usr/lib/systemd/system"
+! grep -q 'retarget.*keycap\.service' "$HERE/../release/build.sh" || fail "release/build.sh rewrites keycap.service's ExecStart: install.sh's unit and the release's would differ"
+grep -A1 -x 'link = "/usr/local/bin/keycap"' "$HERE/../release/exports.toml" | grep -qx 'target = "bin/keycap"' || fail "release/exports.toml has no /usr/local/bin/keycap link to bin/keycap"
 # /etc/keycap is the administrator's: the install writes nothing there
 [ ! -e "$dest/etc/keycap" ] || fail "the install wrote into /etc/keycap: $(ls -A "$dest/etc/keycap")"
 # nothing gives the person, or a group, the device file; the old stand-alone pieces are not staged
