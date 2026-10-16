@@ -28,7 +28,7 @@ gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "5db4e5bbed4f51b92aafdc6cbc612da02625583a"
+rev = "5230090aad51aa9d157173c924371e426b188dc0"
 branch = "master"
 gate = "lane"
 
@@ -109,7 +109,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "c885325b6c3bf047354dc2b5b18dda3899068e90"
+rev = "a49ff367f31ec3723880b3570dbf46606096dfea"
 branch = "master"
 gate = "none"
 
@@ -145,7 +145,7 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "8a8a7ee69bf09a2e21134ad987f81d65059789bd"
+rev = "5ea8b422db462a5d56b7a06f48a1cbf1f66cf415"
 branch = "master"
 gate = "lane"
 
