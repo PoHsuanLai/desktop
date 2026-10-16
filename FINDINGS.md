@@ -125,3 +125,22 @@ What I found and decided:
   has it" test is not reproduced).
 - `pack.sh` needed no change: it lists whatever is staged. `release/selftest.sh` (the "release (pack, verify, hostile
   releases)" check) now also stages a font and a modules-load file and asserts the font link and the system entry.
+
+## Release bundle: almanac and docket (lane desk-callers, 2026-10-16)
+
+- `release/build.sh` builds almanac (`memoryd`) and docket (its four daemons, `quire-do`, `docket-acp`; not the
+  voice daemon) after porter, locked, then runs their installers with `--bin-dir`, `--prefix /opt/quire/current`,
+  `--destdir <stage>` and `--sysconfdir /opt/quire/current/system/etc`. The caller tables land as system files in
+  `/etc/quire`, docket's default settings in `/etc/xdg/quire`. These steps need almanac >= 6aade09 and docket >=
+  e44112c (the `--sysconfdir` commits); the manifest revs are unchanged and the next bump brings them, so a release
+  built before that fails in these two steps.
+- Decision (owner, 2026-10-16): `/etc/xdg/quire`, the XDG system-wide config folder, is an allowed system folder
+  (slipway aa427f2, `ALLOWED_SYSTEM_DIRS`), and slipway leaves alone a file a person edited there. `release.py` and
+  `release/README.md` carry the same list; `manifest.toml` moves only slipway's rev to aa427f2. The selftest accepts
+  a file in `/etc/xdg/quire` and refuses one at `/etc/xdg/other.toml` (now 25 hostile releases).
+- `install/cargo.sh` gives almanac the `net.git-fetch-with-cli` setting its own installer passes (docket's does not).
+- Not exported: `quire-do` and `docket-acp` stay under `/opt/quire/current/bin` (no `/usr/local/bin` link in
+  `exports.toml` yet), and the shell completions and interface XML ship in the bundle without links.
+- The release workflow has a new job `agents` (almanac and docket together; both need perl and make, which
+  `release/deps.sh` already installs). Not run here; it fails until the manifest carries almanac >= 6aade09 and
+  docket >= e44112c.

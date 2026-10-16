@@ -20,7 +20,7 @@ tree_toolchain() {
 # needs.
 tree_configs() {
   case "$(basename "$1")" in
-    quire | sill | shell-host | detent | porter) echo "net.git-fetch-with-cli=true" ;;
+    quire | sill | shell-host | detent | porter | almanac) echo "net.git-fetch-with-cli=true" ;;
   esac
 }
 

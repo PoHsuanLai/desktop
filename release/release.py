@@ -51,7 +51,7 @@ AUTO_EXPORT_DIRS = (
 SYSTEM_TREE = "system"
 SYSTEM_DIRS = (
     "/etc/udev/rules.d", "/etc/modules-load.d", "/etc/modprobe.d", "/usr/lib/systemd/system", "/etc/pam.d",
-    "/etc/polkit-1/rules.d", "/etc/porter", "/etc/quire",
+    "/etc/polkit-1/rules.d", "/etc/porter", "/etc/quire", "/etc/xdg/quire",
 )
 SYSTEM_NAME = re.compile(r"^[A-Za-z0-9+@_-][A-Za-z0-9._+@-]*$")
 
