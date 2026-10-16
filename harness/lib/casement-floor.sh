@@ -44,7 +44,7 @@ floor_powers() {
     wlr-randr | kanshi) echo displays ;;
     wlrctl | lswt | casement-probe) echo windows ;; # casement-probe: `workspaces` (ext_workspace_manager)
     swaylock | demo_lock) echo lock ;;
-    sill | detent | demo_*) ;; # the desktop's programs and the demos: the role below, no power
+    sill | detent | demo_* | casement-shell-exec) ;; # the desktop's programs, the demos and their launcher: the role below, no power
     accountd | inferd | syncd | xdg-desktop-portal | casement | fake-shell) ;; # services the desktop's programs check by role (sill, detent, transom)
     *) return 1 ;;
   esac
@@ -54,11 +54,13 @@ floor_powers() {
 # portal; and the services sill, detent and transom check by role: accounts, inference, sync, portal_frontend,
 # compositor); nothing
 # for a program that is none. The shell-host demos stand in for the shell: they map the shell's
-# surfaces (an exclusive keyboard, an overlay), which casement gives only to the shell. demo_lock is a screen locker,
-# a power a floor row allows, and is not the shell.
+# surfaces (an exclusive keyboard, an overlay), which casement gives only to the shell's connection. The ones that
+# need it start through casement-shell-exec (shell-host's comp_as_shell), which asks Compositor1.Connect("shell")
+# for that connection, so it is the program that must hold the role. demo_lock is a screen locker, a power a floor
+# row allows, and is not the shell.
 floor_role() {
   case "$1" in
-    sill | demo_hover | demo_scroll | demo_ime | demo_swipe | demo_switcher | demo_drag | demo_popup_keys) echo shell ;;
+    sill | casement-shell-exec | demo_hover | demo_scroll | demo_ime | demo_swipe | demo_switcher | demo_drag | demo_popup_keys) echo shell ;;
     detent) echo settings ;;
     transom) echo portal ;;
     accountd) echo accounts ;;
@@ -90,7 +92,7 @@ floor_app() {
 floor_image() {
   local path
   case "$1" in
-    casementctl | casement-probe) path="${SCEN_TOOLS:?floor_image: scenario.sh is not sourced}/bin/$1" ;;
+    casementctl | casement-probe | casement-shell-exec) path="${SCEN_TOOLS:?floor_image: scenario.sh is not sourced}/bin/$1" ;;
     transom) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/transom-target/debug/transom" ;;
     sill) path="${FLOOR_SILL_TARGET:-${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/sill-target}/debug/sill" ;; # FLOOR_SILL_TARGET: the accounts rig runs sill at its pin
     accountd | inferd | syncd) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/porter-target/debug/$1" ;;

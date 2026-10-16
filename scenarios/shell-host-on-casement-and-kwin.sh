@@ -22,7 +22,7 @@ require_jail
 SCRIPTS=(hover scroll modifiers swipe drag ime lock popup-keyboard)
 SH="$SCEN_SRC/shell-host"
 EXAMPLES="$SH/target/debug/examples"
-scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" \
+scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" "$SCEN_TOOLS/bin/casement-shell-exec" \
   "$SCEN_TOOLS/bin/foot" "$SH/scripts/dev/lib/compositor.sh" \
   "$EXAMPLES/demo_hover" "$EXAMPLES/demo_scroll" "$EXAMPLES/demo_ime" "$EXAMPLES/demo_swipe" \
   "$EXAMPLES/demo_switcher" "$EXAMPLES/demo_drag" "$EXAMPLES/demo_lock" "$EXAMPLES/demo_popup_keys" \
@@ -30,9 +30,10 @@ scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TO
 
 export COMPOSITOR=casement CASEMENT_TOOLS="$SCEN_TOOLS"
 # accept-ime runs fcitx5, which takes the input method and the virtual keyboard; accept-lock locks with demo_lock (a floor row for the built demo).
-# The demos that map the shell's surfaces (an exclusive keyboard: accept-modifiers, accept-ime, ...) are rows of the caller list as the shell
-# (harness/lib/casement-floor.sh).
-floor_shim shell-host-on-casement fcitx5 demo_lock demo_hover demo_scroll demo_ime demo_swipe demo_switcher demo_drag demo_popup_keys
+# The demos that map the shell's surfaces are rows of the caller list as the shell; the ones that keep an exclusive keyboard
+# (accept-modifiers, accept-ime) start through casement-shell-exec, which asks for the shell's connection and so holds the
+# role itself (harness/lib/casement-floor.sh).
+floor_shim shell-host-on-casement fcitx5 casement-shell-exec demo_lock demo_hover demo_scroll demo_ime demo_swipe demo_switcher demo_drag demo_popup_keys
 export SHELL_HOST_BACKEND=cpu FOOT="$SCEN_TOOLS/bin/foot"
 OUT_DIR=$(scenario_out shell-host-on-casement)
 

@@ -3,7 +3,7 @@
 # cargo or the network), into this checkout's git-ignored build/. Never
 # writes into a sibling checkout: each repo builds into its own target directory under build/.
 #
-#   build/tools/bin/{casement,casementctl,casement-probe,fake-logind}   casement's dev/bootstrap.sh --build-only
+#   build/tools/bin/{casement,casementctl,casement-probe,casement-shell-exec,fake-logind} casement's dev/bootstrap.sh --build-only
 #   build/tools/bin/foot                                                 the host's (install foot from your distro), else, on Fedora only, its rpm (dnf download, unpacked)
 #   build/sill-target/debug/sill                                         sill with --features debug (the fake DDC)
 #   build/transom-target/debug/transom                                  transom (the portal backend) from the sibling checkout, for portal-quire; needs libpipewire-devel and clang
