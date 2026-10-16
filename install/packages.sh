@@ -29,6 +29,8 @@
 # them the same) and the two lines that give a source install the same program.
 XWAYLAND_SATELLITE_TAG=v0.8.3
 XWAYLAND_SATELLITE_CARGO_LINE="cargo install --locked --git https://github.com/Supreeeme/xwayland-satellite --tag $XWAYLAND_SATELLITE_TAG"
+# casement's own setting for the program's place (xwayland.satellite in casement/settings.toml): a full path, no ~.
+XWAYLAND_SATELLITE_CONFIG_LINE="satellite = \"${HOME:-/home/YOU}/.cargo/bin/xwayland-satellite\""
 XWAYLAND_SATELLITE_APT_LINE="sudo apt install clang pkg-config libxcb1-dev libxcb-composite0-dev libxcb-randr0-dev libxcb-res0-dev libxcb-cursor-dev"
 
 need_table() {
@@ -180,7 +182,7 @@ packages_debian() {
     xdg-open) echo xdg-utils ;;
     vulkan-loader) echo libvulkan1 ;;
     vulkan-driver) echo mesa-vulkan-drivers ;;
-    xwayland-satellite) echo "!xwayland-satellite (older X11 apps) is not in the Ubuntu archive; the prebuilt release includes it. To build it yourself you need Rust from rustup (Ubuntu's is too old), and it lands in ~/.cargo/bin, which must be on your session's PATH. First: $XWAYLAND_SATELLITE_APT_LINE   Then: $XWAYLAND_SATELLITE_CARGO_LINE" ;;
+    xwayland-satellite) echo "!xwayland-satellite (older X11 apps) is not in the Ubuntu archive; the prebuilt release includes it. To build it yourself you need Rust from rustup (Ubuntu's is too old). First: $XWAYLAND_SATELLITE_APT_LINE   Then, as yourself and never as root: $XWAYLAND_SATELLITE_CARGO_LINE   That puts it in ~/.cargo/bin, which the session's search path may not include; point casement at it with this line under [xwayland] in your own ~/.config/casement/settings.toml, which you write yourself (the installer never touches it): $XWAYLAND_SATELLITE_CONFIG_LINE" ;;
     pipewire) echo pipewire ;;
     pipewire-pulse) echo pipewire-pulse ;;
     wireplumber) echo wireplumber ;;

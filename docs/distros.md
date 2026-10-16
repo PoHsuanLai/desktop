@@ -98,8 +98,18 @@ sudo apt install clang pkg-config libxcb1-dev libxcb-composite0-dev libxcb-randr
 cargo install --locked --git https://github.com/Supreeeme/xwayland-satellite --tag v0.8.3
 ```
 
-That puts `xwayland-satellite` in `~/.cargo/bin`, which has to be on the PATH of your session for casement to find it.
-The installer never runs these two lines. v0.8.3 is the tag the release bundle builds as well
+That puts `xwayland-satellite` in `~/.cargo/bin`, which the session's search path may not include. casement has a
+setting for the program's place, so point it there with one line in your own `~/.config/casement/settings.toml`
+(or `$XDG_CONFIG_HOME/casement/settings.toml`), under the heading `[xwayland]`, with your own home folder written out
+in full (casement does not expand `~`):
+
+```
+[xwayland]
+satellite = "/home/YOU/.cargo/bin/xwayland-satellite"
+```
+
+You write that file yourself: the installer never runs the two lines above and never touches your settings. Run the
+`cargo install` line as yourself, never as root. The setting takes effect at the next login. v0.8.3 is the tag the release bundle builds as well
 (`SATELLITE_TAG` in `release/build.sh`; `gate/distro-check.sh` checks it matches `install/packages.sh`).
 
 ## Colour emoji

@@ -284,18 +284,22 @@ build_slipway() {
 build_satellite() {
   # No checkout beside the repos: cargo fetches the tag. Installed into a scratch root and only the program is copied, so
   # cargo's own bookkeeping files stay out of the bundle. Run from / so no tree's cargo config is read. It lands in bin/
-  # and is exported to /usr/local/bin (exports.toml) so casement finds it on the session's PATH. The notice is the MPL-2.0
-  # "where to get the source" statement; the program is unmodified.
+  # and is exported to /usr/local/bin (exports.toml) so casement finds it on the session's PATH. The program is
+  # unmodified MPL-2.0 code: the bundle carries the licence text from the same tag (a shallow clone of it, in the same
+  # scratch folder) and a notice saying where the source is.
   local croot; croot=$(mktemp -d)
   echo "== cargo install --locked --git $SATELLITE_URL --tag $SATELLITE_TAG (xwayland-satellite)"
   (cd / && RUSTUP_TOOLCHAIN="$SATELLITE_RUST" CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/satellite" \
     cargo install --locked --git "$SATELLITE_URL" --tag "$SATELLITE_TAG" --root "$croot" xwayland-satellite)
   put 755 "$croot/bin/xwayland-satellite" bin/xwayland-satellite
-  rm -rf "$croot"
+  git clone --quiet --depth 1 --branch "$SATELLITE_TAG" "$SATELLITE_URL" "$croot/src"
+  head -n 1 "$croot/src/LICENSE" | grep -q 'Mozilla Public License' || die "xwayland-satellite $SATELLITE_TAG: LICENSE is not the Mozilla Public License"
+  put 644 "$croot/src/LICENSE" share/licenses/xwayland-satellite/LICENSE
   local notice; notice=$(mktemp)
-  printf 'xwayland-satellite %s, licence MPL-2.0, shipped unmodified as a separate program.\nSource and licence text: %s/tree/%s\n' \
-    "$SATELLITE_TAG" "$SATELLITE_URL" "$SATELLITE_TAG" >"$notice"
+  printf 'xwayland-satellite %s (commit %s), licence MPL-2.0 (the text is the LICENSE file beside this one), shipped unmodified as a separate program.\nSource: %s/tree/%s\n' \
+    "$SATELLITE_TAG" "$(git -C "$croot/src" rev-parse HEAD)" "$SATELLITE_URL" "$SATELLITE_TAG" >"$notice"
   put 644 "$notice" share/licenses/xwayland-satellite/NOTICE.txt
+  rm -rf "$croot"
   rm -f "$notice"
   echo "xwayland-satellite $SATELLITE_TAG" >"$out/components.d/xwayland-satellite.txt"
 }

@@ -231,7 +231,20 @@ tables at `$sysconfdir/porter`):
   line, in plain words; `docs/distros.md` has the same under "X11 apps on Ubuntu". Not run. The `--check` note is one
   line, because notes are printed that way.
 - Not verified: that `cargo install --git ... xwayland-satellite` builds with the package list above (no build here);
-  the first CI run shows. That a satellite in `~/.cargo/bin` is on the PATH casement's unit sees: the unit gets the user
-  manager's PATH, which on many setups does not include `~/.cargo/bin`; the note says so but nothing sets it. A
-  `--root /usr/local` install would avoid that and would need root, which the note does not ask for.
+  the first CI run shows.
+- Superseded by the follow-up below: a satellite in `~/.cargo/bin` may not be on the PATH casement's unit sees.
 - `gate/distro-check.sh` checks that the Ubuntu note carries the cargo line and that the tag matches `release/build.sh`.
+
+### Follow-up: full MPL text and the Ubuntu config line (2026-10-16)
+
+- The bundle now carries the full MPL-2.0 text beside the binary: `build_satellite` shallow-clones the tag
+  (`git clone --depth 1 --branch v0.8.3`) in the scratch folder, checks the first line of `LICENSE` is the Mozilla Public
+  License, and stages it as `share/licenses/xwayland-satellite/LICENSE` next to `NOTICE.txt` (which keeps the source
+  address and now also the commit). The release selftest checks no licences for any component, so it asserts nothing new.
+- casement has a path setting (casement 5ea8b42, `config/sections/xwayland.rs` and `xwayland/resolve.rs`): key
+  `satellite` in the `[xwayland]` table of `$XDG_CONFIG_HOME/casement/settings.toml` (default
+  `~/.config/casement/settings.toml`); a value with a `/` is used as the full path and is not expanded (no `~`), empty means
+  look in the PATH; it takes effect at the next login. So the Ubuntu note no longer asks for `sudo install`: it prints the
+  cargo line (as yourself, never root) and then `satellite = "<home>/.cargo/bin/xwayland-satellite"` with the path to the
+  file, and says the person writes it. The installer writes nothing there. `gate/distro-check.sh` and `docs/distros.md`
+  match. Not run on a machine: that casement reads the key as described (read from its source only).
