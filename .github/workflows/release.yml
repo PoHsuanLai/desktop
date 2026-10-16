@@ -1,7 +1,10 @@
 # Builds the signed release bundle of the whole desktop at manifest.toml's pins and publishes it to the
 # public PoHsuanLai/desktop-releases (binaries only; the source repos are private). release/README.md says
-# what the owner sets up once. Secrets: RELEASE_READ_TOKEN (read the private repos), MINISIGN_SECRET_KEY and
-# MINISIGN_PASSWORD (sign), RELEASES_TOKEN (create the release in desktop-releases).
+# what the owner sets up once. Secrets: RELEASE_READ_TOKEN (read the private repos; a repository secret, read-only),
+# and, in two GitHub environments that only the default branch and version tags may use and that need a reviewer:
+# `release-signing` holds MINISIGN_SECRET_KEY and MINISIGN_PASSWORD (job pack), `release-publish` holds
+# RELEASES_TOKEN (job publish). A workflow run from any other branch cannot reach the signing key, and the repository
+# holds no copy of it outside the environment.
 #
 # The programs are built on Ubuntu 24.04 (a container pinned by digest, so what gets signed is not built on whatever the
 # tag names that day; bump it on purpose, `docker buildx imagetools inspect ubuntu:24.04` prints the digest), the oldest
@@ -44,6 +47,18 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
+      - name: Only the default branch or a version tag releases
+        env:
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # A second line of defence: the environments below are what actually keeps the signing key from a branch.
+          case "$REF" in
+            "refs/heads/$DEFAULT_BRANCH" | refs/tags/v*) ;;
+            *) echo "release: $REF is not the default branch or a version tag" >&2; exit 1 ;;
+          esac
+
       - name: Version
         id: v
         env:
@@ -184,6 +199,8 @@ jobs:
     needs: [prepare, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    # The signing key and its password live in this environment only (release/README.md, "What you do once").
+    environment: release-signing
     steps:
       - name: Tools
         run: |
@@ -195,6 +212,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: desktop
+
+      - name: The public key is committed, and the signing key is set up
+        env:
+          MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          # Before anything is signed: with no committed key nothing can be checked, and with no key in the environment
+          # the environment is not set up.
+          [ -f desktop/release/release.pub ] || { echo "release/release.pub is not committed (release/README.md step 3)" >&2; exit 1; }
+          [ -n "$MINISIGN_SECRET_KEY" ] || { echo "the release-signing environment has no MINISIGN_SECRET_KEY (release/README.md step 5)" >&2; exit 1; }
+          echo "Signing key id this release is checked against:"
+          sed -n 1p desktop/release/release.pub
 
       - name: Download the staged trees
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -243,7 +272,6 @@ jobs:
       - name: Verify as slipway will
         run: |
           set -euo pipefail
-          [ -f desktop/release/release.pub ] || { echo "release/release.pub is not committed (release/README.md step 3)" >&2; exit 1; }
           desktop/release/verify.sh out --pubkey desktop/release/release.pub
 
       - name: Keep the signed release for the smoke and publish jobs
@@ -365,6 +393,8 @@ jobs:
     needs: [prepare, smoke, health]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # RELEASES_TOKEN, which can create a release in desktop-releases, lives in this environment only.
+    environment: release-publish
     steps:
       - name: Download the signed release
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

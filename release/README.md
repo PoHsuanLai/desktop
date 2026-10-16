@@ -73,12 +73,15 @@ stages the colour emoji font at `share/fonts/quire/Noto-COLRv1.ttf` (with its li
    minisign -G -p ~/.config/quire-release/release.pub -s ~/.config/quire-release/release.key
    ```
 
-3. Commit the public key to this repo. It is what `verify.sh` checks the CI's output against, and the file
-   slipway reads on a machine is `/usr/share/slipway/release.pub` (the same file):
+3. Commit the public key to this repo, **before the first run**: the pack job stops at once without it. It is what
+   `verify.sh` checks the CI's output against, and the file slipway reads on a machine is
+   `/usr/share/slipway/release.pub` (the same file). Its first line carries the key id; the workflow prints it in every
+   run, and `sed -n 1p release/release.pub` shows it, so a person can compare the two:
 
    ```
    cp ~/.config/quire-release/release.pub release/release.pub
    git add release/release.pub && git commit -m "release: the public signing key"
+   sed -n 1p release/release.pub
    ```
 
 4. Make two fine-grained personal access tokens (GitHub, Settings, Developer settings):
@@ -89,14 +92,42 @@ stages the colour emoji font at `share/fonts/quire/Noto-COLRv1.ttf` (with its li
      slipway); permission Contents: Read-only, and nothing else.
    - `RELEASES_TOKEN`: repository PoHsuanLai/desktop-releases only; permission Contents: Read and write.
 
-5. Store the three secrets and the password (the pasted key is the whole file):
+5. Make the two environments the workflow's signing and publishing jobs run in, each usable only from the default
+   branch and from `v*` tags, each with you as the required reviewer (you approve each run on GitHub; a run from any other
+   branch is refused before it can read a secret). The workflow's `environment:` lines are what bind the jobs to them:
 
    ```
-   gh secret set RELEASE_READ_TOKEN   --repo PoHsuanLai/desktop
-   gh secret set RELEASES_TOKEN       --repo PoHsuanLai/desktop
-   gh secret set MINISIGN_SECRET_KEY  --repo PoHsuanLai/desktop < ~/.config/quire-release/release.key
-   gh secret set MINISIGN_PASSWORD    --repo PoHsuanLai/desktop
+   for env in release-signing release-publish; do
+     gh api -X PUT repos/PoHsuanLai/desktop/environments/$env \
+       -F 'deployment_branch_policy[protected_branches]=false' -F 'deployment_branch_policy[custom_branch_policies]=true' \
+       -F 'reviewers[][type]=User' -F "reviewers[][id]=$(gh api user --jq .id)"
+     gh api -X POST repos/PoHsuanLai/desktop/environments/$env/deployment-branch-policies -f name=master -f type=branch
+     gh api -X POST repos/PoHsuanLai/desktop/environments/$env/deployment-branch-policies -f name='v*' -f type=tag
+   done
    ```
+
+   Also restrict who may create `v*` tags (Settings, Rules, Rulesets: a tag ruleset on `v*` that blocks creation and
+   deletion for everyone but you), because a pushed tag is allowed to use the environments.
+
+6. Store the secrets: the signing key and its password in `release-signing`, the release token in `release-publish`, and
+   the read-only token as a repository secret (the pasted key is the whole file). Then **delete any repository-level copy
+   of the signing key, its password and `RELEASES_TOKEN`**: a repository secret of the same name is readable by a workflow
+   run from any branch, which is what the environments are there to prevent:
+
+   ```
+   gh secret set MINISIGN_SECRET_KEY --env release-signing --repo PoHsuanLai/desktop < ~/.config/quire-release/release.key
+   gh secret set MINISIGN_PASSWORD   --env release-signing --repo PoHsuanLai/desktop
+   gh secret set RELEASES_TOKEN      --env release-publish --repo PoHsuanLai/desktop
+   gh secret set RELEASE_READ_TOKEN  --repo PoHsuanLai/desktop
+   gh secret delete MINISIGN_SECRET_KEY --repo PoHsuanLai/desktop   # only if an earlier setup made it
+   gh secret delete MINISIGN_PASSWORD   --repo PoHsuanLai/desktop   # only if an earlier setup made it
+   gh secret delete RELEASES_TOKEN      --repo PoHsuanLai/desktop   # only if an earlier setup made it
+   ```
+
+What this does not do: there is one signing key, and slipway's privileged helper trusts exactly that key file, so
+replacing a lost or stolen key means each person runs slipway's install with the new `--pubkey` again. A second signer
+or a list of next keys would need a change to slipway's key handling and a new helper on every computer (owner's
+decision, recorded in FINDINGS).
 
 ## Cutting a release
 

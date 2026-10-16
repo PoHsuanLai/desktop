@@ -377,3 +377,19 @@ check first is listed under "Not verified" at the end of this section.
   repositories that allow reachable-sha fetches, as GitHub does), and that `cargo install --path` of the repository root
   installs only `xwayland-satellite` (its root `Cargo.toml` is a package that is also a workspace root; read from
   the file at that commit).
+
+### ROOT-09: the signing key is in a protected environment
+
+- The workflow's `pack` job runs in the environment `release-signing` (the signing key and its password) and `publish` in
+  `release-publish` (the token that can create a release in desktop-releases); the `prepare` job also refuses any ref but the
+  default branch and `v*` tags. The pack job checks `release/release.pub` is committed, and that the environment has a key,
+  before it signs anything, and prints the public key's id line in every run. `release/README.md` "What you do once" steps 3,
+  5 and 6 are the owner's one-time commands (create both environments with a reviewer and branch/tag restriction, a tag ruleset
+  on `v*`, set the secrets in the environments, delete any repository-level copies). Nothing was created: no repository,
+  secret, environment or key.
+- Until the owner has done that, the run stops at `pack` with a message naming the missing piece. `release/release.pub` is not in
+  the repository (only the owner can make the key), so the first release also needs step 3.
+- **Needs a decision:** a second signer and a list of next keys (so a key can be rotated without every person reinstalling the
+  helper) need a change in slipway's `PublicKey` and a new helper on every computer. Not done.
+- Limits: environment rules protect the secrets from a pushed branch, not from someone who can change the default branch or
+  push a `v*` tag; approvals are a click by the owner, who is also the only reviewer.
