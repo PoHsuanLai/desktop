@@ -76,9 +76,7 @@ step_screenshot() { accept screenshot; }
 step_screencast() { accept screencast-output; }
 step_settings() { accept settings; }
 
-# step_screencast waits on casement: the first frame of a capture session comes back, then casement
-# closes transom's connection at the next capture (lane cas36-castframe; cas-wave-2026-10-15.md).
-run_steps step_routing step_boot step_settings step_screenshot
+run_steps step_routing step_boot step_settings step_screenshot step_screencast
 if [ "$STATUS" != 0 ]; then
   for f in "$OUT_DIR"/chain-*/transom.log "$OUT_DIR"/chain-*/portal.log; do
     [ -f "$f" ] || continue
