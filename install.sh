@@ -7,15 +7,17 @@
 #   --dry-run      print the plan (what runs, in which order, what is left to you), run nothing, build nothing
 #   --prefix DIR   where the software goes (default $PREFIX, else /usr/local)
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
-#   --sysconfdir   where porter's caller table goes (default $SYSCONFDIR, else /etc)
+#   --sysconfdir   where porter's caller table goes (default $SYSCONFDIR, else /etc); almanac and docket always use /etc/quire
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: porter, detent, casement, sill, transom, keycap, anyview,
-#                  mailo, palmrest, session, fonts)
+#   --only NAMES   just these components (comma separated: porter, almanac, docket, detent, casement, sill, transom, keycap,
+#                  anyview, mailo, palmrest, session, fonts)
 #
-# Order: porter (the account daemons and the caller table), detent (Settings), casement (the compositor and
+# Order: porter (the account daemons and the caller table), almanac (the memory daemon and its caller table),
+# docket (the action router, the companion, the reader and the tool server, with their caller tables; they read
+# porter's accounts), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
 # scripts/install.sh builds it), keycap, anyview, mailo, palmrest, and last the session itself (this repo's
 # install/install.sh: the desktop-session script, the user target and the login entry "sill (casement)"). Each
@@ -43,6 +45,9 @@
 #   - needs root: the destination is not writable by you (a system prefix, /etc/systemd/user, /etc)
 #   - sill, palmrest: installers with fixed destinations that ask for sudo or write your home themselves
 #   - keycap: its system files go to /etc and /usr/local; it stages only under --destdir
+#   - almanac, docket: their caller tables go to /etc/quire (always replaced) and docket's default settings to
+#     /etc/xdg/quire. Their installers refuse to run as root and ask for sudo, doas or pkexec themselves for
+#     just those steps, so outside a --destdir they are left to you, run as yourself (never under sudo)
 # Exit: 0 done (or the plan printed), 1 a component failed, 2 bad usage or a missing component.
 set -euo pipefail
 
@@ -57,7 +62,7 @@ source "$HERE/install/packages.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(porter detent casement sill transom keycap anyview mailo palmrest session)
+ORDER=(porter almanac docket detent casement sill transom keycap anyview mailo palmrest session)
 
 # Where porter goes, whatever --prefix says. Its daemons look for providers, clients.toml and the stoker
 # catalog only under /usr/share (finding B1). Remove this, and the --prefix /usr below, once porter searches
@@ -118,6 +123,20 @@ describe() {
       args=(--prefix "$PORTER_PREFIX" --sysconfdir "$sysconfdir")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       writes=("$destdir$PORTER_PREFIX" "$destdir$sysconfdir") ;;
+    almanac)
+      # memoryd and /etc/quire/memory-callers.toml. The installer has no --sysconfdir: /etc/quire is fixed.
+      script=scripts/install.sh
+      args=(--prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix" "$destdir/etc/quire")
+      [ -n "$destdir" ] || yourself="its caller table goes to /etc/quire; its installer asks for sudo itself and must not be run as root" ;;
+    docket)
+      # the daemons, quire-do and /etc/quire/*-callers.toml (fixed, like almanac's), defaults in /etc/xdg/quire.
+      script=scripts/install.sh
+      args=(--prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix" "$destdir/etc/quire" "$destdir/etc/xdg/quire")
+      [ -n "$destdir" ] || yourself="its caller tables go to /etc/quire; its installer asks for sudo itself and must not be run as root" ;;
     detent)
       script=scripts/install.sh
       envs=("PREFIX=$prefix" "DESTDIR=$destdir")

@@ -83,3 +83,64 @@ bundle-size and file-count limits are not forged in selftest: too big), DEL esca
 `scripts/install.sh`. slipway is in `manifest.toml` (`[repo.slipway]`, rev e8af08f4); the workflow's
 `slipway_ref` input is gone. polkit's action directory follows a link into /opt on a real machine only if
 polkit does; confirm on a machine.
+
+## desk-callers (2026-10-16)
+
+The top-level `install.sh` now installs almanac (the memory daemon, `/etc/quire/memory-callers.toml`) and
+docket (its four daemons, `quire-do`, and the `/etc/quire/*-callers.toml` tables), between porter and detent.
+Both are in `ORDER`, the `--only` help, the README list and `gate/installer-check.sh` (stubs, plan order, the
+staged arguments, and the not-staged case).
+
+What I found and decided:
+
+- Neither installer takes `--sysconfdir`; `/etc/quire` (and docket's `/etc/xdg/quire`) are fixed. Not
+  invented: the top-level declares those places as written, under the destdir, and passes only `--prefix` and
+  `--destdir`. No `--distro`, `--sandbox` or `--no-build` is passed (nothing existing passes them either); the
+  installers read the family from the machine, so Ubuntu, Fedora and Arch work. No linker is asked for.
+- They do not fit porter's "print the root command" path: both refuse to run as root ("Run this as yourself")
+  and escalate (`$SUDO`, sudo, doas, pkexec) per step themselves. A root hint for them would fail. So without a
+  `--destdir` they are listed as "yourself" with the plain command (the same way sill and keycap are); with a
+  `--destdir` they run here and never escalate. A destdir that you cannot write stops them with their own message.
+- `release/build.sh` is not changed: it builds by name from a fixed list and neither is in it. Adding them
+  needs the installers to stage `/etc/quire` inside the prefix (a `--sysconfdir`, or put_system-style output for
+  `memory-callers.toml` and the docket tables), because build.sh refuses files outside `/opt/quire/current` and
+  `release.py` allows system files only in listed folders. Ask almanac and docket for `--sysconfdir`, then add
+  `build_almanac` and `build_docket` (build locked, `--no-build --bin-dir`). The manifest already lists both
+  with gate rows; revs untouched.
+- `install/uninstall.sh` is the session's alone; no top-level uninstall lists components.
+
+## Release bundle: emoji font and monitor brightness (lane desk-callers, item 212, 2026-10-16)
+
+- The session component of `release/build.sh` now stages `fonts/Noto-COLRv1.ttf` and the licence
+  (`OFL-Noto-COLRv1.txt`, the name `install.sh` uses) at `share/fonts/quire/`. `share/fonts` is an automatic export,
+  so the bundle links `/usr/share/fonts/quire/Noto-COLRv1.ttf`; quire's `emoji_file.rs` looks for
+  `<data dir>/fonts/quire/Noto-COLRv1.ttf` over `XDG_DATA_DIRS` (default includes `/usr/share`), and fontconfig
+  reads `/usr/share/fonts` too. The bundle ships the font on every distro (Fedora's own copy is byte-identical,
+  harmless); `install.sh` skips it where fontconfig already has one, which a bundle cannot test.
+- sill ships both files (`dist/udev/60-sill-ddc.rules`, `dist/modules-load.d/sill-ddc.conf`), and slipway's system
+  folders (origin/master at b607414, `ALLOWED_SYSTEM_DIRS`) include `/etc/udev/rules.d` and `/etc/modules-load.d`, so
+  both are staged with `put_system` at those paths (the same folders keycap uses). No slipway follow-up needed. The
+  local ~/slipway checkout is five commits behind origin (its link list still has 7 folders); `release.py`'s lists
+  match origin. Same-tag duplicate with Fedora's `60-ddcutil-i2c.rules` is harmless (install.sh's "unless ddcutil
+  has it" test is not reproduced).
+- `pack.sh` needed no change: it lists whatever is staged. `release/selftest.sh` (the "release (pack, verify, hostile
+  releases)" check) now also stages a font and a modules-load file and asserts the font link and the system entry.
+
+## Release bundle: almanac and docket (lane desk-callers, 2026-10-16)
+
+- `release/build.sh` builds almanac (`memoryd`) and docket (its four daemons, `quire-do`, `docket-acp`; not the
+  voice daemon) after porter, locked, then runs their installers with `--bin-dir`, `--prefix /opt/quire/current`,
+  `--destdir <stage>` and `--sysconfdir /opt/quire/current/system/etc`. The caller tables land as system files in
+  `/etc/quire`, docket's default settings in `/etc/xdg/quire`. These steps need almanac >= 6aade09 and docket >=
+  e44112c (the `--sysconfdir` commits); the manifest revs are unchanged and the next bump brings them, so a release
+  built before that fails in these two steps.
+- Decision (owner, 2026-10-16): `/etc/xdg/quire`, the XDG system-wide config folder, is an allowed system folder
+  (slipway aa427f2, `ALLOWED_SYSTEM_DIRS`), and slipway leaves alone a file a person edited there. `release.py` and
+  `release/README.md` carry the same list; `manifest.toml` moves only slipway's rev to aa427f2. The selftest accepts
+  a file in `/etc/xdg/quire` and refuses one at `/etc/xdg/other.toml` (now 25 hostile releases).
+- `install/cargo.sh` gives almanac the `net.git-fetch-with-cli` setting its own installer passes (docket's does not).
+- Not exported: `quire-do` and `docket-acp` stay under `/opt/quire/current/bin` (no `/usr/local/bin` link in
+  `exports.toml` yet), and the shell completions and interface XML ship in the bundle without links.
+- The release workflow has a new job `agents` (almanac and docket together; both need perl and make, which
+  `release/deps.sh` already installs). Not run here; it fails until the manifest carries almanac >= 6aade09 and
+  docket >= e44112c.

@@ -7,12 +7,12 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter detent transom keycap palmrest anyview mailo slipway); the
+#   --only NAMES    just these (casement sill session porter almanac docket detent transom keycap palmrest anyview mailo slipway); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
 # /opt/quire/current under the destdir OUT/stage, through the component's own installer where it can stage
-# (porter, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
+# (porter, almanac, docket, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
 # palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
@@ -27,7 +27,7 @@ ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
 # shellcheck source=../install/cargo.sh
 source "$ROOT/install/cargo.sh"
-ALL=(casement sill session porter detent transom keycap palmrest anyview mailo slipway)
+ALL=(casement sill session porter almanac docket detent transom keycap palmrest anyview mailo slipway)
 
 version="" out="$ROOT/build/release" sib="$(dirname "$ROOT")" only=""
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -117,6 +117,11 @@ build_sill() {
   put 644 "$schema/sill.settings.toml" share/quire/settings/sill.settings.toml
   rm -rf "$schema"
   put_system 644 "$d/dist/pam.d/sill" /etc/pam.d/sill
+  # External-monitor brightness (distro audit D7): the uaccess rule for the i2c buses and the list that loads
+  # i2c-dev. Both folders are on slipway's list of system folders. Fedora's ddcutil package ships a rule with the
+  # same tag; two rules with the same tag are harmless, so the install.sh "unless ddcutil has it" test is not needed.
+  put_system 644 "$d/dist/udev/60-sill-ddc.rules" /etc/udev/rules.d/60-sill-ddc.rules
+  put_system 644 "$d/dist/modules-load.d/sill-ddc.conf" /etc/modules-load.d/sill-ddc.conf
   put 644 "$d/dist/keycap/keycap.toml" share/sill/keycap.toml
 }
 
@@ -126,6 +131,11 @@ build_session() {
   # the user target in lib/systemd/user (this installer puts it under <sysconfdir>/systemd/user).
   CASEMENT_UNIT_FILE=/nonexistent "$ROOT/install/install.sh" --prefix "$P" --destdir "$stage" \
     --sysconfdir "$P/lib" --sessions-dir "$P/share/wayland-sessions"
+  # The colour emoji font (install.sh puts the same two files in <prefix>/share/fonts/quire/): ubuntu and arch ship
+  # a bitmap build our renderer cannot draw. share/fonts is exported to /usr/share/fonts, where quire's search
+  # (ds-blitz emoji_file.rs: <data dir>/fonts/quire/Noto-COLRv1.ttf for each XDG data dir, /usr/share included) finds it.
+  put 644 "$ROOT/fonts/Noto-COLRv1.ttf" share/fonts/quire/Noto-COLRv1.ttf
+  put 644 "$ROOT/fonts/OFL.txt" share/fonts/quire/OFL-Noto-COLRv1.txt
 }
 
 build_porter() {
@@ -135,6 +145,25 @@ build_porter() {
   # system file slipway-apply places at /etc/porter/callers.toml (where porter reads it).
   (cd "$d" && CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/porter" \
     ./scripts/install.sh --no-build --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
+}
+
+build_almanac() {
+  local d; d=$(repo_dir almanac)
+  cargo_in "$d" almanac -p memoryd
+  # Needs almanac >= 6aade09 (its installer takes --sysconfdir; the next manifest bump brings it). The caller table
+  # lands at system/etc/quire/memory-callers.toml, a system file slipway-apply places at /etc/quire. The unit and the
+  # activation file name the prefix's libexec. Built above, so the installer only installs (--bin-dir).
+  (cd "$d" && ./scripts/install.sh --bin-dir "$(tdir almanac)" --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
+}
+
+build_docket() {
+  local d; d=$(repo_dir docket)
+  cargo_in "$d" docket -p intentd -p companiond -p readerd -p actions-mcp -p docket-cli -p docket-acp-bin
+  # Needs docket >= e44112c (--sysconfdir; the next manifest bump brings it). Its porter crates come by git at the
+  # rev its Cargo.lock pins, like any locked build here. The caller tables land at system/etc/quire/*-callers.toml
+  # and the default settings at system/etc/xdg/quire/, both system files slipway places (/etc/xdg/quire needs
+  # slipway >= aa427f2). Not built with --with-voice (the voice daemon needs the sound and clang development packages).
+  (cd "$d" && ./scripts/install.sh --bin-dir "$(tdir docket)" --prefix "$P" --destdir "$stage" --sysconfdir "$P/system/etc")
 }
 
 build_detent() {

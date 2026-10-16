@@ -36,6 +36,9 @@ elif case == "export-dir":
 elif case == "system-good":
     files["system/etc/pam.d/sill"] = (b"auth required pam_unix.so\n", 0o644)
     system.append("/etc/pam.d/sill")
+elif case == "system-xdg-other":
+    files["system/etc/xdg/other.toml"] = (b"x = 1\n", 0o644)
+    system.append("/etc/xdg/other.toml")
 elif case == "system-dir":
     files["system/etc/passwd"] = (b"root::0:0:::\n", 0o644)
     system.append("/etc/passwd")

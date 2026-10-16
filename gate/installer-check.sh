@@ -26,6 +26,8 @@ STUB
   chmod +x "$f"
 }
 stub porter/scripts/install.sh porter
+stub almanac/scripts/install.sh almanac
+stub docket/scripts/install.sh docket
 stub detent/scripts/install.sh detent
 stub casement/scripts/install.sh casement
 stub sill/dist/install.sh sill
@@ -46,9 +48,12 @@ inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot "$INSTA
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "porter detent casement sill transom keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
+[ "$order" = "porter almanac docket detent casement sill transom keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
 printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
+printf '%s\n' "$plan" | grep -q 'almanac .*runs .*scripts/install.sh --prefix /usr/local --destdir' || fail "almanac does not run into a staging root: $plan"
+printf '%s\n' "$plan" | grep -q 'docket .*runs .*scripts/install.sh --prefix /usr/local --destdir' || fail "docket does not run into a staging root: $plan"
+! printf '%s\n' "$plan" | grep -E 'almanac|docket' | grep -q -- '--sysconfdir' || fail "almanac or docket was given --sysconfdir, which they do not take"
 printf '%s\n' "$plan" | grep -q 'session .*runs' || fail "the session step does not run into a staging root"
 
 # 2. a system prefix without root is left to the person, not attempted.
@@ -57,6 +62,15 @@ printf '%s\n' "$plan" | grep -q 'porter .*yourself (needs root' || fail "a syste
 printf '%s\n' "$plan" | grep -q 'session .*yourself (needs root' || fail "the session step was not left to the person without root: $plan"
 printf '%s\n' "$plan" | grep -q '&& asroot .*install/install.sh --prefix /usr --sysconfdir /etc' || fail "the session root command does not go through the escalation program: $plan"
 printf '%s\n' "$plan" | grep -q 'cd .*porter && asroot .*scripts/install.sh --prefix /usr' || fail "the root command does not go through the escalation program: $plan"
+
+# 2b. without a staging root almanac and docket are left to the person, as themselves: their installers refuse to
+# run as root and ask for sudo for /etc/quire themselves, so no root command is printed for them.
+plan=$(inst --dry-run --prefix "$tmp/user-prefix") || fail "user prefix dry run failed"
+for c in almanac docket; do
+  printf '%s\n' "$plan" | grep -q "$c .*yourself (its caller table" || fail "$c was not left to the person: $plan"
+  printf '%s\n' "$plan" | grep -q "cd .*$c && .*scripts/install.sh --prefix $tmp/user-prefix *\$" || fail "$c command is missing: $plan"
+  ! printf '%s\n' "$plan" | grep -q "asroot .*$c/scripts/install.sh" || fail "$c was offered as a root command: $plan"
+done
 
 # 3. a real run into a staging root passes PREFIX and DESTDIR through, runs the stageable ones, never sudo.
 inst --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "staged run failed"; }
@@ -69,6 +83,8 @@ grep -q 'note: porter goes to /usr, not /opt/d' "$tmp/out.log" || fail "the port
 [ -f "$dest/etc/systemd/user/desktop-session.target" ] || fail "the user target was not staged"
 [ -f "$dest/usr/share/wayland-sessions/sill-casement.desktop" ] || fail "the login entry was not staged"
 [ ! -e "$dest/etc/systemd/user/casement.service" ] || fail "the session installer copied casement.service"
+grep -q "^almanac/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "almanac did not get the prefix and destdir: $(cat "$log")"
+grep -q "^docket/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "docket did not get the prefix and destdir: $(cat "$log")"
 grep -q "^detent/scripts/install.sh  PREFIX=/opt/d DESTDIR=$dest" "$log" || fail "detent did not get PREFIX and DESTDIR"
 grep -q "^transom/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "transom did not get the prefix and destdir"
 grep -q "MAILO_PREFIX=$dest/opt/d" "$log" || fail "mailo did not get its prefix"
