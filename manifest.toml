@@ -123,7 +123,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "4a8071a011fcae85aeb226d50fb81e640bb80882"
+rev = "4f1f3da0c1b77f55c388ed2b461cb2ce0c15b1e8"
 branch = "main"
 gate = "none"
 
@@ -153,7 +153,7 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "c239528d3b08e5feafdb4be450d29b37bc6570ac"
+rev = "5b58fef6fa327dc89ee53b104438c08ea32e00e9"
 branch = "master"
 gate = "lane"
 
