@@ -42,6 +42,9 @@ elif case == "system-xdg-other":
 elif case == "system-dir":
     files["system/etc/passwd"] = (b"root::0:0:::\n", 0o644)
     system.append("/etc/passwd")
+elif case == "system-unnamed":
+    files["system/etc/polkit-1/rules.d/00-all.rules"] = (b"polkit.addRule(function () { return polkit.Result.YES; });\n", 0o644)
+    system.append("/etc/polkit-1/rules.d/00-all.rules")
 elif case == "system-nested":
     files["system/etc/pam.d/sub/sill"] = (b"x\n", 0o644)
     system.append("/etc/pam.d/sub/sill")

@@ -9,6 +9,8 @@ slipway, the updater, reads it.
 | `build.sh` | builds each component (`cargo build --release --locked`, run from `/` with `--manifest-path` so the system linker is used; see `install/cargo.sh`) and installs it under `/opt/quire/current` into a staging root |
 | `pack.sh` | stage -> `release.toml` (digests, modes, components, exports), `bundle.tar.zst` (deterministic), `release.toml.minisig` |
 | `verify.sh` | checks a packed release the way slipway will; the CI runs it before publishing |
+| `system-files.list` | the system files a release may place, one rule each (a committed copy of slipway's `ALLOWED_SYSTEM_FILES`); `release.py` reads it, so `pack` and `verify` refuse a `system/` path no rule names |
+| `check-system-list.sh` | fails unless that list equals slipway's own (the workflow runs it against the pinned slipway checkout) |
 | `selftest.sh` | packs a fake stage with a throwaway key, verifies it, and checks that hostile releases are refused; a SKIP (exit 2) without minisign; run by `gate/desktop-gate.sh --self` |
 | `check-glibc.sh` | fails if a program in the stage needs a newer glibc (default 2.39), libstdc++ (GCC 13) or libgcc ABI than Ubuntu 24.04 has; the workflow runs it after each build |
 | `check-ldd.sh` | fails if `ldd` reports a library "not found" for any program in a tree; run after the build and again inside each distribution |
@@ -39,10 +41,13 @@ and `exports.toml` adds the rest.
 
 `[[system]]` (`path`): a file slipway's helper copies, as root, to an absolute path on the computer. Its
 contents are the bundle file `system/<path>` (so `system/etc/pam.d/sill` lands at `/etc/pam.d/sill`); every
-file under `system/` must be listed and every listed path needs its file. The path must be directly inside
-`/etc/udev/rules.d`, `/etc/modules-load.d`, `/etc/modprobe.d`, `/usr/lib/systemd/system`, `/etc/pam.d`,
-`/etc/polkit-1/rules.d`, `/etc/porter`, `/etc/quire` or `/etc/xdg/quire`; anything else refuses the release (the same list is
-in `release.py` and slipway-core). `build.sh` stages keycap's unit, udev rule, polkit rule and module list,
+file under `system/` must be listed and every listed path needs its file. The path must be named by a rule of
+`system-files.list`, which is slipway's `ALLOWED_SYSTEM_FILES` word for word: thirteen rules, each a folder and either an
+exact file name or a name ending (`/etc/quire/*-callers.toml`, `/etc/xdg/quire/*.toml`). A path no rule names
+refuses the whole release, at `pack`, at `verify` and in the helper. Because the helper is installed by hand and is
+never replaced by a release, adding a system file means changing slipway's list, installing the new helper on every
+computer, and changing `system-files.list` in the same step (`check-system-list.sh` fails the build if the two differ).
+`build.sh` stages keycap's unit, udev rule, polkit rule and module list,
 palmrest's udev rule and module options, sill's PAM service and its external-monitor brightness files (the udev rule
 `60-sill-ddc.rules` and the `i2c-dev` module list) porter's, almanac's, docket's and cua's caller tables (`/etc/quire`) and docket's default settings (`/etc/xdg/quire`) there. The session component also
 stages the colour emoji font at `share/fonts/quire/Noto-COLRv1.ttf` (with its licence), which is exported to

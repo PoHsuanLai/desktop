@@ -116,6 +116,10 @@ jobs:
             [ -z "$channel" ] || rustup toolchain install "$channel" --profile minimal --component rustfmt,clippy
           done
 
+      - name: The system files a release may place are slipway's list
+        if: matrix.name == 'small'
+        run: desktop/release/check-system-list.sh --slipway "$GITHUB_WORKSPACE/slipway"
+
       - name: Cache cargo and the build output
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:

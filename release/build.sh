@@ -91,8 +91,8 @@ tdir() { printf '%s/%s/release' "${CARGO_TARGET_ROOT:-$out/target}" "$1"; }
 # put MODE SRC REL: install SRC at $root/REL.
 put() { install -Dm"$1" "$2" "$root/$3"; }
 # put_system MODE SRC DEST: a file slipway-apply copies (as root) to the absolute DEST on the computer. It
-# travels in the bundle at system/DEST and pack.sh lists it; DEST must sit directly in one of the system
-# folders release.py (and slipway) allow: a mistake here is refused when the release is packed.
+# travels in the bundle at system/DEST and pack.sh lists it; DEST must be a file release/system-files.list (slipway's
+# list, exactly) names: anything else is refused when the release is packed.
 put_system() { put "$1" "$2" "system$3"; }
 # retarget FILE FROM: the unit's path to its program becomes the installed one.
 retarget() { sed -i "s|^ExecStart=$2|ExecStart=$P/bin/$(basename "$2")|" "$1"; grep -q "^ExecStart=$P/bin/" "$1" || die "$1: no ExecStart to retarget"; }

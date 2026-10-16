@@ -286,3 +286,20 @@ check first is listed under "Not verified" at the end of this section.
   confirms before or together with this commit. Nothing in this repo can check that; it is the release gate's job.
 - slipway also installs a D-Bus activation file for the update service, so a call to it (Settings, `slipway status`)
   starts the unit in a login that does not have the target; the target line makes it deterministic.
+
+### ROOT-07 (desktop half): system files are named one by one
+
+- slipway's helper now accepts a system file only when a rule of `ALLOWED_SYSTEM_FILES` names it (13 rules, file by
+  file; the folder list is gone). `release/system-files.list` is the committed copy, `release.py` reads it
+  (`system_ok`, so `pack` and `verify` refuse any other path), `release/check-system-list.sh` compares it with slipway's
+  Rust source, and the `small` build job runs that check against the pinned checkout. The selftest renders the list in
+  slipway's format and checks equal, one rule missing and one rule extra, packs with four unnamed files (a polkit rule in an
+  allowed folder, a second PAM file, an unnamed udev rule, `/etc/quire/callers.toml`, which does not end in `-callers.toml`
+  with something before it) and forges one more hostile release (`system-unnamed`). The selftest ran here (minisign 0.12): pass.
+- `manifest.toml` moves slipway from aa427f2 to 769704c, the tip with the exact list, the three helpers and the session
+  calls. The release cannot be installed by the older helper once it carries a path the older list does not name; the
+  hand-installed helper must be replaced on each computer (slipway's `scripts/install.sh`).
+- Every file `build.sh` stages is on the list. porter, almanac, docket and cua stage their caller tables through their own
+  installers, so a name they write that the list does not cover is only found when `pack` runs in CI.
+- Superseded wording above: "allowed system folders" (this file and the README) now means the list; the stale line in
+  "Whether the release should write `/etc/pam.d` at all" is answered: one file, `/etc/pam.d/sill`, named.

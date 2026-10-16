@@ -1,0 +1,23 @@
+# The system files a release may place, one rule per line: FOLDER KIND NAME.
+#
+#   exact   the file is named exactly NAME
+#   ending  any plain name that ends in NAME and is longer than it
+#
+# A committed copy of slipway-core's ALLOWED_SYSTEM_FILES (crates/slipway-core/src/release/system.rs), in the same
+# order. release.py reads it for pack and verify, so `system/` holding a path no rule here names fails the pack, and
+# release/check-system-list.sh compares it with slipway's source (the workflow runs that). slipway's privileged helper
+# is installed by hand and is not replaced by a release, so a file added here also needs a new helper on every
+# computer: change this list only together with slipway, never alone.
+/etc/pam.d                 exact   sill
+/etc/udev/rules.d          exact   60-sill-ddc.rules
+/etc/modules-load.d        exact   sill-ddc.conf
+/usr/lib/systemd/system    exact   keycap.service
+/etc/udev/rules.d          exact   70-keycap.rules
+/etc/polkit-1/rules.d      exact   keycap.polkit.rules
+/etc/modules-load.d        exact   keycap.conf
+/etc/udev/rules.d          exact   70-palmrest.rules
+/etc/modprobe.d            exact   99-palmrest.conf
+/etc/porter                exact   callers.toml
+/etc/porter                exact   inferd-callers.toml
+/etc/quire                 ending  -callers.toml
+/etc/xdg/quire             ending  .toml

@@ -7,7 +7,7 @@ Format 1: see release/README.md. The rules below are the whole contract:
   - release.toml lists every regular file with its sha256 and mode, sorted by path;
   - exports are system links, each under one of EXPORT_ROOTS, each to a file in the bundle;
   - system files are copies slipway-apply places as root: each bundle file under system/ is listed in
-    release.toml as [[system]] with its absolute destination, directly inside one of SYSTEM_DIRS.
+    release.toml as [[system]] with its absolute destination, which a rule of system-files.list names.
 """
 import base64
 import datetime
@@ -46,14 +46,32 @@ AUTO_EXPORT_DIRS = (
     "share/wayland-sessions", "share/xdg-desktop-portal", "share/dbus-1/services", "lib/systemd/user",
     "share/applications", "share/polkit-1/actions", "share/quire", "share/porter", "share/stoker", "share/fonts",
 )
-# The tree of files slipway-apply copies (not links) to a system folder, and the only folders it may name.
-# Must be the same list as slipway-core's ALLOWED_SYSTEM_DIRS (release/system.rs); a file goes directly in one.
+# The tree of files slipway-apply copies (not links) to a system folder. A file is accepted only when a rule of
+# system-files.list names it: that file is a committed copy of slipway-core's ALLOWED_SYSTEM_FILES
+# (release/system.rs), checked against slipway's source by check-system-list.sh.
 SYSTEM_TREE = "system"
-SYSTEM_DIRS = (
-    "/etc/udev/rules.d", "/etc/modules-load.d", "/etc/modprobe.d", "/usr/lib/systemd/system", "/etc/pam.d",
-    "/etc/polkit-1/rules.d", "/etc/porter", "/etc/quire", "/etc/xdg/quire",
-)
+SYSTEM_LIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "system-files.list")
 SYSTEM_NAME = re.compile(r"^[A-Za-z0-9+@_-][A-Za-z0-9._+@-]*$")
+
+
+def read_system_rules(path=SYSTEM_LIST):
+    """(folder, kind, name) per line of the list; kind is "exact" or "ending". A malformed line stops everything."""
+    rules = []
+    with open(path, encoding="utf-8") as f:
+        for number, line in enumerate(f, 1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) != 3 or parts[1] not in ("exact", "ending") or not parts[0].startswith("/"):
+                raise SystemExit(f"{path}:{number}: expected FOLDER exact|ending NAME, got {line!r}")
+            rules.append(tuple(parts))
+    if not rules:
+        raise SystemExit(f"{path}: no rules")
+    return tuple(rules)
+
+
+SYSTEM_RULES = read_system_rules()
 
 
 class Refused(Exception):
@@ -91,10 +109,14 @@ def export_ok(link):
 
 
 def system_ok(dest):
-    """A system file's destination: absolute, directly inside one of SYSTEM_DIRS, a plain name."""
+    """A system file's destination: absolute, a plain name, directly in a folder, and named by a rule of the list."""
     folder, _, name = dest.rpartition("/") if isinstance(dest, str) else ("", "", "")
-    if folder not in SYSTEM_DIRS or not SYSTEM_NAME.match(name) or len(name) > 255:
-        raise Refused(f"system file {dest!r}: not directly inside an allowed system folder")
+    named = SYSTEM_NAME.match(name) and len(name) <= 255 and any(
+        f == folder and (name == n if kind == "exact" else len(name) > len(n) and name.endswith(n))
+        for f, kind, n in SYSTEM_RULES
+    )
+    if not named:
+        raise Refused(f"system file {dest!r}: no rule of release/system-files.list names it")
 
 
 def system_dest(rel):
@@ -439,6 +461,32 @@ def check_installed(directory, root, base="/"):
     print(f"installed {doc['version']}: {len(doc.get('export', []))} exports and {len(doc.get('system', []))} system files in place")
 
 
+def slipway_system_rules(source):
+    """The rules of slipway-core's ALLOWED_SYSTEM_FILES in the text of release/system.rs, as (folder, kind, name)."""
+    block = re.search(r"ALLOWED_SYSTEM_FILES[^=]*=\s*\[(.*?)\n\];", source, re.S)
+    if not block:
+        raise Refused("ALLOWED_SYSTEM_FILES is not in that file")
+    code = re.sub(r"//[^\n]*", "", block.group(1))
+    found = re.findall(r'rule\(\s*"([^"]+)",\s*NameRule::(Exact|Ending)\(\s*"([^"]+)"\s*\),?\s*\)', code)
+    if not found or code.count("rule(") != len(found):
+        raise Refused("could not read every rule of ALLOWED_SYSTEM_FILES")
+    return tuple((folder, kind.lower(), name) for folder, kind, name in found)
+
+
+def check_system_list(source_path):
+    """Fails unless system-files.list holds exactly the rules of slipway's source, in the same order."""
+    with open(source_path, encoding="utf-8") as f:
+        theirs = slipway_system_rules(f.read())
+    if theirs != SYSTEM_RULES:
+        ours, other = set(SYSTEM_RULES), set(theirs)
+        extra = sorted(" ".join(r) for r in ours - other)
+        missing = sorted(" ".join(r) for r in other - ours)
+        raise Refused("release/system-files.list differs from slipway's ALLOWED_SYSTEM_FILES: "
+                      f"only here: {extra or 'nothing'}; only in slipway: {missing or 'nothing'}"
+                      + ("" if ours != other else " (same rules, different order)"))
+    print(f"system-files.list matches slipway's ALLOWED_SYSTEM_FILES ({len(theirs)} rules)")
+
+
 def main(argv):
     cmd, rest = argv[0], argv[1:]
     try:
@@ -449,6 +497,8 @@ def main(argv):
             verify(rest[0], rest[1])
         elif cmd == "installed":
             check_installed(*rest)
+        elif cmd == "system-list":
+            check_system_list(rest[0])
         else:
             raise Refused(f"unknown command {cmd}")
     except Refused as e:
