@@ -17,6 +17,7 @@ slipway, the updater, reads it.
 | `check-glibc.sh` | fails if a program in the stage needs a newer glibc (default 2.39), libstdc++ (GCC 13) or libgcc ABI than Ubuntu 24.04 has; the workflow runs it after each build |
 | `check-ldd.sh` | fails if `ldd` reports a library "not found" for any program in a tree; run after the build and again inside each distribution |
 | `deps.sh` | the packages the flow needs per family (debian, fedora, arch): `tools`, `build`, `runtime` |
+| `install-rustup.sh` | rustup from its published program for one version, SHA-256 checked (replaces `curl https://sh.rustup.rs | sh` in the workflow) |
 | `install-zig.sh` | Zig 0.16 from the official tarball, SHA-256 checked (temor builds with it; no distribution ships a fixed 0.16) |
 | `smoke.sh` | installs a packed release with slipway's helper on a throwaway machine (a CI container) and checks the links, system files, libraries and a repeat install |
 | `lib.sh` | sourced by the scripts: the distribution family and the one-line install hint for a missing tool |
@@ -107,7 +108,7 @@ gh workflow run release.yml --repo PoHsuanLai/desktop -f version=0.2.0 -f notes=
 
 or tag: `git tag -a v0.2.0 -m "What changed" && git push origin v0.2.0` (the tag's message is the notes).
 The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket, stoker and cua, and the small
-ones together, with xwayland-satellite, which is built from its public repository at the tag in `build.sh`, `SATELLITE_TAG`) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
+ones together, with xwayland-satellite, which is built from its public repository at the commit in `build.sh`, `SATELLITE_REV`, the one `SATELLITE_TAG` names) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
 Arch as well), checks their glibc and library needs, packs and signs, verifies, installs the signed release with
 slipway's helper in clean Ubuntu 24.04, Fedora 44 and Arch containers, and only then creates the release
 `v0.2.0` in desktop-releases. Watch it with

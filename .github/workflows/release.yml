@@ -3,8 +3,9 @@
 # what the owner sets up once. Secrets: RELEASE_READ_TOKEN (read the private repos), MINISIGN_SECRET_KEY and
 # MINISIGN_PASSWORD (sign), RELEASES_TOKEN (create the release in desktop-releases).
 #
-# The programs are built on Ubuntu 24.04 (container ubuntu:24.04, the oldest base the desktop supports: glibc
-# 2.39, GCC 13's libstdc++, noble's libinput, wayland, pipewire), so they load on Fedora and Arch too; a build
+# The programs are built on Ubuntu 24.04 (a container pinned by digest, so what gets signed is not built on whatever the
+# tag names that day; bump it on purpose, `docker buildx imagetools inspect ubuntu:24.04` prints the digest), the oldest
+# base the desktop supports: glibc 2.39, GCC 13's libstdc++, noble's libinput, wayland, pipewire), so they load on Fedora and Arch too; a build
 # on a newer base would not load on Ubuntu. After the build, release/check-glibc.sh and check-ldd.sh fail the job
 # if a program asks for a newer C library than that or a library that is not there. The signed result is then
 # installed by slipway's helper in clean ubuntu:24.04, fedora:44 and archlinux:latest containers (job smoke),
@@ -61,7 +62,7 @@ jobs:
     # The oldest supported base, not the runner image (which has newer toolchain pieces). Disk: the runner's
     # ~14 GB is shared with the container; the heavy components have a job each for that reason (unverified
     # that casement and sill fit; if not, free space cannot be reclaimed from inside the container).
-    container: ubuntu:24.04
+    container: ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
     timeout-minutes: 350
     env:
       DEBIAN_FRONTEND: noninteractive
@@ -97,10 +98,10 @@ jobs:
       - name: Zig 0.16 (temor), checked against its published SHA-256
         run: desktop/release/install-zig.sh --version 0.16.0
 
-      - name: Rust toolchains named by the repos
+      - name: rustup, checked against its published SHA-256 (release/install-rustup.sh)
         run: |
           set -euo pipefail
-          curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain none --profile minimal
+          desktop/release/install-rustup.sh
           echo "$HOME/.cargo/bin" >>"$GITHUB_PATH"
 
       - name: Check out the manifest repos beside desktop
@@ -127,9 +128,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             desktop/build/release/target
+          # An exact key and no restore-keys: a cache is restored only for exactly this manifest, never by prefix, so a
+          # cache written by another run cannot seed the build of what gets signed (a manifest change builds cold).
           key: cargo-ubuntu2404-${{ matrix.name }}-${{ hashFiles('desktop/manifest.toml') }}
-          restore-keys: |
-            cargo-ubuntu2404-${{ matrix.name }}-
 
       - name: Build and stage
         run: |
@@ -329,7 +330,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     container:
-      image: ubuntu:24.04
+      image: ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
       options: --privileged
     env:
       DEBIAN_FRONTEND: noninteractive

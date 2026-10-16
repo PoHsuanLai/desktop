@@ -29,9 +29,12 @@ P=/opt/quire/current
 source "$ROOT/install/cargo.sh"
 ALL=(casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway satellite)
 # xwayland-satellite (MPL-2.0; a separate program casement starts for X11 apps), built from its own public repository at
-# a release tag, locked. Ubuntu 24.04 does not package it. Bump the tag here; release/README.md and docs/distros.md name it.
+# one commit, locked. Ubuntu 24.04 does not package it. Bump both lines together: SATELLITE_REV is the commit the tag
+# names (`git ls-remote $SATELLITE_URL 'refs/tags/v0.8.3^{}'`), because a tag can be moved and a commit cannot.
+# release/README.md and docs/distros.md name the tag.
 SATELLITE_URL=https://github.com/Supreeeme/xwayland-satellite
 SATELLITE_TAG=v0.8.3
+SATELLITE_REV=b83eab900644e4c7c77982ce3d44cb490f0c5e1d
 # The Rust it is built with: the channel the repos pin (the workflow installs it); satellite itself needs 1.85 or later.
 SATELLITE_RUST=1.98.1
 
@@ -282,26 +285,30 @@ build_slipway() {
 }
 
 build_satellite() {
-  # No checkout beside the repos: cargo fetches the tag. Installed into a scratch root and only the program is copied, so
-  # cargo's own bookkeeping files stay out of the bundle. Run from / so no tree's cargo config is read. It lands in bin/
-  # and is exported to /usr/local/bin (exports.toml) so casement finds it on the session's PATH. The program is
-  # unmodified MPL-2.0 code: the bundle carries the licence text from the same tag (a shallow clone of it, in the same
-  # scratch folder) and a notice saying where the source is.
+  # No checkout beside the repos: the commit is fetched once into a scratch folder, and the program is built from that
+  # folder (so the code, the licence text and the notice all come from the same commit). Installed into the scratch root
+  # and only the program is copied, so cargo's own bookkeeping files stay out of the bundle. Run from / so no tree's cargo
+  # config is read. It lands in bin/ and is exported to /usr/local/bin (exports.toml) so casement finds it on the
+  # session's PATH. The program is unmodified MPL-2.0 code: the bundle carries the licence text from the same commit and a
+  # notice saying where the source is.
   local croot; croot=$(mktemp -d)
-  echo "== cargo install --locked --git $SATELLITE_URL --tag $SATELLITE_TAG (xwayland-satellite)"
+  git -C "$croot" init -q src
+  git -C "$croot/src" fetch -q --depth 1 "$SATELLITE_URL" "$SATELLITE_REV" || die "xwayland-satellite: cannot fetch $SATELLITE_REV"
+  git -C "$croot/src" checkout -q --detach FETCH_HEAD
+  [ "$(git -C "$croot/src" rev-parse HEAD)" = "$SATELLITE_REV" ] || die "xwayland-satellite: fetched a commit other than $SATELLITE_REV"
+  echo "== cargo install --locked --path $croot/src (xwayland-satellite $SATELLITE_TAG at $SATELLITE_REV)"
   (cd / && RUSTUP_TOOLCHAIN="$SATELLITE_RUST" CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/satellite" \
-    cargo install --locked --git "$SATELLITE_URL" --tag "$SATELLITE_TAG" --root "$croot" xwayland-satellite)
+    cargo install --locked --path "$croot/src" --root "$croot")
   put 755 "$croot/bin/xwayland-satellite" bin/xwayland-satellite
-  git clone --quiet --depth 1 --branch "$SATELLITE_TAG" "$SATELLITE_URL" "$croot/src"
-  head -n 1 "$croot/src/LICENSE" | grep -q 'Mozilla Public License' || die "xwayland-satellite $SATELLITE_TAG: LICENSE is not the Mozilla Public License"
+  head -n 1 "$croot/src/LICENSE" | grep -q 'Mozilla Public License' || die "xwayland-satellite $SATELLITE_REV: LICENSE is not the Mozilla Public License"
   put 644 "$croot/src/LICENSE" share/licenses/xwayland-satellite/LICENSE
   local notice; notice=$(mktemp)
   printf 'xwayland-satellite %s (commit %s), licence MPL-2.0 (the text is the LICENSE file beside this one), shipped unmodified as a separate program.\nSource: %s/tree/%s\n' \
-    "$SATELLITE_TAG" "$(git -C "$croot/src" rev-parse HEAD)" "$SATELLITE_URL" "$SATELLITE_TAG" >"$notice"
+    "$SATELLITE_TAG" "$SATELLITE_REV" "$SATELLITE_URL" "$SATELLITE_REV" >"$notice"
   put 644 "$notice" share/licenses/xwayland-satellite/NOTICE.txt
   rm -rf "$croot"
   rm -f "$notice"
-  echo "xwayland-satellite $SATELLITE_TAG" >"$out/components.d/xwayland-satellite.txt"
+  echo "xwayland-satellite $SATELLITE_REV" >"$out/components.d/xwayland-satellite.txt"
 }
 
 for name in "${selected[@]}"; do

@@ -65,6 +65,8 @@ contains debian-note-config-file "$(family_notes debian xwayland-satellite)" "~/
 ! family_notes debian xwayland-satellite | grep -q "sudo cargo" || fail "the note offers sudo cargo"
 # the source-install tag and the release bundle's tag are the same.
 expect satellite-tag "$(sed -n 's/^SATELLITE_TAG=//p' "$HERE/../release/build.sh")" "$XWAYLAND_SATELLITE_TAG"
+# ... and the bundle builds a commit, not the tag (a tag can be moved).
+[[ "$(sed -n 's/^SATELLITE_REV=//p' "$HERE/../release/build.sh")" =~ ^[0-9a-f]{40}$ ]] || fail "SATELLITE_REV in release/build.sh is not a full commit hash"
 # every need in the table has an answer (a package, "-" or a note) on all three families.
 while read -r _ key _; do
   for fam in fedora debian arch; do

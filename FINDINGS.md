@@ -355,3 +355,25 @@ check first is listed under "Not verified" at the end of this section.
   list of known places misses a key kept somewhere new, so a new kind of secret needs a line in the list.
 - `--cap-drop`, `--unshare-uts` and a seccomp filter (also in the finding) are not added: the user namespace already has
   no capabilities outside it, and a filter needs the same lane-by-lane test.
+
+### ROOT-08: what builds the signed release is pinned
+
+- rustup: `release/install-rustup.sh` downloads `rustup-init` 1.29.1 for x86_64 from `static.rust-lang.org` and checks its
+  SHA-256 (dda72343...; read from the published `.sha256` and from the downloaded file on 2026-10-16) instead of
+  `curl sh.rustup.rs | sh`. Any other version needs `--sha256`. The toolchains themselves still come from rustup's
+  own signed manifests.
+- Container: the build jobs and the `health` job use `ubuntu:24.04@sha256:534baea6...` (the index digest on Docker Hub,
+  read 2026-10-16). It does not follow Ubuntu's security rebuilds until someone bumps it; apt inside it is still
+  unversioned (the archive is signed and the base is fixed; pinning every package version would break at the first archive
+  update and was not done). smoke keeps `fedora:44` and `archlinux:latest` moving on purpose: they only test, they sign nothing.
+- xwayland-satellite: `SATELLITE_REV` (b83eab90..., the commit `v0.8.3` names) replaces the tag in the build; the commit is
+  fetched once, verified by `rev-parse`, built with `cargo install --locked --path`, and the licence, the notice and the
+  component record come from the same checkout (the second clone is gone). `gate/distro-check.sh` checks the value is a
+  full commit hash. The source-install line for people in `install/packages.sh` and `docs/distros.md` still says
+  `--tag v0.8.3` (it is typed by a person, not by CI).
+- Cache: `restore-keys` is gone, so a cache is restored only for exactly this manifest. Cost: the first build after a
+  manifest change is cold (casement and sill take the longest).
+- Not verified: that `git fetch --depth 1 <url> <full sha>` is accepted by GitHub for that repository (it is for public
+  repositories that allow reachable-sha fetches, as GitHub does), and that `cargo install --path` of the repository root
+  installs only `xwayland-satellite` (its root `Cargo.toml` is a package that is also a workspace root; read from
+  the file at that commit).
