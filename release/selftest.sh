@@ -100,5 +100,28 @@ for hostile in extra digest size symlink dotdot absolute setuid export export-di
   if "$HERE/verify.sh" "$tmp/h-$hostile" --pubkey "$tmp/key.pub" >/dev/null 2>&1; then check "verify accepted the hostile release '$hostile'"; fi
 done
 
+# slipway's install is checked as a whole: three programs and one polkit file with three actions (installing and the
+# good-start note need no password at the keyboard, going back asks for the administrator's).
+h="$tmp/helpers"
+mkdir -p "$h/usr/libexec" "$h/usr/share/polkit-1/actions"
+for p in apply rollback health; do printf '#!/bin/sh\n' >"$h/usr/libexec/slipway-$p"; chmod 755 "$h/usr/libexec/slipway-$p"; done
+policy() { # ACTIVE-FOR-ROLLBACK
+  { echo '<policyconfig>'
+    for p in apply rollback health; do
+      active=yes; [ "$p" != rollback ] || active=$1
+      printf '<action id="org.quire.slipway.%s"><defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>%s</allow_active></defaults><annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/slipway-%s</annotate></action>\n' "$p" "$active" "$p"
+    done
+    echo '</policyconfig>'; } >"$h/usr/share/polkit-1/actions/org.quire.slipway.policy"
+}
+policy auth_admin_keep
+"$HERE/check-helpers.sh" --root "$h" >/dev/null 2>&1 || check "a complete slipway install is not accepted"
+policy yes
+"$HERE/check-helpers.sh" --root "$h" >/dev/null 2>&1 && check "a rollback that needs no password was accepted"
+policy auth_admin_keep
+rm "$h/usr/libexec/slipway-health"
+"$HERE/check-helpers.sh" --root "$h" >/dev/null 2>&1 && check "a missing slipway-health was accepted"
+printf '#!/bin/sh\n' >"$h/usr/libexec/slipway-health"; chmod 775 "$h/usr/libexec/slipway-health"
+"$HERE/check-helpers.sh" --root "$h" >/dev/null 2>&1 && check "a group-writable slipway-health was accepted"
+
 [ "$fail" = 0 ] || exit 1
 echo "release selftest: pass (deterministic pack, verify, 26 hostile releases refused)"

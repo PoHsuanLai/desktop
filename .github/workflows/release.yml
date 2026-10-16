@@ -138,11 +138,15 @@ jobs:
             --out "$GITHUB_WORKSPACE/desktop/build/release" --siblings "$GITHUB_WORKSPACE" --only "${{ matrix.only }}"
           # An artifact is a zip, which would drop the modes: ship the staged tree as a tar.
           tar -C desktop/build/release -cf "stage-${{ matrix.name }}.tar" stage components.d
-          # slipway-apply is not in the bundle (a release must not replace a program that runs as root), but the
-          # smoke job needs the one built from the same pin, on the same oldest base.
+          # slipway's three privileged programs are not in the bundle (a release must not replace a program that runs
+          # as root), nor is its polkit file, but the smoke job needs the ones built from the same pin, on the same
+          # oldest base. The user program rides along for the start-and-rollback scenarios.
           if [ "${{ matrix.name }}" = small ]; then
             mkdir helper
-            cp desktop/build/release/target/slipway/release/slipway-apply helper/
+            for p in slipway-apply slipway-rollback slipway-health slipway; do
+              cp "desktop/build/release/target/slipway/release/$p" helper/
+            done
+            cp "$GITHUB_WORKSPACE/slipway/dist/org.quire.slipway.policy" helper/
           fi
 
       - name: The C library the programs need is no newer than Ubuntu 24.04's
@@ -165,12 +169,12 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-      - name: Upload the privileged helper (for the smoke job)
+      - name: Upload slipway's programs and polkit file (for the smoke job)
         if: matrix.name == 'small'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: helper
-          path: helper/slipway-apply
+          path: helper/
           if-no-files-found: error
           retention-days: 3
 
@@ -302,7 +306,7 @@ jobs:
           name: release-out
           path: in/release
 
-      - name: Download the helper
+      - name: Download slipway's programs and polkit file
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: helper
@@ -311,10 +315,10 @@ jobs:
       - name: Install it and check what landed
         run: |
           set -euo pipefail
-          # The artifact zip dropped the helper's executable bit.
-          chmod 755 in/helper/slipway-apply
+          # The artifact zip dropped the programs' executable bit.
+          chmod 755 in/helper/slipway*
           desktop/release/smoke.sh --really --release in/release/out \
-            --pubkey desktop/release/release.pub --helper in/helper/slipway-apply
+            --pubkey desktop/release/release.pub --helpers in/helper --policy in/helper/org.quire.slipway.policy
 
   # Only a release that installed on all three distributions is published.
   publish:

@@ -200,6 +200,25 @@ Two fixes, pick one:
 Some background services use systemd's private mount namespaces and may be affected by the same rule; if one of
 them fails to start on Ubuntu with a "namespace" error, the same two fixes apply.
 
+## Updates
+
+Updates come from slipway, a program of its own. Its installer puts three programs in `/usr/libexec`
+(`slipway-apply`, `slipway-rollback`, `slipway-health`) and one polkit file, `org.quire.slipway.policy`, that names them,
+the same on Ubuntu, Fedora and Arch. A newer signed release installs without a password for the person at the keyboard;
+going back to an earlier version asks for the administrator's password. The session wants slipway's update service in every
+login, so the daily check asks before it installs anything.
+
+If an update does not start, the session puts the previous version back by itself after several restarts of the computer, and
+if the compositor cannot start at all the session ends and says so in `~/.local/state/desktop-session/guard.log`. To go back
+at once by hand, open a text console (Ctrl+Alt+F3) and run:
+
+```
+pkexec /usr/libexec/slipway-rollback
+```
+
+slipway never places or reloads an AppArmor profile, so the Ubuntu note below is unchanged by it. It needs polkit, which
+the install lines above already include (`polkit` on Fedora and Arch, `polkitd pkexec` on Ubuntu).
+
 ## Where things go
 
 `./install.sh` takes `--prefix` (default `/usr/local`), `--sysconfdir` (default `/etc`) and `--destdir`. porter goes

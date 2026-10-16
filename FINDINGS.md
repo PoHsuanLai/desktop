@@ -303,3 +303,20 @@ check first is listed under "Not verified" at the end of this section.
   installers, so a name they write that the list does not cover is only found when `pack` runs in CI.
 - Superseded wording above: "allowed system folders" (this file and the README) now means the list; the stale line in
   "Whether the release should write `/etc/pam.d` at all" is answered: one file, `/etc/pam.d/sill`, named.
+
+### Packaging: slipway's three programs and one polkit file
+
+- slipway's `scripts/install.sh` (origin/master 769704c) installs `slipway-apply`, `slipway-rollback` and `slipway-health`
+  in `PREFIX/libexec`, `org.quire.slipway.policy` (three actions) in `PREFIX/share/polkit-1/actions`, the user unit and bus
+  file, `/etc/slipway/config.toml` and, with `--pubkey`, `/usr/share/slipway/release.pub`. The desktop's own `install.sh` does
+  not run it (it needs root and a key, and builds with cargo's defaults: ROOT-17's linker and root-build points stay with
+  slipway); the desktop's path is `release/bootstrap.sh` after it, and both now say so.
+- New `release/check-helpers.sh` holds the install to the owner's decisions: the three programs exist, are root-owned and
+  not group/other writable; the policy has exactly the three actions, each naming its program; apply and health allow only an
+  active local session without a password, rollback is `auth_admin_keep`. `smoke.sh` now installs the three programs and the
+  policy the way slipway's install does and runs it before the release; `bootstrap.sh` runs it before it asks for anything.
+  The workflow's `small` job uploads all four slipway programs and the policy file (artifact `helper`). The selftest covers
+  a complete install, a rollback without a password, a missing program and a group-writable one.
+- `docs/distros.md` has a short "Updates" section (what is installed where, the password rules, the by-hand way back).
+- Not verified: `scripts/install.sh --bin-dir` flow on a real machine; that polkit follows the policy file's `exec.path`
+  to `/usr/libexec/slipway-*` on Fedora and Arch as on Ubuntu (it reads the path, not the distro).

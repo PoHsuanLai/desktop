@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # First install of the desktop on a machine: fetches the latest release, checks it, and hands it to slipway's
-# privileged helper. Run slipway's scripts/install.sh with --pubkey first (it installs the helper at
-# /usr/libexec/slipway-apply, its polkit action and the key at /usr/share/slipway/release.pub).
+# privileged helper. Run slipway's scripts/install.sh with --pubkey first: it installs three programs in
+# /usr/libexec (slipway-apply installs a release, slipway-rollback goes back and asks for the administrator's
+# password, slipway-health keeps the record of which starts went well), the one polkit file that names them and
+# the key at /usr/share/slipway/release.pub. This script checks all of that (release/check-helpers.sh) before it
+# asks for anything.
 #
 #   release/bootstrap.sh [--pubkey FILE] [--base URL] [--verify-only]
 #
@@ -39,6 +42,11 @@ done
 if [ "$verify_only" = 0 ]; then
   [ -x "$helper" ] || { echo "bootstrap.sh: no $helper: run slipway's scripts/install.sh --pubkey FILE first" >&2; exit 2; }
   command -v pkexec >/dev/null || { echo "bootstrap.sh: pkexec is not installed ($(install_hint polkit))" >&2; exit 2; }
+  if ! complete=$("$HERE/check-helpers.sh" 2>&1); then
+    echo "$complete" >&2
+    echo "bootstrap.sh: slipway's install is not complete: run its scripts/install.sh --pubkey FILE again" >&2
+    exit 2
+  fi
 fi
 
 dir=$(mktemp -d)

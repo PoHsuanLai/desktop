@@ -11,6 +11,7 @@ slipway, the updater, reads it.
 | `verify.sh` | checks a packed release the way slipway will; the CI runs it before publishing |
 | `system-files.list` | the system files a release may place, one rule each (a committed copy of slipway's `ALLOWED_SYSTEM_FILES`); `release.py` reads it, so `pack` and `verify` refuse a `system/` path no rule names |
 | `check-system-list.sh` | fails unless that list equals slipway's own (the workflow runs it against the pinned slipway checkout) |
+| `check-helpers.sh` | fails unless slipway's own install is complete: `slipway-apply`, `slipway-rollback` and `slipway-health` in `/usr/libexec`, and the one polkit file with its three actions (installing and the good-start note need no password at the keyboard, going back asks for the administrator's); `smoke.sh` and `bootstrap.sh` run it |
 | `selftest.sh` | packs a fake stage with a throwaway key, verifies it, and checks that hostile releases are refused; a SKIP (exit 2) without minisign; run by `gate/desktop-gate.sh --self` |
 | `check-glibc.sh` | fails if a program in the stage needs a newer glibc (default 2.39), libstdc++ (GCC 13) or libgcc ABI than Ubuntu 24.04 has; the workflow runs it after each build |
 | `check-ldd.sh` | fails if `ldd` reports a library "not found" for any program in a tree; run after the build and again inside each distribution |
@@ -114,20 +115,33 @@ nothing is overwritten.
 
 ## First install on a machine
 
-slipway installs the desktop, so slipway's own pieces come first: its `scripts/install.sh` puts the privileged
-helper at `/usr/libexec/slipway-apply`, its polkit action, the user unit and the release key at
-`/usr/share/slipway/release.pub`. Then `release/bootstrap.sh` fetches the latest release from
-desktop-releases, checks it with `verify.sh` against that key, and runs `pkexec /usr/libexec/slipway-apply`
-on it:
+slipway installs the desktop, so slipway's own pieces come first. Its `scripts/install.sh` puts three privileged
+programs in `/usr/libexec`, the one polkit file that names them, the user unit and bus file, the system settings and the
+release key at `/usr/share/slipway/release.pub`:
+
+| Program | What it does | Password |
+|---|---|---|
+| `slipway-apply` | installs a signed release that is newer than the one in use | none, for the person at the keyboard (it checks the signature itself) |
+| `slipway-rollback` | goes back to the previous release | the administrator's, kept for a few minutes |
+| `slipway-health` | keeps the record of which starts went well and puts the previous release back after several failed ones | none, and only root can write its record |
+
+Then `release/bootstrap.sh` fetches the latest release from desktop-releases, checks it with `verify.sh` against that key,
+checks slipway's install with `check-helpers.sh`, and runs `pkexec /usr/libexec/slipway-apply` on it:
 
 ```
 cd slipway && sudo scripts/install.sh --pubkey /path/to/release.pub
 cd ../desktop && release/bootstrap.sh
 ```
 
-The helper is not part of any release (a release must not replace a binary that runs as root); later
-releases arrive through slipway's daily check. `release/bootstrap.sh --verify-only` downloads and checks
-without installing.
+(`scripts/install.sh` builds as whoever runs it unless it is given `--bin-dir` with the programs already built; build them
+as yourself first, so no build step runs as root, then give it `--bin-dir`.) None of the three programs is part of any
+release (a release must not replace a program that runs as root); later releases arrive through slipway's daily check, and a
+change to a helper is a new run of slipway's install by hand. `release/bootstrap.sh --verify-only` downloads and checks
+without installing. The way back by hand, from a text console, is `pkexec /usr/libexec/slipway-rollback`.
+
+From then on the session does the rest: `desktop-session.target` wants the update service, `desktop-session` runs
+`slipway recover` before the compositor starts, and the shell runs `slipway confirm` about half a minute after it
+answers. CI covers the install on three distributions (`smoke.sh`).
 
 ## Local trial
 
