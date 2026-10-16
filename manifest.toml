@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "abd6ae8768a1d631302e2d17b6d560446116821f"
+rev = "de060069eec36707705dc4c5b043d7f8a2f4e147"
 branch = "master"
 gate = "lane"
 
@@ -64,20 +64,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "6aade09baa51da1ce88ab613427b8b9b664314fe"
+rev = "0f30934e85938c40e0f34ee5cc945ee77b860ef8"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "e44112c84d1e7ca96a4fad1155044fbf717dbc79"
+rev = "994117c0358406bdc493cba6eb713e264c645da8"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "7397bc649ca0c49c8f0e73ca90efda2d39b2c30f"
+rev = "f6fe8bcd88e14f9c8d325790082686e227ee91e9"
 branch = "master"
 gate = "lane"
 
