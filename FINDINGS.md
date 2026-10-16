@@ -530,9 +530,8 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   `launcher-p95-on-casement`, `appearance-reaches-*` (they pass without the shell role; giving sill the row is the real shape and a later edit once this
   one is green) and the accounts scenarios (they run sill and detent at their pins, a different image from `build/sill-target`).
 - **Display confirmation.** A change by a program (wlr-randr and the like) is asked ("keep the new settings?", 15 s, reverts unless kept). No
-  scenario changes outputs through a program: `set_scale` and the size changes go through `casementctl debug output set`. Whether that control is
-  exempt from the trial could not be read in the casement checkout beside this one (the trial is not in it yet); if it is not, the 1.5 scale in
-  `detent-on-casement-at-1.5` would go back after 15 s.
+  scenario changes outputs through a program: `set_scale` and the size changes go through `casementctl debug output set`, which
+  configures the output directly (`debug/dump.rs` calls `core_loop::configure_output`) and never opens a trial (checked in casement 377c937).
 - **Release notes and the floor file (lane dharn).** The repo had no standing release notes (they are typed into the workflow's notes box or the tag's
   message); `docs/release-notes.md` now holds the next release's text, with the sentences about the first-use questions and the display confirmation,
   and `release/README.md` points to it. No `/etc/quire/privacy.toml` is shipped by `install/`, `release/` or `dist/` (nothing names it), and a release
