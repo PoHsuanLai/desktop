@@ -8,10 +8,9 @@
 # and the demos' CPU backend, and reads each script's verdict. Each script's exit code is its
 # verdict: 0 passed, anything else failed (their PASS/FAIL lines are printed for the ones that did).
 #
-# The KWin half is not here: plan 11 §3.4 and Q-T4 keep KWin differential runs a tool "never in a
-# gate", and shell-host's kwin-virtual.sh needs a writable checkout (.kwin-env, tools/fake-input's
-# build) the jail does not give. It is the scenario `shell-host-on-kwin` (expected skip, FINDINGS
-# FD-07, closes P2: KWin leaves the harness).
+# There is no KWin half: plan 11 §3.4 and Q-T4 keep KWin differential runs a tool "never in a gate",
+# and KWin left the harness at P2 (FINDINGS FD-07: the skipped `shell-host-on-kwin` row and scenario
+# are gone). shell-host's own scripts/dev/kwin-virtual.sh stays a developer tool.
 #
 # budget: 300
 # Exit: 0 pass | 1 a script failed | 2 outside the jail | 3 artefacts missing (harness/scenario-build.sh).
