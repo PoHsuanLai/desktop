@@ -109,6 +109,12 @@ world; printf '[workspace.dependencies]\npeephole = { version = "1", features = 
 bad 1 nofake; says "workspace.dependencies"
 world; printf '[features]\nfake = []\n[dev-dependencies]\npeephole = { version = "1", features = ["fake"] }\n' >"$tmp/w/turnstile/Cargo.toml"
 ok nofake
+world; printf '[dependencies]\npeephole = { version = "1", features = ["dev-rows"] }\n' >"$tmp/w/turnstile/Cargo.toml"
+bad 1 nofake; says "peephole turns"
+world; printf 'cargo_in "$d" x --features peephole/dev-rows\n' >>"$tmp/w/desktop/release/build.sh"
+bad 1 nofake
+world; printf '[features]\n[dev-dependencies]\npeephole = { version = "1", features = ["dev-rows"] }\n' >"$tmp/w/turnstile/Cargo.toml"
+ok nofake
 
 # --- nothing opens /dev/uinput
 world

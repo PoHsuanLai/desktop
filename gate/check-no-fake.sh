@@ -48,7 +48,10 @@ def bad(message):
 
 # 1. The build and install scripts and workflows.
 RUNS_CARGO = re.compile(r"\bcargo(_in)?\b|\bbuild_outside\b|\bcargo-[a-z]+\b")
-NAMES_FAKE = re.compile(r"\bfake\b|--all-features")
+# The stand-in features: peephole/turnstile/keycap/palmrest `fake`, and peephole's `dev-rows` (a person's own rows
+# file naming services).
+STAND_INS = {"fake", "dev-rows"}
+NAMES_FAKE = re.compile(r"\bfake\b|\bdev-rows\b|--all-features")
 scripts = [os.path.join(root, "install.sh")]
 for folder in ("install", "release", ".github/workflows", "harness"):
     for dirpath, _, files in os.walk(os.path.join(root, folder)):
@@ -88,7 +91,7 @@ def reaches_fake(features, start="default", seen=None):
     seen.add(start)
     for item in features.get(start, []):
         name = item.split("/")[-1].removeprefix("dep:")
-        if name == "fake" and ("/" in item or item == "fake"):
+        if name in STAND_INS and ("/" in item or item in STAND_INS):
             return True
         if item in features and reaches_fake(features, item, seen):
             return True
@@ -96,7 +99,7 @@ def reaches_fake(features, start="default", seen=None):
 
 
 def turns_on(spec):
-    return isinstance(spec, dict) and "fake" in spec.get("features", [])
+    return isinstance(spec, dict) and any(f in STAND_INS for f in spec.get("features", []))
 
 
 def check_manifest(path, label):
