@@ -8,7 +8,10 @@
 #   safe        the --safe casement stays up on one output (pixman, no effects) and the session
 #               does not exit
 #   ends        with a stand-in that always panics, the --safe run's quick exit ends the session with
-#               status 1 and a guard log line (the other login entry stays available)
+#               status 1 and a guard log line (the other login entry stays available); when the rollback
+#               program is there, the log also names the command to go back by hand
+#   state       without DESKTOP_SESSION_STATE, guard.log is kept in $XDG_STATE_HOME/desktop-session (it must
+#               outlive the session; the runtime folder does not) and casement.log stays in the runtime folder
 #   components  none run by default (DESKTOP_SESSION_NESTED=1: no systemd, no sill); with
 #               DESKTOP_SESSION_STUBS the session starts its components from stand-in programs: sill as
 #               the unit sill.service (and again after it exits), the power-key inhibitor,
@@ -140,13 +143,26 @@ safe_stays_up_on_one_output() {
 
 safe_failing_ends_the_session() {
   local rc=0
-  start_session ends FAKE_CASEMENT_ALWAYS_PANIC=1
+  start_session ends FAKE_CASEMENT_ALWAYS_PANIC=1 DESKTOP_SESSION_ROLLBACK_HELPER="$(command -v true)"
   wait_for 600 bash -c "! kill -0 $SESSION_PID" || { echo "the session did not end" >&2; return 1; }
   wait "$SESSION_PID" || rc=$?
   SESSION_PID=
   [ "$rc" = 1 ] || { echo "exit $rc, expected 1" >&2; return 1; }
   grep -q 'casement --safe exited quickly' "$STATE/guard.log" || return 1
-  grep -q 'the crash guard ends the session' "$STATE/guard.log"
+  grep -q 'the crash guard ends the session' "$STATE/guard.log" || return 1
+  grep -q "by hand.*pkexec $(command -v true)" "$STATE/guard.log" || { echo "no way back named:" >&2; cat "$STATE/guard.log" >&2; return 1; }
+}
+
+# Without DESKTOP_SESSION_STATE the decisions go to the person's state folder, so they outlive the session.
+guard_log_outlives_the_runtime_folder() {
+  local kept="$OUT_DIR/xdg-state"
+  rm -rf "$kept"
+  start_session kept DESKTOP_SESSION_STATE= XDG_STATE_HOME="$kept" HOME="$OUT_DIR/home"
+  wait_for 100 grep -q 'starting casement' "$kept/desktop-session/guard.log" || { echo "no guard.log in the state folder" >&2; return 1; }
+  [ ! -e "$RUN/desktop-session/guard.log" ] || { echo "guard.log is also in the runtime folder" >&2; return 1; }
+  [ -e "$RUN/desktop-session/casement.log" ] || { echo "casement.log is not in the runtime folder" >&2; return 1; }
+  stop_session
+  [ -s "$kept/desktop-session/guard.log" ] || { echo "guard.log did not survive the session" >&2; return 1; }
 }
 
 # stub_components: stand-in programs that log each call to $OUT_DIR/stubs.log. sill exits at once the
@@ -191,7 +207,7 @@ components_start_and_end_with_the_session() {
 }
 
 for name in step_bus guard_reaches_safe safe_stays_up_on_one_output safe_failing_ends_the_session \
-  components_start_and_end_with_the_session; do
+  guard_log_outlives_the_runtime_folder components_start_and_end_with_the_session; do
   STEP_BUDGET=60 step "$name" "$name" || true
 done
 if [ "$STEP_WORST" != 0 ]; then

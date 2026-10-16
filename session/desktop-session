@@ -48,15 +48,25 @@
 # exit; a longer run clears the count. Three quick exits in a row switch the session to
 # `casement --safe` (pixman, no effects, one output). A quick exit of the safe run, or a safe
 # casement that cannot start, ends the session with status 1 and a notice in the guard log; your
-# other session stays available at the login screen.
-# Every decision is appended to $STATE/guard.log.
+# other session stays available at the login screen. When updates are managed here (slipway and its
+# rollback program are installed) the notice also says how to go back to the previous version by hand.
+# Every decision is appended to guard.log, which is kept across logins in
+# ${XDG_STATE_HOME:-$HOME/.local/state}/desktop-session/ (the runtime folder is erased when the session
+# ends, and this log is what explains a session that ended); it is rotated once, at 256 KiB.
+# Before the first casement starts, `slipway recover` runs (not in a nested test run, and only when slipway is
+# installed): it puts the previous version back when the latest update failed to start in several different
+# restarts of the computer. Exit 5 means it did, and the session then starts that version.
 #
 # Settings a person may change: ~/.config/desktop-session/session.env (sh syntax, read first), for
 # instance DESKTOP_SESSION_QUICK_SECS. The same variables are how the harness drives this script:
 #   DESKTOP_SESSION_CASEMENT_CMD   the casement command (default: casement); words, no quoting
 #   DESKTOP_SESSION_BACKEND_ARGS   its arguments before --safe (default: --backend tty)
 #   DESKTOP_SESSION_QUICK_SECS     the quick-exit limit (default 20)
-#   DESKTOP_SESSION_STATE          where guard.log and casement.log go (default $XDG_RUNTIME_DIR/desktop-session)
+#   DESKTOP_SESSION_STATE          where guard.log and casement.log both go (tests; default: guard.log in
+#                                  ${XDG_STATE_HOME:-$HOME/.local/state}/desktop-session, casement.log in
+#                                  $XDG_RUNTIME_DIR/desktop-session)
+#   DESKTOP_SESSION_ROLLBACK_HELPER  the program that goes back to the previous version, named in the notice
+#                                  when the guard ends the session (default /usr/libexec/slipway-rollback)
 #   DESKTOP_SESSION_STUBS          a directory of stand-in programs (sill, pam_kwallet_init,
 #                                  busctl, ksecretd, gnome-keyring-daemon, ibus-daemon, systemd-inhibit, systemd-run,
 #                                  systemctl, detent) that, with
@@ -92,6 +102,10 @@ quick_secs="${DESKTOP_SESSION_QUICK_SECS:-20}"
 stubs="${DESKTOP_SESSION_STUBS:-}"
 first_run_delay="${DESKTOP_SESSION_FIRST_RUN_DELAY:-5}"
 state="${DESKTOP_SESSION_STATE:-${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/desktop-session}"
+guard_state="${DESKTOP_SESSION_STATE:-${XDG_STATE_HOME:-${HOME:?HOME is not set}/.local/state}/desktop-session}"
+# A log kept across logins must not grow without bound: past this size it is moved to guard.log.1 (one generation).
+guard_log_max=262144
+rollback_helper="${DESKTOP_SESSION_ROLLBACK_HELPER:-/usr/libexec/slipway-rollback}"
 read -r -a casement_cmd <<<"${DESKTOP_SESSION_CASEMENT_CMD:-casement}"
 read -r -a backend_args <<<"${DESKTOP_SESSION_BACKEND_ARGS---backend tty}"
 unit="${DESKTOP_SESSION_UNIT:-casement.service}"
@@ -110,8 +124,11 @@ if [ -z "$nested" ]; then
             ;;
     esac
 fi
-mkdir -p "$state"
-guard_log="$state/guard.log"
+mkdir -p "$state" "$guard_state"
+guard_log="$guard_state/guard.log"
+if [ -f "$guard_log" ] && [ "$(($(wc -c <"$guard_log")))" -gt "$guard_log_max" ]; then
+    mv -f -- "$guard_log" "$guard_log.1"
+fi
 guard() { printf '%s\n' "$*" >>"$guard_log"; log "$*"; }
 
 # Ubuntu's snap programs: /snap/bin is on PATH and snapd's desktop files on XDG_DATA_DIRS in a normal login, but
@@ -455,6 +472,32 @@ run_casement() {
     cat "$state/casement.log" >&2
 }
 
+# Before any casement starts: if the latest update has failed to start in several different restarts of the
+# computer, slipway puts the previous version back (exit 5) and this session starts that one. It needs no
+# password and no running update service. Skipped in a nested test run (no system to roll back) and where
+# slipway is not installed. Its own words go to guard.log; the rest of the session never waits on its answer.
+recover_update() {
+    local status=0
+    [ -z "$nested" ] || return 0
+    have slipway || return 0
+    "$(bin slipway)" recover >>"$guard_log" 2>&1 || status=$?
+    case "$status" in
+        0) ;;
+        5) guard "the latest update did not start; the previous version was put back" ;;
+        *) guard "could not check whether the latest update starts (exit $status); starting anyway" ;;
+    esac
+}
+
+# When the guard gives up: how to go back to the previous version by hand, if updates are managed here.
+manual_way_back() {
+    local helper
+    helper=$(first_executable "$rollback_helper")
+    [ -n "$helper" ] || return 0
+    guard "to go back to the previous version by hand, open a text console and run: pkexec $helper"
+    guard "what happened is written in $guard_log"
+}
+
+recover_update
 quick=0
 mode=normal
 while :; do
@@ -478,6 +521,7 @@ while :; do
     if [ "$mode" = safe ]; then
         guard "casement --safe exited quickly too"
         guard "casement --safe failed too: the crash guard ends the session (your other session stays available at the login screen)"
+        manual_way_back
         [ -n "$nested" ] || stop_unit
         exit 1
     fi

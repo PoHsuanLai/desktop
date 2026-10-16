@@ -248,3 +248,29 @@ tables at `$sysconfdir/porter`):
   cargo line (as yourself, never root) and then `satellite = "<home>/.cargo/bin/xwayland-satellite"` with the path to the
   file, and says the person writes it. The installer writes nothing there. `gate/distro-check.sh` and `docs/distros.md`
   match. Not run on a machine: that casement reads the key as described (read from its source only).
+
+## Production audit lane pa-desk (2026-10-16)
+
+Written without a compiler, a systemd user manager, polkit or minisign; nothing here was run except `bash -n`. What to
+check first is listed under "Not verified" at the end of this section.
+
+### ROOT-03: the crash guard consults slipway
+
+- `session/desktop-session` runs `"$(bin slipway)" recover` once, before the respawn loop, and only when it is not a nested
+  test run and slipway is installed (`have slipway`). Exit 5 (the previous version was put back) is logged as "the latest
+  update did not start; the previous version was put back" and the session starts the restored version; any other nonzero
+  exit is logged and the session starts anyway. slipway's own words go to guard.log.
+- guard.log moved from `$XDG_RUNTIME_DIR` (erased at the end of the session, which is when it is needed) to
+  `${XDG_STATE_HOME:-$HOME/.local/state}/desktop-session/`, created at start, moved to `guard.log.1` once past 256 KiB.
+  casement.log stays in the runtime folder (the drop-in appends to it and the socket name is read from it).
+  `DESKTOP_SESSION_STATE` (tests) still puts both in one folder.
+- When the guard ends the session it prints `pkexec /usr/libexec/slipway-rollback` (only where that program is
+  installed; `DESKTOP_SESSION_ROLLBACK_HELPER` overrides the path for tests). That command asks for the administrator's
+  password, by the owner's decision.
+- **Not closed, needs a decision (slipway FINDINGS 22):** slipway counts different boots, so a crash loop inside one boot
+  (login screen, log in, guard ends the session, log in again) is not rolled back until the computer restarts; the manual
+  line above is the only way back within a boot. Closing it needs the guard to tell root, on a channel a program of the
+  person cannot forge, that the session was ended by the guard; there is none today and none is invented here.
+- The scenario `session-crash-guard` checks the way-back line and that guard.log is in the state folder while casement.log
+  stays in the runtime folder. The `slipway recover` call itself is not testable there (it is skipped when nested, which is
+  the only way that scenario runs); see the release scenarios below.
