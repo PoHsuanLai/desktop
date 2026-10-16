@@ -341,3 +341,17 @@ check first is listed under "Not verified" at the end of this section.
   (Docker mounts `/proc/sys` read-only without `--privileged`); that `slipway confirm` creates its state folders under the
   scratch home; the exact words of `slipway recover` when it restores (the scenario looks for "previous version").
   If `mount` is refused the script exits 2 and the job fails; that is the signal, not a pass.
+
+### ROOT-18: the jail hides the person's keys (partly)
+
+- `harness/jail.sh` showed the whole host read-only, including `~/.ssh`, `~/.config/quire-release` and API-key files, and a
+  `--bind` dir is writable: code run in a lane could copy a key into the worktree. `harness/secret-paths.list` now names the
+  places keys live (14 folders, 7 files); the jail covers each that exists with an empty folder or an empty file, and
+  sets `JAIL_REAL_HOME` so `selftest.sh` checks they read empty (verified here: `selftest.sh --all` passes, `.ssh`,
+  `.gnupg` and `~/.cargo/credentials.toml` show empty inside).
+- **Deferred, a decision:** the verified fix is an allow-list (show only `/usr`, `/etc/os-release`, the worktree and scratch).
+  Lanes also read `~/.cargo`, `~/.rustup`, the sibling checkouts and the gate's build directories under the home folder, so
+  an allow-list needs a pass over every scenario and the lane gate to find what they read; I could not run those here. A
+  list of known places misses a key kept somewhere new, so a new kind of secret needs a line in the list.
+- `--cap-drop`, `--unshare-uts` and a seccomp filter (also in the finding) are not added: the user namespace already has
+  no capabilities outside it, and a filter needs the same lane-by-lane test.

@@ -8,7 +8,7 @@
 #
 # Inside: /dev/input, /dev/dri, /dev/uinput, wayland-0 and the system bus are absent; udmabuf is
 # present; the filesystem is read-only apart from scratch; there is no network; HOME and the XDG
-# dirs are scratch; a private bus works; fabricated GPU nodes (when asked, render-range minors the drm crate accepts) are the only ones in
+# dirs are scratch, the keys and tokens in the real home are hidden; a private bus works; fabricated GPU nodes (when asked, render-range minors the drm crate accepts) are the only ones in
 # /sys/dev/char; USER is set. Checks only stat paths, so running it outside the jail opens no device either.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,6 +63,20 @@ egl_surfaceless_llvmpipe() { # skipped (ok) where eglinfo is not installed
   [ -n "$r" ] && ! printf '%s\n' "$r" | grep -qv llvmpipe
 }
 
+# secrets_hidden: every place of secret-paths.list that exists on the host shows empty in here (JAIL_REAL_HOME is the
+# host's home, which the jail sets; outside the jail it is unset and this fails).
+secrets_hidden() {
+  local kind rel path
+  [ -n "${JAIL_REAL_HOME:-}" ] || return 1
+  while read -r kind rel; do
+    path="$JAIL_REAL_HOME/$rel"
+    case "$kind" in
+      d) [ ! -d "$path" ] || [ -z "$(ls -A "$path" 2>/dev/null)" ] || return 1 ;;
+      f) [ ! -f "$path" ] || [ ! -s "$path" ] || return 1 ;;
+    esac
+  done < <(grep -v '^#' "$HERE/secret-paths.list" | grep .)
+}
+
 checks() {
   check "require_jail holds (no /dev/input, no wayland-0, no system bus, PID 1 is bwrap)" bash -c "source '$HERE/lib/jail.sh'; [ -z \"\$(jail_violations)\" ]"
   check "/dev/input absent" absent /dev/input
@@ -77,6 +91,7 @@ checks() {
   check "root filesystem read-only" read_only /usr
   check "/tmp writable (tmpfs)" writable /tmp
   check "HOME is under scratch" under_scratch "${HOME:-}/x"
+  check "the person's keys and tokens (secret-paths.list) are hidden" secrets_hidden
   check "XDG_RUNTIME_DIR is /run/user/UID" bash -c "[ \"\${XDG_RUNTIME_DIR:-}\" = /run/user/$UID_ ]"
   check "XDG config, state, cache are under scratch" bash -c "$(declare -f under_scratch); under_scratch \"\$XDG_CONFIG_HOME/x\" && under_scratch \"\$XDG_STATE_HOME/x\" && under_scratch \"\$XDG_CACHE_HOME/x\""
   check "scratch writable" writable "${JAIL_SCRATCH:-/nonexistent}"

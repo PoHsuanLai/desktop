@@ -22,6 +22,9 @@
 # Beyond the plan's command line: `--proc /proc` (so PID 1 of the namespace, bwrap, is visible
 # to require_jail, and the host's processes are not), and PATH, USER, LANG, TERM carried in.
 #
+# The person's keys and tokens (harness/secret-paths.list: ~/.ssh, ~/.gnupg, ~/.config/quire-release and others) are
+# covered by an empty folder or file, so code run here cannot read them and write them into a --bind dir.
+#
 # Exit codes (plan §6.1): the command's own; 3 = bubblewrap or /dev/udmabuf or a --bind dir missing, or the
 # system forbids the namespace (Ubuntu 24.04's AppArmor rule), or the software Vulkan driver is missing.
 set -euo pipefail
@@ -136,6 +139,16 @@ while [ "$n" -lt "$gpus" ]; do
   args+=(--dir "/sys/dev/char/226:$((128 + n))/device/drm")
   n=$((n + 1))
 done
+# Hide the person's secrets (the real home is otherwise readable): an empty folder over each directory, an empty file
+# (not /dev/null: a device node on a bind mount cannot be opened) over each file, for those that exist. The list is
+# shared with the selftest.
+: >"$scratch/empty"
+while read -r kind rel; do
+  case "$kind" in
+    d) [ ! -d "$HOME/$rel" ] || args+=(--tmpfs "$HOME/$rel") ;;
+    f) [ ! -f "$HOME/$rel" ] || args+=(--ro-bind "$scratch/empty" "$HOME/$rel") ;;
+  esac
+done < <(grep -v '^#' "$ROOT/harness/secret-paths.list" | grep .)
 args+=(--bind "$scratch" "$scratch")
 for d in "${binds[@]}"; do
   [ -d "$d" ] || die3 "--bind $d: no such directory" "create it first (a cargo target dir exists after the first build)"
@@ -152,7 +165,7 @@ args+=(
   --setenv __EGL_VENDOR_LIBRARY_FILENAMES /usr/share/glvnd/egl_vendor.d/50_mesa.json
   --setenv VK_ICD_FILENAMES "$vulkan_icd"
   --setenv MESA_SHADER_CACHE_DISABLE true --setenv LP_NUM_THREADS 4
-  --setenv JAIL_SCRATCH "$scratch" --setenv JAIL_GPUS "$gpus"
+  --setenv JAIL_SCRATCH "$scratch" --setenv JAIL_GPUS "$gpus" --setenv JAIL_REAL_HOME "$HOME"
 )
 for kv in "${envs[@]}"; do args+=(--setenv "${kv%%=*}" "${kv#*=}"); done
 
