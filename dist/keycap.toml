@@ -1,0 +1,11 @@
+# The desktop's machine settings for keycap, the keyboard mapping: /etc/keycap/keycap.toml.
+#
+# Caps Lock switches the input method (Ctrl+Space). A rule on a key pressed alone is refused when it arrives
+# from a person's own file over the socket (anyone's program could type with it), so it lives here, in the
+# file only an administrator can write. It lays over keycap's built-in mapping, so only the difference is
+# listed. The installer never overwrites an existing /etc/keycap/keycap.toml.
+
+[profile.default]
+rules = [
+  { when = "capslock", then = "ctrl+space" },
+]
