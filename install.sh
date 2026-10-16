@@ -312,7 +312,7 @@ case "$prefix" in
   /usr | /usr/local) ;;
   *)
     echo "note: $prefix is not on the session's search paths, so what is installed under it is found only if you tell the session:"
-    echo "        data and D-Bus services: put its share folder in the user manager's XDG_DATA_DIRS, e.g. one line in ~/.config/environment.d/50-quire.conf, then log in again:"
+    echo "        data and background services: put its share folder in the user manager's XDG_DATA_DIRS, e.g. one line in ~/.config/environment.d/50-quire.conf, then log in again:"
     echo "          XDG_DATA_DIRS=$prefix/share:/usr/local/share:/usr/share"
     echo "        user units: systemd's user manager does not read $prefix/lib/systemd/user at all; link them where it does, as root:"
     echo "          mkdir -p /usr/local/lib/systemd/user && ln -sf $prefix/lib/systemd/user/* /usr/local/lib/systemd/user/" ;;
