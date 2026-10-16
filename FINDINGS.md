@@ -426,3 +426,64 @@ check first is listed under "Not verified" at the end of this section.
   can write. (Done on the session side, lane pa-units: casement.service and sill.service are installed root-held in
   `/etc/systemd/user` and carry `UnsetEnvironment` for the loader variables; the session passes its arguments as
   `CASEMENT_SESSION_ARGS` in the user manager's environment, writes no drop-in, and removes the old runtime one at start.)
+
+## pa2-desk: the table of the desktop's programs, the input service, the keyboard map (lane pa2-desk, 2026-10-17)
+
+What changed: `dist/desktop-callers.toml` (peephole's table, one row per role, `settings` twice, four paths per program), placed by
+`install.sh` first (`install/system.sh callers`) and by every release (`system/etc/quire/desktop-callers.toml`); the input service
+(`turnstile`: program, `/usr/local/bin/turnstile` export, socket, service, `72-turnstile.rules`, `turnstile.conf`) in the release and in
+`install.sh`; keycap installed by `install/system.sh keycap`, not by keycap's installer; `release/system-files.list` takes slipway's four turnstile
+rules (it equals slipway origin/master, 17 rules, `check-system-list.sh` says so); three new gate checks and one test for them.
+
+- **The socket lets any local program connect, on purpose.** `turnstile.socket` is `SocketMode=0666`, `DirectoryMode=0755`
+  (`/run/turnstile/input.sock`); turnstile's own header says who may have a device is "decided by the identity of the caller, never by this
+  mode" (peephole over the pidfd and this table: `pad_daemon` for palmrest, `keymap_daemon` for keycap, at `Exe`). So keycap's service (a
+  `DynamicUser`) and palmrest (the person's user service) both connect, and nothing in the desktop changes the mode. The unit comments, turnstile's
+  README and the wave-2 design (4.1) agree; the daemon was not run.
+- **`settings` has two rows.** The first keeps peephole's (unit `org.quire.Settings.service`, for processes that unit starts); the second has no
+  unit (`app = "org.quire.Settings"`, the `detent` images), because Settings is also started by a launcher outside any unit and slipway asks for it at
+  `Exe` (slipway FINDINGS 24, its ask to this lane). Four roles are known by image alone: `settings` (second row), `updater_cli`,
+  `sandbox_launcher`, `manager`. `check-callers-table.sh` allows no other row without a unit (the brief said "settings only"; peephole's own
+  table and slipway need the other three).
+- **Each program is listed in four places**, not three: `/opt/quire/releases/*/...` (what `/proc/<pid>/exe` shows), `/opt/quire/current/...`
+  (what the release's units say in `ExecStart`, and peephole matches `ExecStart` against these patterns for `Full`), `/usr/local/...` (a build from
+  source with the default prefix; the daemons in `libexec` also get `/usr/local/libexec/...`, which peephole's sample lacks) and `/usr/...`.
+  `check-callers-table.sh` compares each unit's `ExecStart` in the checkouts with its row (13 of 15 units found; slipway's and
+  xdg-desktop-portal's are not in a sibling).
+- **keycap is no longer installed by keycap's installer.** Its `install.sh` always places `dist/keycap.uinput.conf` (`DeviceAllow=/dev/uinput`
+  as a drop-in) and `dist/70-keycap.rules` (`GROUP="input"`, `MODE="0660"` on the node), the "standalone" pieces; the owner rule is that nothing
+  shipped gives the node to a group or the person. The release no longer stages `70-keycap.rules` or `keycap.conf` (turnstile's `turnstile.conf`
+  loads `uinput`); a computer that got them from an earlier release has them removed by slipway when unchanged. `72-turnstile.rules` sorts after
+  `70-` and sets root and 0600, so a leftover `70-keycap.rules` is overridden, but `system.sh keycap` warns about it and about
+  `/etc/systemd/system/keycap.service.d/10-uinput.conf`. Lost by not running keycap's installer: the Plasma overlay (`--desktop plasma`, the default on
+  KDE), `--plasma-focus`, and `restorecon` on its own list (system.sh runs `restorecon -F` on what it placed). A KDE machine that wants the overlay
+  runs keycap's installer by hand and then removes its drop-in.
+- **`/etc/keycap/keycap.toml` is not in a release.** slipway's list names no `/etc/keycap` file, and adding one is a new helper on every computer.
+  `./install.sh` places `dist/keycap.toml` (`[profile.default] rules = [ { when = "capslock", then = "ctrl+space" } ]`, the same form as sill's
+  `dist/keycap/keycap.toml`) when there is no file, and keeps one that is there (it is the machine's, shared by every session; it prints the rule to
+  add). Asks: slipway adds `/etc/keycap` + `keycap.toml` (exact) to `ALLOWED_SYSTEM_FILES`, then `build.sh` stages it with `put_system`;
+  `system-files.list` moves with it. Until then sill's Caps Lock layer rule stays refused by keycap on a release-only machine.
+- **A table or a unit placed by `install.sh` and a later release can conflict.** slipway replaces a system file only if it is absent, equal, or what
+  an earlier release placed; anything else it leaves and reports (`plan_system`, `Conflict`). `desktop-callers.toml`, `turnstile.*` and the
+  rules come from the same sources in both paths, so they are equal when the desktop checkout is the release's. `keycap.service` is not: the
+  release starts `/opt/quire/current/bin/keycap`, `install.sh` starts `<prefix>/bin/keycap`. Not tried.
+- **Before the first release that carries turnstile**, everyone re-runs slipway's install by hand (a helper with the four rules and the step that
+  reloads systemd and the device rules and starts `turnstile.socket`); an older helper refuses that release whole (slipway FINDINGS 25).
+  `release/README.md` says so. `release/check-system-list.sh` fails against the manifest's current slipway pin (5c33809, 13 rules) until the pin
+  step moves it; `build.sh` builds `turnstile` only once the manifest has `[repo.turnstile]` (and `release/checkout.sh` reads the manifest), which
+  this lane did not add.
+
+Could not be determined by reading (nothing was built, installed or started; `shellcheck` is not on this machine, so `bash -n` was the only
+syntax check, and `gate/installer-check.sh`, `release/*.sh` and `install/system.sh` were not run beyond `--dry-run` of `system.sh`):
+
+| # | Fact | How to check |
+|---|---|---|
+| 1 | `Table::from_toml` accepts `dist/desktop-callers.toml` (the repo's checks re-implement the reader's rules in Python from peephole's docs; peephole was not compiled) | `cargo test` in peephole with `include_str!` of this file, or `TableFiles::load` on an installed copy |
+| 2 | `/usr/libexec/xdg-desktop-portal` (Ubuntu, Fedora) and `/usr/lib/xdg-desktop-portal` (Arch) are the frontend's paths; `slipway.service` and `xdg-desktop-portal.service` ExecStart are not compared (not in a checkout) | `dpkg -L`, `rpm -ql`, `pacman -Ql` per distribution |
+| 3 | `gate/installer-check.sh` passes with the new order (callers first, turnstile before keycap, keycap's own installer never run) | run it |
+| 4 | `release/build.sh --only turnstile,keycap,palmrest,session` stages the four turnstile files, the table and no keycap device rule; `retarget` accepts palmrest's `/usr/local/bin/palmrest` | a local build (`release/README.md`, "Local trial") |
+| 5 | `systemd-analyze verify` on `turnstile.service` and `keycap.service` as `system.sh` renders them (only `ExecStart` changes) | on a Fedora, Ubuntu and Arch machine |
+| 6 | `modprobe uinput` and the `uinput` module exist on all three; `udevadm trigger --subsystem-match=misc` re-applies `72-turnstile.rules` to a node that is already there | the three distributions |
+| 7 | `/etc/keycap` ownership when `ConfigurationDirectory=keycap` meets `DynamicUser=yes` (keycap's own open item) and whether the daemon reads a root-owned `keycap.toml` there | a start of the real service |
+| 8 | The table check is not in CI: the pack job has no peephole checkout (peephole is not in `manifest.toml`); `--self` runs it where a peephole checkout is beside this repo | add peephole to the manifest or fetch its tag in the job |
+| 9 | `check-no-uinput-access.sh` reads rule text; a rule that reaches the node without naming `uinput` is not seen | `udevadm test /sys/devices/virtual/misc/uinput` per distribution, `getfacl /dev/uinput` |
