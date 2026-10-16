@@ -25,17 +25,17 @@ tools_debian="git ca-certificates curl tar gzip xz-utils findutils python3 zstd 
 tools_fedora="git ca-certificates curl tar gzip xz findutils which python3 zstd minisign"
 tools_arch="git ca-certificates curl tar gzip xz findutils which python zstd minisign"
 
-build_debian="build-essential cmake pkg-config clang mold libclang-dev perl binutils
+build_debian="build-essential cmake pkg-config clang libclang-dev perl binutils
   libwayland-dev wayland-protocols libxkbcommon-dev libinput-dev libseat-dev libudev-dev libdrm-dev
   libgbm-dev libegl-dev libgles-dev libpixman-1-dev libpipewire-0.3-dev libpulse-dev libpam0g-dev
   libasound2-dev libfontconfig-dev libfreetype-dev libharfbuzz-dev libxml2-dev libpng-dev libdbus-1-dev
   libx11-dev libxcb1-dev libdav1d-dev libvulkan-dev libssl-dev"
-build_fedora="gcc gcc-c++ make cmake pkgconf-pkg-config clang clang-devel llvm-devel mold perl-core binutils
+build_fedora="gcc gcc-c++ make cmake pkgconf-pkg-config clang clang-devel llvm-devel perl-core binutils
   wayland-devel wayland-protocols-devel libxkbcommon-devel libinput-devel libseat-devel systemd-devel libdrm-devel
   mesa-libgbm-devel mesa-libEGL-devel mesa-libGL-devel pixman-devel pipewire-devel pulseaudio-libs-devel pam-devel
   alsa-lib-devel fontconfig-devel freetype-devel harfbuzz-devel libxml2-devel libpng-devel dbus-devel
   libX11-devel libxcb-devel libdav1d-devel vulkan-loader-devel openssl-devel"
-build_arch="base-devel cmake clang mold perl
+build_arch="base-devel cmake clang perl
   wayland wayland-protocols libxkbcommon libinput seatd systemd-libs libdrm mesa libglvnd pixman pipewire libpulse
   pam alsa-lib fontconfig freetype2 harfbuzz libxml2 libpng dbus libx11 libxcb dav1d vulkan-icd-loader openssl"
 

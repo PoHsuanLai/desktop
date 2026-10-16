@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The distro helpers under install/ in a scratch directory: the family from an os-release file, the package
-# table and the install lines per family, the escalation program, the system-linker fallback, and the check
+# table and the install lines per family, the escalation program, the cargo helper (a build runs from / with --manifest-path), and the check
 # mode against a made-up machine. Nothing reads the real /etc/os-release or writes outside the scratch
 # directory; the programs the checks look for are stubs on a PATH of its own.
 #
@@ -14,8 +14,6 @@ trap 'rm -rf -- "${tmp:?}"' EXIT
 
 # shellcheck source=../install/distro.sh
 source "$INSTALL_DIR/distro.sh"
-# shellcheck source=../install/linker.sh
-source "$INSTALL_DIR/linker.sh"
 # shellcheck source=../install/packages.sh
 source "$INSTALL_DIR/packages.sh"
 # shellcheck source=../install/check.sh
@@ -101,44 +99,24 @@ if [ "$(id -u)" != 0 ]; then
   contains escalate-says "$(cat "$tmp/escalate.err")" "Run this yourself, as root"
 fi
 
-# 5. the system linker: the config's rustflags minus the mold argument.
-repo="$tmp/repo"
-mkdir -p "$repo/.cargo"
-cat >"$repo/.cargo/config.toml" <<'CONFIG'
-[target.aarch64-unknown-linux-gnu]
-rustflags = ["-C", "target-cpu=other"]
-
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold", "-C", "target-cpu=native"]
-
-[profile.dev]
-opt-level = 0
-CONFIG
-expect keeps-the-rest "$(plain_rustflags "$repo")" "-C target-cpu=native"
-cat >"$repo/.cargo/config.toml" <<'CONFIG'
-[target.x86_64-unknown-linux-gnu]
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-CONFIG
-expect only-mold "$(plain_rustflags "$repo")" ""
-printf '[target.x86_64-unknown-linux-gnu]\nrustflags = ["-Clink-arg=-fuse-ld=mold"]\n' >"$repo/.cargo/config.toml"
-expect joined-form "$(plain_rustflags "$repo")" ""
-expect no-config "$(plain_rustflags "$tmp/nowhere")" ""
-
-env_after() { # runs use_plain_linker REPO in a subshell and prints its status and the two variables
-  (
-    use_plain_linker "$repo" && status=0 || status=$?
-    echo "status=$status linker=${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER:-} flags=${RUSTFLAGS-unset}"
-  )
-}
-unset RUSTFLAGS
-expect linker-missing "$(DESKTOP_FASTER_LINKER=no DESKTOP_HOST_ARCH=x86_64 env_after)" "status=0 linker=cc flags="
-expect linker-present "$(DESKTOP_FASTER_LINKER=yes DESKTOP_HOST_ARCH=x86_64 env_after)" "status=1 linker= flags=unset"
-expect linker-aarch64 "$(DESKTOP_FASTER_LINKER=no DESKTOP_HOST_ARCH=aarch64 env_after)" "status=1 linker= flags=unset"
-expect linker-caller-flags "$(RUSTFLAGS='-C debuginfo=0' DESKTOP_FASTER_LINKER=no DESKTOP_HOST_ARCH=x86_64 env_after)" "status=1 linker= flags=-C debuginfo=0"
-contains notice "$(DESKTOP_FASTER_LINKER=no DESKTOP_HOST_ARCH=x86_64 plain_linker_notice)" "was not found"
-expect no-notice "$(DESKTOP_FASTER_LINKER=yes plain_linker_notice)" ""
+# 5. building from outside the tree: cargo runs from /, names the manifest, gets the tree's pinned toolchain and the
+# settings its config gives besides the linker, and never RUSTFLAGS. cargo and rustup are stubs.
+# shellcheck source=../install/cargo.sh
+source "$INSTALL_DIR/cargo.sh"
+mkdir -p "$tmp/cargobin" "$tmp/trees/sill" "$tmp/trees/casement"
+printf '#!/bin/sh\necho "cwd=$PWD TC=${RUSTUP_TOOLCHAIN:-} FLAGS=${RUSTFLAGS-unset} TARGET=$CARGO_TARGET_DIR $*"\n' >"$tmp/cargobin/cargo"
+printf '#!/bin/sh\nexit 0\n' >"$tmp/cargobin/rustup"
+chmod +x "$tmp/cargobin"/*
+printf '[toolchain]\nchannel = "1.2.3"\ncomponents = ["rustfmt"]\n' >"$tmp/trees/sill/rust-toolchain.toml"
+unset RUSTFLAGS CARGO_TARGET_DIR
+expect toolchain "$(tree_toolchain "$tmp/trees/sill")" "1.2.3"
+expect no-toolchain "$(tree_toolchain "$tmp/trees/casement")" ""
+expect git-config "$(tree_configs "$tmp/trees/sill")" "net.git-fetch-with-cli=true"
+expect no-config "$(tree_configs "$tmp/trees/casement")" ""
+expect build-outside "$(PATH=$tmp/cargobin:$PATH build_outside "$tmp/trees/sill" -p sill)" \
+  "cwd=/ TC=1.2.3 FLAGS=unset TARGET=$tmp/trees/sill/target build --release --locked --manifest-path $tmp/trees/sill/Cargo.toml --config net.git-fetch-with-cli=true -p sill"
+expect build-outside-plain "$(CARGO_TARGET_DIR=$tmp/t PATH=$tmp/cargobin:$PATH build_outside "$tmp/trees/casement" -p casement)" \
+  "cwd=/ TC= FLAGS=unset TARGET=$tmp/t build --release --locked --manifest-path $tmp/trees/casement/Cargo.toml -p casement"
 
 # 6. the check mode on a made-up machine: an empty PATH of stubs, an empty root, a fake dpkg and ldconfig.
 bin="$tmp/machine/bin" root="$tmp/machine/root"
@@ -149,7 +127,7 @@ run_machine() { # OS-RELEASE-CONTENT [ARGS]: the check on the machine as it is n
   shift
   machine_rc=0
   machine_out=$(PATH=$bin DESKTOP_OS_RELEASE=$(osr machine-os "$content") DESKTOP_CHECK_ROOT=$root \
-    DESKTOP_LDCONFIG=$tmp/no-ldconfig DESKTOP_FASTER_LINKER=yes SUDO=asroot run_check "$@" 2>&1) || machine_rc=$?
+    DESKTOP_LDCONFIG=$tmp/no-ldconfig SUDO=asroot run_check "$@" 2>&1) || machine_rc=$?
 }
 printf '#!/bin/sh\nexit 1\n' >"$bin/dpkg"; chmod +x "$bin/dpkg"   # dbus-user-session is not installed
 run_machine 'ID=ubuntu

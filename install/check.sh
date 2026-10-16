@@ -124,7 +124,6 @@ run_check() {
       rc=1
     fi
     report_group "build libraries and tools" build "$family" || rc=1
-    faster_linker_present || echo "  clang and mold are optional: without them builds use the system linker (slower to link)"
   fi
   report_group "recommended (a feature is missing without it)" recommended "$family" || true
   echo

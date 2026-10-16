@@ -20,7 +20,7 @@ stub() { # REPO-RELATIVE-SCRIPT FAIL-NAME
   mkdir -p "$(dirname "$f")"
   cat >"$f" <<STUB
 #!/usr/bin/env bash
-echo "$1 \$* PREFIX=\${PREFIX:-} DESTDIR=\${DESTDIR:-} MAILO_PREFIX=\${MAILO_PREFIX:-} LINKER=\${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER:-} FLAGS=\${RUSTFLAGS-unset}" >>"$log"
+echo "$1 \$* PREFIX=\${PREFIX:-} DESTDIR=\${DESTDIR:-} MAILO_PREFIX=\${MAILO_PREFIX:-} FLAGS=\${RUSTFLAGS-unset}" >>"$log"
 [ "\${STUB_FAIL:-}" != "$2" ] || exit 7
 STUB
   chmod +x "$f"
@@ -40,7 +40,7 @@ printf '#!/bin/sh\necho sudo >>"%s"\nexit 1\n' "$log" >"$tmp/bin/sudo"; chmod +x
 export PATH="$tmp/bin:$PATH" HOME="$home" XDG_CONFIG_HOME="$home/.config"
 
 fail() { echo "installer-check: $*" >&2; exit 1; }
-inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot DESKTOP_FASTER_LINKER="${STUB_LINKER:-yes}" DESKTOP_HOST_ARCH=x86_64 "$INSTALL" --siblings "$sib" "$@"; }
+inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot "$INSTALL" --siblings "$sib" "$@"; }
 
 # 1. dry run: the plan, in order, nothing run.
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
@@ -77,12 +77,21 @@ grep -q "^keycap/install.sh" "$log" || fail "no component ran"
 [ ! -e "$home/.config" ] || fail "something wrote the scratch ~/.config"
 grep -q 'left to you.*sill' "$tmp/out.log" || fail "the summary does not name what is left"
 
-# 3b. the linker: with clang and mold present nothing is overridden; without them the system linker is.
-grep -q 'LINKER= FLAGS=unset' "$log" || fail "the linker was overridden although clang and mold are present: $(cat "$log")"
+# 3b. the build: detent, the one tree this installer builds itself, is built with the system's linker. cargo runs
+# from / with --manifest-path (so the tree's .cargo/config.toml, clang and mold, is not read), the tree's pinned
+# toolchain goes in RUSTUP_TOOLCHAIN, and neither RUSTFLAGS nor a linker variable is set. cargo here is a stub.
+grep -q 'FLAGS=unset' "$log" || fail "an installer was given RUSTFLAGS: $(cat "$log")"
+! grep -q 'LINKER' "$log" || fail "an installer was given a linker: $(cat "$log")"
+rm -f -- "$sib/detent/target/release/detent"
+printf '[toolchain]\nchannel = "9.9.9"\n' >"$sib/detent/rust-toolchain.toml"
+printf '#!/bin/sh\necho "cargo cwd=$PWD TC=${RUSTUP_TOOLCHAIN:-} FLAGS=${RUSTFLAGS-unset} LINKER=${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER:-} $*" >>"%s"\nmkdir -p "$CARGO_TARGET_DIR/release" && : >"$CARGO_TARGET_DIR/release/detent" && chmod +x "$CARGO_TARGET_DIR/release/detent"\n' "$log" >"$tmp/bin/cargo"
+printf '#!/bin/sh\nexit 0\n' >"$tmp/bin/rustup"
+chmod +x "$tmp/bin/cargo" "$tmp/bin/rustup"
 : >"$log"
-STUB_LINKER=no inst --destdir "$dest" >"$tmp/out.log" 2>&1 || fail "the run without mold failed"
-grep -q 'LINKER=cc FLAGS= ' "$log" || grep -q 'LINKER=cc FLAGS=$' "$log" || fail "no system linker without mold: $(cat "$log")"
-grep -q 'faster linker (clang and mold) was not found' "$tmp/out.log" || fail "the missing faster linker was not said"
+inst --destdir "$dest" --only detent >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "the detent build run failed"; }
+grep -q "^cargo cwd=/ TC=9.9.9 FLAGS=unset LINKER= build --release --locked --manifest-path $sib/detent/Cargo.toml --config net.git-fetch-with-cli=true\$" "$log" || fail "detent was not built from / with --manifest-path: $(cat "$log")"
+rm -f -- "$tmp/bin/cargo" "$tmp/bin/rustup"
+: >"$log"
 
 # 3c. the emoji font: staged under the prefix with its licence; not when --only leaves it out; not when fontconfig
 # already has a COLRv1 Noto Color Emoji; fc-cache runs on a real (unstaged) install.

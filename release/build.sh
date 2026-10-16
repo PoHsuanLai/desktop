@@ -18,11 +18,15 @@
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
 # A component whose repo is not beside this one is an error, except the mpv-wgpu plugin of anyview, which is
 # left out with a warning.
+# Builds use this system's own linker: install/cargo.sh runs cargo from / with --manifest-path, so a tree's
+# .cargo/config.toml (clang and mold, for development) is not read.
 # Exit: 0 staged, 1 a build or install failed, 2 bad usage or a checkout at the wrong rev.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
+# shellcheck source=../install/cargo.sh
+source "$ROOT/install/cargo.sh"
 ALL=(casement sill session porter detent transom keycap palmrest anyview mailo slipway)
 
 version="" out="$ROOT/build/release" sib="$(dirname "$ROOT")" only=""
@@ -74,7 +78,7 @@ repo_dir() {
 cargo_in() {
   local dir=$1 name=$2; shift 2
   echo "== cargo build --release --locked $* ($name)"
-  (cd "$dir" && CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/$name" cargo build --release --locked "$@")
+  (export CARGO_TARGET_DIR="${CARGO_TARGET_ROOT:-$out/target}/$name"; build_outside "$dir" "$@")
 }
 tdir() { printf '%s/%s/release' "${CARGO_TARGET_ROOT:-$out/target}" "$1"; }
 

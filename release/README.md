@@ -6,7 +6,7 @@ slipway, the updater, reads it.
 
 | File | What |
 |---|---|
-| `build.sh` | builds each component (`cargo build --release --locked`) and installs it under `/opt/quire/current` into a staging root |
+| `build.sh` | builds each component (`cargo build --release --locked`, run from `/` with `--manifest-path` so the system linker is used; see `install/cargo.sh`) and installs it under `/opt/quire/current` into a staging root |
 | `pack.sh` | stage -> `release.toml` (digests, modes, components, exports), `bundle.tar.zst` (deterministic), `release.toml.minisig` |
 | `verify.sh` | checks a packed release the way slipway will; the CI runs it before publishing |
 | `selftest.sh` | packs a fake stage with a throwaway key, verifies it, and checks that hostile releases are refused; a SKIP (exit 2) without minisign; run by `gate/desktop-gate.sh --self` |
