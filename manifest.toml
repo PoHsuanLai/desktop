@@ -103,7 +103,7 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "000794740a3da12823d6a0dcc31c02e20ff080a5"
+rev = "c0124dd206a0b52306331315c4336f257e37ee7d"
 branch = "master"
 gate = "none"
 
@@ -115,7 +115,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "06f6cb9c43b08840f46283990876b65046964809"
+rev = "c765e4c43c23cd32312347e315829d8cf322f20f"
 branch = "main"
 gate = "none"
 
