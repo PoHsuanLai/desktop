@@ -83,3 +83,28 @@ bundle-size and file-count limits are not forged in selftest: too big), DEL esca
 `scripts/install.sh`. slipway is in `manifest.toml` (`[repo.slipway]`, rev e8af08f4); the workflow's
 `slipway_ref` input is gone. polkit's action directory follows a link into /opt on a real machine only if
 polkit does; confirm on a machine.
+
+## desk-callers (2026-10-16)
+
+The top-level `install.sh` now installs almanac (the memory daemon, `/etc/quire/memory-callers.toml`) and
+docket (its four daemons, `quire-do`, and the `/etc/quire/*-callers.toml` tables), between porter and detent.
+Both are in `ORDER`, the `--only` help, the README list and `gate/installer-check.sh` (stubs, plan order, the
+staged arguments, and the not-staged case).
+
+What I found and decided:
+
+- Neither installer takes `--sysconfdir`; `/etc/quire` (and docket's `/etc/xdg/quire`) are fixed. Not
+  invented: the top-level declares those places as written, under the destdir, and passes only `--prefix` and
+  `--destdir`. No `--distro`, `--sandbox` or `--no-build` is passed (nothing existing passes them either); the
+  installers read the family from the machine, so Ubuntu, Fedora and Arch work. No linker is asked for.
+- They do not fit porter's "print the root command" path: both refuse to run as root ("Run this as yourself")
+  and escalate (`$SUDO`, sudo, doas, pkexec) per step themselves. A root hint for them would fail. So without a
+  `--destdir` they are listed as "yourself" with the plain command (the same way sill and keycap are); with a
+  `--destdir` they run here and never escalate. A destdir that you cannot write stops them with their own message.
+- `release/build.sh` is not changed: it builds by name from a fixed list and neither is in it. Adding them
+  needs the installers to stage `/etc/quire` inside the prefix (a `--sysconfdir`, or put_system-style output for
+  `memory-callers.toml` and the docket tables), because build.sh refuses files outside `/opt/quire/current` and
+  `release.py` allows system files only in listed folders. Ask almanac and docket for `--sysconfdir`, then add
+  `build_almanac` and `build_docket` (build locked, `--no-build --bin-dir`). The manifest already lists both
+  with gate rows; revs untouched.
+- `install/uninstall.sh` is the session's alone; no top-level uninstall lists components.
