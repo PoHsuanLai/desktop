@@ -120,6 +120,31 @@ So the repo carries the COLRv1 font (`fonts/`, with its licence and source) and 
 `<prefix>/share/fonts/quire/` and refreshes the font cache, unless fontconfig already lists a `Noto-COLRv1`
 font. Use a prefix of `/usr` or `/usr/local`, which fontconfig searches by default.
 
+## Running AI on this computer
+
+The assistant can run models on this computer through llama.cpp's server (`llama-server`). The installer does not
+install it: it is optional, and large. Settings, under Models on this computer, says when it is missing and shows
+the one command for your distro, with a button to copy it:
+
+- **Fedora**: `sudo dnf install llama-cpp`
+- **Arch**: `sudo pacman -S llama-cpp`
+- **Debian 14 and newer, Ubuntu 26.04 and newer**: `sudo apt install llama.cpp-tools`
+- **Debian 13, Ubuntu 24.04 to 25.10**: no package. Get the server from llama.cpp's releases page
+  (`github.com/ggml-org/llama.cpp/releases`) and put `llama-server` in `/usr/local/bin` as root.
+
+The assistant looks for `llama-server` in `/usr/bin`, then `/usr/local/bin`, and never in your own search path. It
+reads that list when it starts, so after installing, press **Start using it** in Settings: it restarts the assistant
+(asking first, since a conversation that is open stops).
+
+vLLM is not looked for. If you run it, install it into a Python environment of your own (for example
+`uv venv ~/vllm && uv pip install --python ~/vllm vllm`) and name that Python in `~/.config/quire/inferd.toml`
+(or `$XDG_CONFIG_HOME/quire/inferd.toml`):
+
+```
+[engines]
+vllm_python = "/home/YOU/vllm/bin/python"
+```
+
 ## Picking the session at login
 
 The installer puts the entry **sill (casement)** in `/usr/share/wayland-sessions`.
