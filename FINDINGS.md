@@ -53,7 +53,7 @@ lists as `release.py`'s):
   desktop).
 - Not staged yet: sill's DDC/CI udev rule and `i2c-dev` module list (`dist/udev`, `dist/modules-load.d`; sill's own
   installer leaves them out on purpose, ddcutil's package ships the rule on Fedora; audit D7 decides) and
-  `/etc/keycap/keycap.toml` (keycap's machine layer; `/etc/keycap` is not an allowed system folder).
+  nothing of keycap's: its Caps Lock rule now ships as `/usr/lib/keycap/keycap.toml` (see pa2-desk).
 
 Whether the release should write `/etc/pam.d` at all is slipway's open question 5; deleting the folder from
 both lists (`ALLOWED_SYSTEM_DIRS`, `SYSTEM_DIRS`) turns it off.
@@ -458,11 +458,19 @@ rules (it equals slipway origin/master, 17 rules, `check-system-list.sh` says so
   `/etc/systemd/system/keycap.service.d/10-uinput.conf`. Lost by not running keycap's installer: the Plasma overlay (`--desktop plasma`, the default on
   KDE), `--plasma-focus`, and `restorecon` on its own list (system.sh runs `restorecon -F` on what it placed). A KDE machine that wants the overlay
   runs keycap's installer by hand and then removes its drop-in.
-- **`/etc/keycap/keycap.toml` is not in a release.** slipway's list names no `/etc/keycap` file, and adding one is a new helper on every computer.
-  `./install.sh` places `dist/keycap.toml` (`[profile.default] rules = [ { when = "capslock", then = "ctrl+space" } ]`, the same form as sill's
-  `dist/keycap/keycap.toml`) when there is no file, and keeps one that is there (it is the machine's, shared by every session; it prints the rule to
-  add). Asks: slipway adds `/etc/keycap` + `keycap.toml` (exact) to `ALLOWED_SYSTEM_FILES`, then `build.sh` stages it with `put_system`;
-  `system-files.list` moves with it. Until then sill's Caps Lock layer rule stays refused by keycap on a release-only machine.
+- **Resolved (2026-10-17): the Caps Lock rule ships as keycap's vendor file, `/usr/lib/keycap/keycap.toml`.** It used to be
+  `/etc/keycap/keycap.toml`, which no release could carry (a release must never write the administrator's `/etc`, and slipway's
+  list named no such file). keycap gained a vendor layer under the machine file (built-in < vendor < `/etc/keycap/keycap.toml` < the
+  person's own; same trust as the machine file, read only when root-only; keycap's FINDINGS "Vendor layer"), slipway's list gained
+  `/usr/lib/keycap/keycap.toml` (18th rule, none removed), `install/system.sh keycap` places `dist/keycap.toml` there every time
+  (644 root:root, like the callers table) and `--remove keycap` takes it back while unchanged, `build.sh` stages it with
+  `put_system`, and `system-files.list` has the same rule. `/etc/keycap` is no longer touched by any install or release. Left: (1) a
+  computer whose slipway helper predates the rule must re-run slipway's install by hand before the release that lists it (an older
+  helper refuses that release whole), (2) a `/etc/keycap/keycap.toml` an earlier `./install.sh` wrote stays (it holds the same rule, so
+  it changes nothing; delete it by hand, `--remove keycap` no longer looks at it), (3) the keycap and slipway pins in `manifest.toml`
+  must move to revs that have the vendor layer and the rule before a release is cut (until then `check-system-list.sh` fails against
+  the old slipway pin, on purpose), and (4) keycap watches `/usr/lib/keycap` only if it exists when the daemon starts; `system.sh`
+  restarts a running service when it changed any file, which covers a first install.
 - **A table or a unit placed by `install.sh` and a later release can conflict.** slipway replaces a system file only if it is absent, equal, or what
   an earlier release placed; anything else it leaves and reports (`plan_system`, `Conflict`). `desktop-callers.toml`, `turnstile.*` and the
   rules come from the same sources in both paths, so they are equal when the desktop checkout is the release's. `keycap.service` is not: the

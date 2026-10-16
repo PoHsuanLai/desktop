@@ -238,5 +238,5 @@ game packages add, and one small service (`turnstile`, started when something as
 and the touchpad program, and for nobody else. Its socket accepts any local program; who gets a device is decided by which program is asking,
 from `/etc/quire/desktop-callers.toml`. Nothing in the desktop gives that file to a group, so a keyboard-map install left over from before
 (`/etc/udev/rules.d/70-keycap.rules`, `/etc/systemd/system/keycap.service.d/10-uinput.conf`) should be removed; `install/system.sh keycap`
-says so when it finds them. On Fedora the files are labelled with `restorecon` when SELinux is on. On Ubuntu no AppArmor profile is placed.
+says so when it finds them. The same part places keycap's vendor file, `/usr/lib/keycap/keycap.toml` (Caps Lock switches the input method), on every family; `/etc/keycap/keycap.toml` stays the administrator's and nothing here writes it. On Fedora the files are labelled with `restorecon` when SELinux is on. On Ubuntu no AppArmor profile is placed.
 Services that were running before the list of programs was installed read it only when they start: log out and in once.

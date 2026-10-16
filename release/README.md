@@ -45,7 +45,7 @@ and `exports.toml` adds the rest.
 `[[system]]` (`path`): a file slipway's helper copies, as root, to an absolute path on the computer. Its
 contents are the bundle file `system/<path>` (so `system/etc/pam.d/sill` lands at `/etc/pam.d/sill`); every
 file under `system/` must be listed and every listed path needs its file. The path must be named by a rule of
-`system-files.list`, which is slipway's `ALLOWED_SYSTEM_FILES` word for word: seventeen rules, each a folder and either an
+`system-files.list`, which is slipway's `ALLOWED_SYSTEM_FILES` word for word: eighteen rules, each a folder and either an
 exact file name or a name ending (`/etc/quire/*-callers.toml`, `/etc/xdg/quire/*.toml`). A path no rule names
 refuses the whole release, at `pack`, at `verify` and in the helper. Because the helper is installed by hand and is
 never replaced by a release, adding a system file means changing slipway's list, installing the new helper on every
@@ -194,9 +194,10 @@ a release that lists a file its rule list does not name, so **everyone re-runs s
 at the version it has: the release is refused whole and says why. `release/system-files.list` and slipway's pin in `manifest.toml` move in
 the same step; until then `release/check-system-list.sh` fails against the old pin, on purpose.
 
-Not carried by a release: `/etc/keycap/keycap.toml` (Caps Lock switches the input method), because slipway's list names no file in `/etc/keycap`.
-`./install.sh` places it (`install/system.sh keycap`, never over a file that is there); on a machine installed from a release alone it is missing
-until slipway's list gains a rule for it (FINDINGS, pa2-desk).
+Carried by a release: `/usr/lib/keycap/keycap.toml` (Caps Lock switches the input method), keycap's vendor file. `/etc/keycap/keycap.toml` stays the
+administrator's and no release or install writes it; keycap lays it over the vendor file. Slipway's list gained the rule after the first release that
+carries the input service, so a computer whose helper is older than that rule must re-run slipway's install by hand before the release that lists it
+(an older helper refuses that release whole). `./install.sh` places the same file (`install/system.sh keycap`, replacing it each time).
 
 ## Local trial
 

@@ -9,7 +9,9 @@
 # is installed by hand and is not replaced by a release, so a file added here also needs a new helper on every
 # computer: change this list only together with slipway, never alone. The four turnstile rules are slipway's
 # input-service change (its FINDINGS 25, commit c36aaa0): until the pinned slipway has them, `check-system-list.sh`
-# fails against that pin, so this file and the pin move in the same step.
+# fails against that pin, so this file and the pin move in the same step. /usr/lib/keycap/keycap.toml is the
+# desktop's vendor defaults for the keyboard daemon (slipway's 18th rule); /etc/keycap stays the administrator's and
+# no release places a file there.
 /etc/pam.d                 exact   sill
 /etc/udev/rules.d          exact   60-sill-ddc.rules
 /etc/modules-load.d        exact   sill-ddc.conf
@@ -17,6 +19,7 @@
 /etc/udev/rules.d          exact   70-keycap.rules
 /etc/polkit-1/rules.d      exact   keycap.polkit.rules
 /etc/modules-load.d        exact   keycap.conf
+/usr/lib/keycap            exact   keycap.toml
 /usr/lib/systemd/system    exact   turnstile.socket
 /usr/lib/systemd/system    exact   turnstile.service
 /etc/udev/rules.d          exact   72-turnstile.rules

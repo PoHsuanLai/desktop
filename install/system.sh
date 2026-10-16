@@ -14,8 +14,9 @@
 #              but it, and the list that loads the kernel module. Then it reloads systemd and the device rules and
 #              starts the socket. No part of the desktop gives /dev/uinput to the person or to a group.
 #   keycap     the keyboard map: its program (built by install.sh), its service, the rule that lets the person at the
-#              keyboard restart it without a password, and /etc/keycap/keycap.toml (dist/keycap.toml: Caps Lock
-#              switches the input method) when there is none; a file already there is kept. It does not run keycap's own
+#              keyboard restart it without a password, and /usr/lib/keycap/keycap.toml (dist/keycap.toml: Caps Lock
+#              switches the input method), always replaced. That is keycap's vendor file, laid under the administrator's
+#              /etc/keycap/keycap.toml, which this never reads, writes or removes. It does not run keycap's own
 #              installer, which would give the `input` group the device file and the service a drop-in to open it.
 #
 # Never runs sudo. A place you cannot write stops it with the command to run as root (through whichever of sudo, doas
@@ -56,7 +57,8 @@ files() {
     keycap)
       echo "755 $keycap_bin $prefix/bin/keycap"
       echo "644 $siblings/keycap/dist/keycap.service $vendor_units/keycap.service"
-      echo "644 $siblings/keycap/dist/keycap.polkit.rules /etc/polkit-1/rules.d/keycap.polkit.rules" ;;
+      echo "644 $siblings/keycap/dist/keycap.polkit.rules /etc/polkit-1/rules.d/keycap.polkit.rules"
+      echo "644 $DIST/keycap.toml /usr/lib/keycap/keycap.toml" ;;
   esac
 }
 
@@ -125,28 +127,6 @@ settle() { # the units, the device rules and the kernel module take effect; $1 t
   esac
 }
 
-# config_keycap: /etc/keycap/keycap.toml, only when there is none. The machine file is shared by every session on the
-# computer, so one that is there is the administrator's and is kept.
-config_keycap() {
-  local target=$destdir/etc/keycap/keycap.toml owner=()
-  [ "$(id -u)" != 0 ] || owner=(-o root -g root)
-  if [ -e "$target" ]; then
-    if cmp -s "$DIST/keycap.toml" "$target"; then note "already in place: $target"
-    elif grep -Eq 'when[[:space:]]*=[[:space:]]*"capslock"' "$target"; then note "kept your $target (it already has a Caps Lock rule)"
-    else
-      note "kept your $target. To make Caps Lock switch the input method, add to it:"
-      note "    [profile.default]"
-      note "    rules = [ { when = \"capslock\", then = \"ctrl+space\" } ]"
-      note "(or merge it into the [profile.default] section you already have)"
-    fi
-    return 0
-  fi
-  note "$target (644): Caps Lock switches the input method"
-  [ "$dry" = 0 ] || return 0
-  install -d -m 755 "${owner[@]}" "$(dirname "$target")"
-  install -m 644 "${owner[@]}" "$DIST/keycap.toml" "$target"
-}
-
 install_part() {
   local source
   case "$part" in
@@ -169,11 +149,10 @@ install_part() {
   done < <(files)
   local dests=()
   while read -r _ _ dest; do dests+=("$dest"); done < <(files)
-  [ "$part" != keycap ] || dests+=(/etc/keycap/keycap.toml)
   need_write "${dests[@]}"
   while read -r fmode source dest; do put "$fmode" "$source" "$dest"; done < <(files)
   if [ "$part" = keycap ]; then
-    config_keycap
+    note "Caps Lock switches the input method (/usr/lib/keycap/keycap.toml). /etc/keycap/keycap.toml is yours and is not touched: rules you put there win."
     # An earlier, stand-alone install of keycap left things that undo the desktop's choices.
     if [ -z "$destdir" ] && [ -e /etc/systemd/system/keycap.service ]; then
       note "WARNING: /etc/systemd/system/keycap.service from an earlier install hides the one just placed; remove it, then run: systemctl daemon-reload"
@@ -202,7 +181,6 @@ remove_part() {
     [ -e "$destdir$dest" ] && present+=("$dest")
     : "$fmode"
   done < <(files)
-  [ "$part" != keycap ] || { [ ! -e "$destdir/etc/keycap/keycap.toml" ] || present+=(/etc/keycap/keycap.toml); }
   [ "${#present[@]}" = 0 ] || need_write "${present[@]}"
   if live && [ "$(id -u)" = 0 ] && systemd_running; then
     case "$part" in
@@ -220,12 +198,6 @@ remove_part() {
     fi
     : "$fmode"
   done < <(files)
-  if [ "$part" = keycap ] && [ -f "$destdir/etc/keycap/keycap.toml" ]; then
-    if cmp -s "$DIST/keycap.toml" "$destdir/etc/keycap/keycap.toml"; then
-      note "remove: $destdir/etc/keycap/keycap.toml"
-      [ "$dry" = 1 ] || rm -f -- "$destdir/etc/keycap/keycap.toml"
-    else note "kept (not what the installer wrote): $destdir/etc/keycap/keycap.toml"; fi
-  fi
   if live && [ "$(id -u)" = 0 ] && systemd_running; then
     run "tell systemd the files are gone" systemctl daemon-reload
     [ "$part" != turnstile ] || run "apply the device rules" udevadm control --reload-rules

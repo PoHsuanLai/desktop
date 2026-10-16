@@ -147,25 +147,31 @@ grep -q "^transom/scripts/install.sh" "$log" || fail "no component ran"
 cmp -s "$HERE/../dist/desktop-callers.toml" "$dest/etc/quire/desktop-callers.toml" || fail "the callers table was not staged as it is in dist/"
 [ "$(stat -c %a "$dest/etc/quire/desktop-callers.toml")" = 644 ] || fail "the callers table is not mode 644"
 for f in usr/lib/systemd/system/turnstile.socket usr/lib/systemd/system/turnstile.service etc/udev/rules.d/72-turnstile.rules etc/modules-load.d/turnstile.conf \
-  opt/d/bin/turnstile usr/lib/systemd/system/keycap.service etc/polkit-1/rules.d/keycap.polkit.rules opt/d/bin/keycap etc/keycap/keycap.toml; do
+  opt/d/bin/turnstile usr/lib/systemd/system/keycap.service etc/polkit-1/rules.d/keycap.polkit.rules opt/d/bin/keycap usr/lib/keycap/keycap.toml; do
   [ -f "$dest/$f" ] || fail "$f was not staged"
 done
 grep -q '^ExecStart=/opt/d/bin/turnstile$' "$dest/usr/lib/systemd/system/turnstile.service" || fail "turnstile.service does not start the installed program: $(cat "$dest/usr/lib/systemd/system/turnstile.service")"
 grep -q '^ExecStart=/opt/d/bin/keycap$' "$dest/usr/lib/systemd/system/keycap.service" || fail "keycap.service does not start the installed program"
-grep -q 'rules = \[ { when = "capslock", then = "ctrl+space" } \]\|when = "capslock", then = "ctrl+space"' "$dest/etc/keycap/keycap.toml" || fail "keycap.toml has no Caps Lock rule"
+grep -q 'rules = \[ { when = "capslock", then = "ctrl+space" } \]\|when = "capslock", then = "ctrl+space"' "$dest/usr/lib/keycap/keycap.toml" || fail "the vendor keycap.toml has no Caps Lock rule"
+cmp -s "$HERE/../dist/keycap.toml" "$dest/usr/lib/keycap/keycap.toml" || fail "the vendor keycap.toml was not staged as it is in dist/"
+[ "$(stat -c %a "$dest/usr/lib/keycap/keycap.toml")" = 644 ] || fail "the vendor keycap.toml is not mode 644"
+# /etc/keycap is the administrator's: the install writes nothing there
+[ ! -e "$dest/etc/keycap" ] || fail "the install wrote into /etc/keycap: $(ls -A "$dest/etc/keycap")"
 # nothing gives the person, or a group, the device file; the old stand-alone pieces are not staged
 [ ! -e "$dest/etc/udev/rules.d/70-keycap.rules" ] || fail "keycap's group rule for /dev/uinput was staged"
 [ -z "$(find "$dest" -name '*uinput.conf' -o -name '10-uinput*')" ] || fail "a uinput drop-in was staged: $(find "$dest" -name '*uinput.conf' -o -name '10-uinput*')"
 if grep -rh 'uaccess' "$dest/etc/udev/rules.d" 2>/dev/null | grep -v 'TAG-="uaccess"' | grep -q .; then fail "a staged rule gives the person a device file"; fi
-# a second run keeps a keycap.toml the administrator changed, and says so
-printf '[profile.default]\nrules = []\n' >"$dest/etc/keycap/keycap.toml"
+# a second run replaces a vendor keycap.toml that was changed, and leaves the administrator's file alone
+printf '[profile.default]\nrules = []\n' >"$dest/usr/lib/keycap/keycap.toml"
+mkdir -p "$dest/etc/keycap"; printf '[profile.default]\nrules = []\n' >"$dest/etc/keycap/keycap.toml"
 inst --destdir "$dest" --prefix /opt/d --only keycap >"$tmp/out2.log" 2>&1 || { cat "$tmp/out2.log" >&2; fail "the keyboard map step failed the second time"; }
-grep -q 'rules = \[\]' "$dest/etc/keycap/keycap.toml" || fail "an existing keycap.toml was overwritten"
-grep -q 'kept your' "$tmp/out2.log" || fail "the kept keycap.toml was not said"
-# the removal takes away only what is unchanged, and keeps the changed keycap.toml
+cmp -s "$HERE/../dist/keycap.toml" "$dest/usr/lib/keycap/keycap.toml" || fail "a changed vendor keycap.toml was not replaced"
+[ "$(cat "$dest/etc/keycap/keycap.toml")" = "$(printf '[profile.default]\nrules = []')" ] || fail "the administrator's keycap.toml was changed"
+# the removal takes away what is unchanged (the vendor file) and never looks at /etc/keycap
 "$HERE/../install/system.sh" --remove keycap --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out3.log" 2>&1 || { cat "$tmp/out3.log" >&2; fail "removing the keyboard map failed"; }
 [ ! -e "$dest/opt/d/bin/keycap" ] || fail "the keyboard map program was kept by the removal"
-[ -f "$dest/etc/keycap/keycap.toml" ] || fail "a changed keycap.toml was removed"
+[ ! -e "$dest/usr/lib/keycap/keycap.toml" ] || fail "the vendor keycap.toml was kept by the removal"
+[ -f "$dest/etc/keycap/keycap.toml" ] || fail "the administrator's keycap.toml was removed"
 "$HERE/../install/system.sh" --remove turnstile --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out3.log" 2>&1 || fail "removing the input service failed"
 [ ! -e "$dest/etc/udev/rules.d/72-turnstile.rules" ] || fail "the device rule was kept by the removal"
 inst --destdir "$dest" --prefix /opt/d --only keycap,turnstile >/dev/null 2>&1 || fail "the input steps did not run again"

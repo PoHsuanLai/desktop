@@ -35,7 +35,8 @@
 #
 # keycap is not installed by keycap's own installer: that one gives the `input` group the device file /dev/uinput and the service a
 # drop-in to open it, which the desktop closes (the input service owns the node). install/system.sh puts the program, the service,
-# the restart rule and /etc/keycap/keycap.toml (only when there is none) instead.
+# the restart rule and /usr/lib/keycap/keycap.toml (Caps Lock; keycap's vendor file, under the administrator's
+# /etc/keycap/keycap.toml, which is never touched) instead.
 #
 # Builds. The repos pin Rust 1.98.1 and need rustup (a distro's rust package is the wrong version). Some
 # repos' cargo config asks for clang and mold, which is how they are worked on. An install never reads it
@@ -197,11 +198,11 @@ describe() {
       # The keyboard map, installed by install/system.sh and not by keycap's own installer (see the header).
       dir="$HERE"
       script=install/system.sh
-      blurb="the keyboard map: its program and service, the rule that lets you restart it, and /etc/keycap/keycap.toml (Caps Lock switches the input method) when there is none"
+      blurb="the keyboard map: its program and service, the rule that lets you restart it, and /usr/lib/keycap/keycap.toml (Caps Lock switches the input method)"
       args=(keycap --prefix "$prefix")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       args+=(--siblings "$siblings")
-      writes=("$destdir$prefix" "$destdir/usr/lib/systemd/system" "$destdir/etc/polkit-1/rules.d" "$destdir/etc/keycap") ;;
+      writes=("$destdir$prefix" "$destdir/usr/lib/systemd/system" "$destdir/etc/polkit-1/rules.d" "$destdir/usr/lib/keycap") ;;
     anyview)
       script=dist/install.sh
       args=(--prefix "$prefix")
