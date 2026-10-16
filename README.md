@@ -6,7 +6,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | Path | What |
 |---|---|
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
-| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, almanac, docket, detent, casement, sill, transom, keycap, anyview, mailo, palmrest, session) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
+| `install.sh` | installs the desktop: runs each component repo's own installer in order (porter, stoker, almanac, docket, detent, casement, sill, transom, keycap, anyview, mailo, palmrest, session) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
 | `docs/distros.md` | Ubuntu 24.04+, Fedora and Arch: what is checked, the install lines, picking the session at login, the Ubuntu AppArmor note |
 | `install/` (helpers) | `distro.sh` (family from os-release, sudo/doas/pkexec), `packages.sh` (the one package table), `check.sh`, `cargo.sh` (builds a tree from `/` with `--manifest-path`, so the system linker is used), `fonts.sh` |
 | `fonts/` | `Noto-COLRv1.ttf` (OFL) with its source and sha256: Ubuntu and Arch ship a bitmap emoji font our renderer cannot draw |
@@ -31,7 +31,8 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 
 `./install.sh [--dry-run] [--prefix DIR] [--destdir DIR] [--sysconfdir DIR] [--siblings DIR] [--only NAME,...]`
 runs each component's own installer, siblings checked out side by side, in this order: porter
-(`scripts/install.sh`: the daemons and the caller table), almanac (`scripts/install.sh`: the memory daemon, its unit
+(`scripts/install.sh`: the daemons and the caller table), stoker (`scripts/install.sh`: the model catalogue inferd reads;
+nothing is built), almanac (`scripts/install.sh`: the memory daemon, its unit
 and `/etc/quire/memory-callers.toml`), docket (`scripts/install.sh`: the action router, the companion, the reader, the tool
 server and `quire-do`, with their units and the `/etc/quire/*-callers.toml` tables; they read porter's accounts, so they come
 after it), detent (`scripts/install.sh`: Settings, which
@@ -44,7 +45,7 @@ installer takes; the first failure stops the run and names the component and wha
 It never runs sudo and never writes under `~/.config` or `/etc` itself. A component runs only when every place
 it writes is writable by you (a user prefix, or a `--destdir`); the rest are printed as "yourself", with the
 command, to run with the right privileges: a system prefix, sill and palmrest (fixed destinations, their own
-sudo or home files), keycap outside a `--destdir`, and almanac and docket outside a `--destdir` (their caller tables go to the
+sudo or home files), keycap outside a `--destdir`, stoker outside a `--destdir` (its installer asks for sudo itself), and almanac and docket outside a `--destdir` (their caller tables go to the
 fixed `/etc/quire`; their installers refuse to run as root and ask for sudo for just those steps, so the command is
 printed to run as yourself). Neither takes `--sysconfdir`. `gate/installer-check.sh` tests all of this against stub
 installers.

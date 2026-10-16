@@ -26,6 +26,7 @@ STUB
   chmod +x "$f"
 }
 stub porter/scripts/install.sh porter
+stub stoker/scripts/install.sh stoker
 stub almanac/scripts/install.sh almanac
 stub docket/scripts/install.sh docket
 stub detent/scripts/install.sh detent
@@ -48,10 +49,12 @@ inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot "$INSTA
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "porter almanac docket detent casement sill transom keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
+[ "$order" = "porter stoker almanac docket detent casement sill transom keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
 printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
 printf '%s\n' "$plan" | grep -q 'porter .*runs .*scripts/install.sh --prefix /usr/local --sysconfdir /etc --destdir' || fail "porter does not get the desktop prefix and /etc: $plan"
+printf '%s\n' "$plan" | grep -q 'stoker .*runs .*scripts/install.sh --prefix /usr/local --sysconfdir /etc --destdir' || fail "stoker does not get the desktop prefix, /etc and the destdir: $plan"
+! printf '%s\n' "$plan" | grep -q 'note: .* is not on the session' || fail "the default prefix got the search-path note: $plan"
 printf '%s\n' "$plan" | grep -q 'almanac .*runs .*scripts/install.sh --prefix /usr/local --destdir' || fail "almanac does not run into a staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'docket .*runs .*scripts/install.sh --prefix /usr/local --destdir' || fail "docket does not run into a staging root: $plan"
 ! printf '%s\n' "$plan" | grep -E 'almanac|docket' | grep -q -- '--sysconfdir' || fail "almanac or docket was given --sysconfdir, which they do not take"
@@ -73,11 +76,29 @@ for c in almanac docket; do
   ! printf '%s\n' "$plan" | grep -q "asroot .*$c/scripts/install.sh" || fail "$c was offered as a root command: $plan"
 done
 
+# 2c. without a staging root stoker is left to the person, as themselves (its installer asks for sudo itself).
+plan=$(inst --dry-run --prefix "$tmp/user-prefix") || fail "user prefix dry run failed"
+printf '%s\n' "$plan" | grep -q 'stoker .*yourself (its installer asks for sudo' || fail "stoker was not left to the person: $plan"
+! printf '%s\n' "$plan" | grep -q "asroot .*stoker/scripts/install.sh" || fail "stoker was offered as a root command: $plan"
+
+# 2d. a prefix off the session's search paths prints, never writes, how to tell the session: the data dirs line and the unit links.
+for p in /opt/d "$tmp/user-prefix"; do
+  plan=$(inst --dry-run --prefix "$p") || fail "dry run with prefix $p failed"
+  printf '%s\n' "$plan" | grep -q "XDG_DATA_DIRS=$p/share:/usr/local/share:/usr/share\$" || fail "no XDG_DATA_DIRS line for $p: $plan"
+  printf '%s\n' "$plan" | grep -q "environment.d" || fail "the note does not name environment.d for $p: $plan"
+  printf '%s\n' "$plan" | grep -q "ln -sf $p/lib/systemd/user/\* /usr/local/lib/systemd/user/" || fail "no unit link line for $p: $plan"
+done
+for p in /usr /usr/local; do
+  ! inst --dry-run --prefix "$p" | grep -q 'XDG_DATA_DIRS=' || fail "prefix $p got the search-path note"
+done
+[ ! -e "$home/.config/environment.d" ] || fail "the note was written, not printed"
+
 # 3. a real run into a staging root passes PREFIX and DESTDIR through, runs the stageable ones, never sudo.
 inst --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "staged run failed"; }
 # porter goes under the same prefix as everything else (its daemons find what they ship under XDG_DATA_DIRS),
 # with the caller tables in --sysconfdir.
 grep -q "^porter/scripts/install.sh --prefix /opt/d --sysconfdir /etc --destdir $dest" "$log" || fail "porter did not get the prefix, /etc and the destdir: $(cat "$log")"
+grep -q "^stoker/scripts/install.sh --prefix /opt/d --sysconfdir /etc --destdir $dest" "$log" || fail "stoker did not get the prefix, /etc and the destdir: $(cat "$log")"
 grep -q "^casement/scripts/install.sh --prefix /opt/d --locked --destdir $dest" "$log" || fail "casement did not get the prefix and destdir: $(cat "$log")"
 ! grep -q 'note: porter goes to' "$tmp/out.log" || fail "a porter prefix note is still printed: $(cat "$tmp/out.log")"
 # the session step is this repo's own installer: really run, into the staging root

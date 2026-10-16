@@ -161,6 +161,23 @@ tables at `$sysconfdir/porter`):
   fixed list (`TABLE_DIRS`), not `$XDG_*`, and a table counts only when root holds it (root-owned, no group or other
   write along its real path), so it must be installed as root, as before.
 - Not verified: that the user session's `XDG_DATA_DIRS` keeps `/usr/local/share` (unset gives the default; a session that
-  sets it without that entry would not find an install under `/usr/local`), and the stoker catalog, which this
-  installer does not install (stoker's own `scripts/install.sh` puts it at `$PREFIX/share/stoker/catalog`). Nothing was
-  built or installed; `gate/installer-check.sh` and a dry run passed.
+  sets it without that entry would not find an install under `/usr/local`). Nothing was built or installed;
+  `gate/installer-check.sh` and a dry run passed.
+- The stoker catalog was installed by nothing on this repo's master, so inferd had no model catalogue on a fresh install.
+  `install.sh` now has a `stoker` step right after porter (`scripts/install.sh --prefix P --sysconfdir S [--destdir D]`,
+  stoker 3ae1211; it builds nothing and writes only `<prefix>/share/stoker/catalog`). Outside a `--destdir` it is left to
+  the person like almanac (its installer escalates itself). `release/build.sh` has `build_stoker` (`--no-build`, staged
+  under `share/stoker`, an auto-exported folder in `release.py`) and the CI `agents` job builds `almanac,docket,stoker`.
+  Not run: the CI job and `build_stoker` (no build here; the stoker installer's dry run lists the catalog files).
+- A prefix other than `/usr` and `/usr/local` is on no search path the session has. The plan now prints (never writes)
+  an `environment.d` line `XDG_DATA_DIRS=<prefix>/share:/usr/local/share:/usr/share` for the D-Bus service files and the
+  shipped data. Units are a separate matter: systemd's user manager reads `/usr/lib`, `/usr/local/lib` and
+  `$XDG_DATA_DIRS/systemd/user`, never `<prefix>/lib/systemd/user`, so `XDG_DATA_DIRS` alone does not find them; the note
+  also prints a root `ln -sf <prefix>/lib/systemd/user/* /usr/local/lib/systemd/user/`. That link command and the
+  systemd search-path claim come from systemd's documented behaviour and were not tried on a machine. The session
+  installer's casement.service check (`install/install.sh`) only tests that the file exists under the prefix, so it
+  does not catch this.
+- The release bundle is not affected: it lives under `/opt/quire/current` but `release.py` exports `share/dbus-1/services`,
+  `lib/systemd/user`, `share/porter`, `share/stoker` and the other folders in `AUTO_EXPORT_DIRS` as links into `/usr/share`
+  and `/usr/lib/systemd/user`, and the caller tables go to `/etc/porter` as system files. `release/build.sh` is unchanged
+  apart from the stoker step.
