@@ -76,10 +76,9 @@ step_screenshot() { accept screenshot; }
 step_screencast() { accept screencast-output; }
 step_settings() { accept settings; }
 
-# step_screenshot and step_screencast wait on transom against casement in the jail: Access is answered
-# (the person is asked through the shell), but the screenshot's response carries no uri and screen
-# sharing's Start answers 2 (cas-wave-2026-10-15.md follow-ups).
-run_steps step_routing step_boot step_settings
+# step_screencast waits on casement: the first frame of a capture session comes back, then casement
+# closes transom's connection at the next capture (lane cas36-castframe; cas-wave-2026-10-15.md).
+run_steps step_routing step_boot step_settings step_screenshot
 if [ "$STATUS" != 0 ]; then
   for f in "$OUT_DIR"/chain-*/transom.log "$OUT_DIR"/chain-*/portal.log; do
     [ -f "$f" ] || continue
