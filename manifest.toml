@@ -14,7 +14,7 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "b43decf2e80a52d72a0229287f256cbde5cc7a37"
+rev = "f42f88966a5b93bd28afca79880dc915f2956a2d"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
@@ -52,7 +52,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "de060069eec36707705dc4c5b043d7f8a2f4e147"
+rev = "4b48f043e4579ee11d197530f2041918d42f5c88"
 branch = "master"
 gate = "lane"
 
@@ -64,20 +64,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "0f30934e85938c40e0f34ee5cc945ee77b860ef8"
+rev = "583073bc168284d4a75075e63ed50d2a3148235d"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "994117c0358406bdc493cba6eb713e264c645da8"
+rev = "ac27f4c88d8a9725104b963492fc212fa2059650"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "f6fe8bcd88e14f9c8d325790082686e227ee91e9"
+rev = "c43e02c48f3aff040129d42c99e49460cb092eb4"
 branch = "master"
 gate = "lane"
 
@@ -109,13 +109,13 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "a49ff367f31ec3723880b3570dbf46606096dfea"
+rev = "203c484e390395cc26ea9816687eddde6f5f041a"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "76256d36781df628ada8a572f5f0e69a914b5452"
+rev = "06f6cb9c43b08840f46283990876b65046964809"
 branch = "main"
 gate = "none"
 
