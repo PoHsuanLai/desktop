@@ -61,7 +61,7 @@ local_only = "off"
 [ai.floor]
 files = "anywhere"
 [ai.model.text]
-fast = "openai-openai/fake-model"
+fast = "openai-openai/gpt-6-luna"
 TOML
   inferd_start || return 1
   sill_start || return 1
