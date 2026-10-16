@@ -91,7 +91,7 @@ jobs:
           - { name: mailo, only: mailo }
           - { name: porter, only: porter }
           - { name: agents, only: "almanac,docket,stoker,cua" }
-          - { name: small, only: "session,detent,transom,keycap,palmrest,slipway,satellite" }
+          - { name: small, only: "session,detent,transom,turnstile,keycap,palmrest,slipway,satellite" }
     steps:
       - name: Git and certificates (the checkout needs them)
         run: |

@@ -28,6 +28,11 @@ target = "bin/detent"
 link = "/usr/local/bin/keycap"
 target = "bin/keycap"
 
+# The input service's unit starts this link (turnstile.service: ExecStart=/usr/local/bin/turnstile).
+[[export]]
+link = "/usr/local/bin/turnstile"
+target = "bin/turnstile"
+
 [[export]]
 link = "/usr/local/bin/palmrest"
 target = "bin/palmrest"

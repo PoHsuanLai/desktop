@@ -7,13 +7,13 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway satellite); the
+#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo slipway satellite); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
 # /opt/quire/current under the destdir OUT/stage, through the component's own installer where it can stage
-# (porter, stoker, almanac, docket, cua, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, keycap,
-# palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
+# (porter, stoker, almanac, docket, cua, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, turnstile,
+# keycap, palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
 # A component whose repo is not beside this one is an error, except the mpv-wgpu plugin of anyview, which is
@@ -27,7 +27,7 @@ ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
 # shellcheck source=../install/cargo.sh
 source "$ROOT/install/cargo.sh"
-ALL=(casement sill session porter stoker almanac docket cua detent transom keycap palmrest anyview mailo slipway satellite)
+ALL=(casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo slipway satellite)
 # xwayland-satellite (MPL-2.0; a separate program casement starts for X11 apps), built from its own public repository at
 # one commit, locked. Ubuntu 24.04 does not package it. Bump both lines together: SATELLITE_REV is the commit the tag
 # names (`git ls-remote $SATELLITE_URL 'refs/tags/v0.8.3^{}'`), because a tag can be moved and a commit cannot.
@@ -97,8 +97,13 @@ put() { install -Dm"$1" "$2" "$root/$3"; }
 # travels in the bundle at system/DEST and pack.sh lists it; DEST must be a file release/system-files.list (slipway's
 # list, exactly) names: anything else is refused when the release is packed.
 put_system() { put "$1" "$2" "system$3"; }
-# retarget FILE FROM: the unit's path to its program becomes the installed one.
-retarget() { sed -i "s|^ExecStart=$2|ExecStart=$P/bin/$(basename "$2")|" "$1"; grep -q "^ExecStart=$P/bin/" "$1" || die "$1: no ExecStart to retarget"; }
+# retarget FILE FROM...: the unit's path to its program becomes the installed one. Each FROM is a path the unit may
+# have started the program by (a unit may change its default between two revs of its repo); the one it has is replaced.
+retarget() {
+  local file=$1 from; shift
+  for from in "$@"; do sed -i "s|^ExecStart=$from|ExecStart=$P/bin/$(basename "$from")|" "$file"; done
+  grep -q "^ExecStart=$P/bin/" "$file" || die "$file: no ExecStart to retarget"
+}
 
 build_casement() {
   local d; d=$(repo_dir casement)
@@ -146,6 +151,10 @@ build_session() {
   # lib/systemd/user (this installer puts it under <sysconfdir>/systemd/user).
   "$ROOT/install/install.sh" --prefix "$P" --destdir "$stage" --siblings /nonexistent \
     --sysconfdir "$P/lib" --sessions-dir "$P/share/wayland-sessions"
+  # The table of the desktop's own programs, a system file slipway places at /etc/quire/desktop-callers.toml (the rule
+  # `/etc/quire/*-callers.toml` names it). slipway's update service, the portal backend and the input service read it
+  # and refuse every caller without it, so it travels in every release.
+  put_system 644 "$ROOT/dist/desktop-callers.toml" /etc/quire/desktop-callers.toml
   # The colour emoji font (install.sh puts the same two files in <prefix>/share/fonts/quire/): ubuntu and arch ship
   # a bitmap build our renderer cannot draw. share/fonts is exported to /usr/share/fonts, where quire's search
   # (ds-blitz emoji_file.rs: <data dir>/fonts/quire/Noto-COLRv1.ttf for each XDG data dir, /usr/share included) finds it.
@@ -251,32 +260,48 @@ build_transom() {
   done
 }
 
+build_turnstile() {
+  local d; d=$(repo_dir turnstile)
+  # The root service that makes palmrest's and keycap's virtual input devices. Only the daemon is built (-p turnstile,
+  # no feature: its `fake` kernel and identity are for its tests and never ship; gate/check-no-fake.sh). The program is
+  # exported to /usr/local/bin/turnstile (exports.toml), which the unit starts as shipped. The four files are system
+  # files (turnstile's lane named them; slipway's list has them since its input-service change): the socket and the
+  # service in the vendor folder, the rule that makes /dev/uinput root-only and takes the `uaccess` tag off it, and the
+  # module list. Nothing here gives the node to the person or to the `input` group.
+  cargo_in "$d" turnstile -p turnstile
+  put 755 "$(tdir turnstile)/turnstile" bin/turnstile
+  put_system 644 "$d/dist/turnstile.socket" /usr/lib/systemd/system/turnstile.socket
+  put_system 644 "$d/dist/turnstile.service" /usr/lib/systemd/system/turnstile.service
+  put_system 644 "$d/dist/72-turnstile.rules" /etc/udev/rules.d/72-turnstile.rules
+  put_system 644 "$d/dist/turnstile-modules.conf" /etc/modules-load.d/turnstile.conf
+}
+
 build_keycap() {
   local d; d=$(repo_dir keycap)
   cargo_in "$d" keycap
-  # INTERIM: install.sh stages under DESTDIR but at /etc and /usr/local, outside the prefix. The unit, the
-  # udev rule, the polkit rule and the module list are system files (slipway-apply places them); the unit
-  # goes to /usr/lib/systemd/system (the vendor folder; /etc stays the administrator's). keycap ships no
-  # modules-load file (distro audit lane 12 asks for one): the line is written here.
+  # INTERIM: install.sh stages under DESTDIR but at /etc and /usr/local, outside the prefix. The unit and the polkit
+  # rule are system files (slipway-apply places them); the unit goes to /usr/lib/systemd/system (the vendor folder; /etc
+  # stays the administrator's). On the desktop the input service (turnstile) owns /dev/uinput and hands keycap each
+  # device, so none of keycap's standalone pieces for that node ship: not its 70-keycap.rules (the `input` group may
+  # write the node), not the drop-in dist/keycap.uinput.conf (DeviceAllow=/dev/uinput), and not a module list of its own
+  # (turnstile's turnstile.conf loads uinput). /etc/keycap/keycap.toml is not here either: slipway's list names no
+  # /etc/keycap file (FINDINGS), the source install places it.
   put 755 "$(tdir keycap)/keycap" bin/keycap
   put_system 644 "$d/dist/keycap.service" /usr/lib/systemd/system/keycap.service
   retarget "$root/system/usr/lib/systemd/system/keycap.service" /usr/local/bin/keycap
-  put_system 644 "$d/dist/70-keycap.rules" /etc/udev/rules.d/70-keycap.rules
   put_system 644 "$d/dist/keycap.polkit.rules" /etc/polkit-1/rules.d/keycap.polkit.rules
-  local modules; modules=$(mktemp)
-  printf '# keycap writes its virtual keyboard through /dev/uinput.\nuinput\n' >"$modules"
-  put_system 644 "$modules" /etc/modules-load.d/keycap.conf
-  rm -f "$modules"
   put 644 "$d/dist/keycap.plasma.toml" share/keycap/keycap.plasma.toml
 }
 
 build_palmrest() {
   local d; d=$(repo_dir palmrest)
   cargo_in "$d" palmrest
-  # INTERIM: install.sh writes ~/.local/bin and the user's systemd directory and enables the service.
+  # INTERIM: install.sh writes the user's systemd directory and enables the service. The unit's ExecStart is a root-owned
+  # program (the input service serves only a palmrest only root can change): /usr/local/bin/palmrest, or the older
+  # %h/.local/bin/palmrest of an earlier rev; either becomes the installed one.
   put 755 "$(tdir palmrest)/palmrest" bin/palmrest
   put 644 "$d/dist/palmrest.service" lib/systemd/user/palmrest.service
-  retarget "$root/lib/systemd/user/palmrest.service" '%h/.local/bin/palmrest'
+  retarget "$root/lib/systemd/user/palmrest.service" /usr/local/bin/palmrest '%h/.local/bin/palmrest'
   put_system 644 "$d/dist/70-palmrest.rules" /etc/udev/rules.d/70-palmrest.rules
   put_system 644 "$d/dist/99-palmrest.conf" /etc/modprobe.d/99-palmrest.conf
 }
