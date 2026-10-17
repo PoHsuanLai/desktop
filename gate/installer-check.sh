@@ -119,6 +119,28 @@ for p in /usr /usr/local; do
 done
 [ ! -e "$home/.config/environment.d" ] || fail "the note was written, not printed"
 
+# 2e. a program root runs never lives where the person can replace it. A user-owned prefix (--prefix ~/.local) is refused by
+# install/system.sh for the input service and the keyboard map, and install.sh puts those two under /usr/local instead and says so;
+# a prefix root holds is kept. (Without a staging root: the check judges the real folders.)
+mkdir -p "$tmp/user-prefix/bin"
+for part in turnstile keycap; do
+  if "$HERE/../install/system.sh" "$part" --dry-run --prefix "$tmp/user-prefix" --siblings "$sib" >"$tmp/out-unheld.log" 2>&1; then
+    fail "install/system.sh $part accepted a prefix the person owns: $(cat "$tmp/out-unheld.log")"
+  fi
+  grep -q "is not a safe place for a program that root runs" "$tmp/out-unheld.log" || fail "the refusal for $part does not say why: $(cat "$tmp/out-unheld.log")"
+  "$HERE/../install/system.sh" "$part" --dry-run --prefix /usr --siblings "$sib" >"$tmp/out-held.log" 2>&1 || { cat "$tmp/out-held.log" >&2; fail "install/system.sh $part refused /usr, which root holds"; }
+  plan=$(inst --dry-run --prefix "$tmp/user-prefix" --only "$part") || fail "dry run with a user prefix failed for $part"
+  printf '%s\n' "$plan" | grep -q "install/system.sh $part --prefix /usr/local" || fail "$part was not moved to /usr/local for a user prefix: $plan"
+  ! printf '%s\n' "$plan" | grep -q "install/system.sh $part --prefix $tmp/user-prefix" || fail "$part was planned under the user's prefix: $plan"
+  printf '%s\n' "$plan" | grep -q "note: $part runs as root, so its program goes under /usr/local" || fail "the move of $part was not said: $plan"
+  plan=$(inst --dry-run --prefix /usr --only "$part") || fail "dry run with /usr failed for $part"
+  printf '%s\n' "$plan" | grep -q "install/system.sh $part --prefix /usr " || fail "$part left /usr, which root holds: $plan"
+done
+[ -z "$(find "$tmp/user-prefix" -type f)" ] || fail "a refused install left files under the person's prefix"
+# a staging root is not judged: the folder it becomes is the packager's
+plan=$(inst --dry-run --destdir "$dest" --prefix "$tmp/user-prefix" --only turnstile) || fail "staged dry run with a user prefix failed"
+printf '%s\n' "$plan" | grep -q "install/system.sh turnstile --prefix $tmp/user-prefix --destdir" || fail "a staged prefix was moved: $plan"
+
 # 3. a real run into a staging root passes PREFIX and DESTDIR through, runs the stageable ones, never sudo.
 inst --destdir "$dest" --prefix /opt/d >"$tmp/out.log" 2>&1 || { cat "$tmp/out.log" >&2; fail "staged run failed"; }
 # porter goes under the same prefix as everything else (its daemons find what they ship under XDG_DATA_DIRS),

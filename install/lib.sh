@@ -23,6 +23,8 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../session" && pwd)"
 source "$(dirname "${BASH_SOURCE[0]}")/distro.sh"
 # shellcheck source=packages.sh
 source "$(dirname "${BASH_SOURCE[0]}")/packages.sh"
+# shellcheck source=rootheld.sh
+source "$(dirname "${BASH_SOURCE[0]}")/rootheld.sh"
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
 sysconfdir=${SYSCONFDIR:-/etc}

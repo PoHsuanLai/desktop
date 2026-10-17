@@ -24,6 +24,12 @@
 # place and identical is left alone. --remove takes away what this put in place, each file only while it is still what
 # was written, and stops what it started.
 #
+# The programs root runs (turnstile, keycap) go only where root alone can replace them: with no --destdir, a --prefix whose
+# folders are not all owned by root and closed to group and others (for example ~/.local) is refused, because the services
+# run that program as root and the owner of the folder could swap it. Use --prefix /usr/local (the default) or another
+# folder root holds. install.sh does this for you: it puts these two parts under /usr/local when your prefix is not root's.
+# Under --destdir nothing is checked here: it is a staging root, and the folder it becomes is the packager's to hold.
+#
 # Needs from the machine: systemd and udev (all three supported families have both); nothing is installed from a
 # package, so there are no apt, dnf or pacman lines. restorecon is used when SELinux is there (Fedora).
 # Exit: 0 done, 1 something failed or a place is not writable, 2 bad usage or a missing file.
@@ -127,8 +133,18 @@ settle() { # the units, the device rules and the kernel module take effect; $1 t
   esac
 }
 
+# refuse_unheld_prefix: for the parts whose program root runs, stop (exit 1) unless the prefix's folders belong to root alone.
+refuse_unheld_prefix() {
+  local why
+  case "$part" in turnstile | keycap) ;; *) return 0 ;; esac
+  [ -z "$destdir" ] || return 0
+  why=$(not_root_held "$prefix/bin") || return 0
+  die "$prefix is not a safe place for a program that root runs: $why. The $part service runs as root, so anyone who can replace its program could run their own code as root. Use --prefix /usr/local, or a folder only root can write." 1
+}
+
 install_part() {
   local source
+  refuse_unheld_prefix
   case "$part" in
     callers) step "the list of the desktop's own programs (/etc/quire/desktop-callers.toml)"
       note "The update service, the screen-sharing service and the input service read it when they start, and refuse"

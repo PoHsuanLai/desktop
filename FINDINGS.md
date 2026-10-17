@@ -547,3 +547,16 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   `gate/installer-check.sh` asserts the list rule, the byte-equal unit at the default prefix, that `build.sh` stages the unit at that path without
   `retarget`, and the export link. Not run here (lane rules); the byte-for-byte case was tried by hand with `system.sh keycap --destdir` in a scratch folder.
   A computer that already holds the previous release's unit (`/opt/quire/current/bin/keycap`) gets the new one as that release's own earlier file.
+
+## pa3-root: install, release and session (lane pa3-root, 2026-10-17)
+
+- **NEW-ROOT-1: a program root runs is never put where the person can replace it.** `./install.sh --prefix ~/.local` used to print the root command for
+  turnstile and keycap with the same prefix; run as root, `install/system.sh` then wrote `ExecStart=/home/u/.local/bin/turnstile` into a unit that runs as
+  root, in a folder the person owns. Two layers now. `install/system.sh` (the part that does the work) refuses, exit 1 and a plain sentence, when `<prefix>/bin`
+  or any folder above it is not owned by root or can be written by group or others (`install/rootheld.sh`, `not_root_held`; symlinks followed, a folder
+  that does not exist yet judged by its nearest parent). `install.sh` does not stop the whole desktop install for it: it hands these two parts `/usr/local`
+  (the release's place; `dist/desktop-callers.toml` lists only `/usr/local/bin` and `/usr/bin` for them anyway) and the plan says so. Chosen over "always
+  /usr/local" so that a packager's `--destdir ... --prefix /usr` still lands in `/usr/bin`; a `--destdir` is not judged (it is a staging root; the folder it
+  becomes is the packager's to hold). Test: `gate/installer-check.sh` 2e (a user-owned prefix is refused for both parts, `/usr` is accepted, the plan
+  moves them to `/usr/local` and says so, a staged prefix is kept). Not covered: root-owned but group-writable folders (the test cannot make one without
+  root); the function was run by hand over `/tmp`, `~/.local`, `/usr/local` and a missing path.

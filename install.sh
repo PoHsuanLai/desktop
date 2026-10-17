@@ -52,6 +52,9 @@
 #     /usr/local/bin through sudo, its service in your home)
 #   - callers, turnstile, keycap: install/system.sh puts files in /etc, /usr/lib/systemd/system and /usr/local; it never runs sudo itself, so
 #     outside a --destdir the root command is printed
+#     turnstile and keycap are started as root, so their programs go only where root alone can replace them: when --prefix has a
+#     folder the person owns or can write (~/.local), these two go under /usr/local instead and the plan says so; install/system.sh
+#     refuses such a prefix on its own (re-audit NEW-ROOT-1)
 #   - stoker: the catalogue goes under the prefix; its installer asks for sudo, doas or pkexec itself for a system
 #     prefix, so outside a --destdir it is left to you, run as yourself
 #   - almanac, docket, cua: their caller tables go to /etc/quire (always replaced) and docket's default settings to
@@ -67,6 +70,8 @@ source "$HERE/install/distro.sh"
 source "$HERE/install/cargo.sh"
 # shellcheck source=install/packages.sh
 source "$HERE/install/packages.sh"
+# shellcheck source=install/rootheld.sh
+source "$HERE/install/rootheld.sh"
 # shellcheck source=install/check.sh
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
@@ -113,6 +118,13 @@ fi
 case "$prefix" in /*) ;; *) die "--prefix must be an absolute path" ;; esac
 destdir=${destdir%/}
 prefix=${prefix%/}
+
+# root_prefix: where a program that root runs goes (turnstile, keycap). Their services run as root, so anyone who can replace the
+# program could run their own code as root: the prefix is used only when every folder up to / is root's alone (a staging root
+# is the packager's to hold, so it is not checked). Otherwise (--prefix ~/.local, say) it is /usr/local, the release's place.
+root_prefix() {
+  if [ -n "$destdir" ] || ! not_root_held "$prefix/bin" >/dev/null; then printf '%s' "$prefix"; else printf '%s' /usr/local; fi
+}
 
 # What a component is: its directory, its installer (relative), the command words after the installer, the
 # environment it takes, the places it writes, and why it is left to you (empty: it can run here).
@@ -190,19 +202,19 @@ describe() {
       dir="$HERE"
       script=install/system.sh
       blurb="the input service: it alone makes virtual keyboards and pads, for the keyboard map and the touchpad program, and /dev/uinput is closed to everybody else"
-      args=(turnstile --prefix "$prefix")
+      args=(turnstile --prefix "$(root_prefix)")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       args+=(--siblings "$siblings")
-      writes=("$destdir$prefix" "$destdir/usr/lib/systemd/system" "$destdir/etc/udev/rules.d" "$destdir/etc/modules-load.d") ;;
+      writes=("$destdir$(root_prefix)" "$destdir/usr/lib/systemd/system" "$destdir/etc/udev/rules.d" "$destdir/etc/modules-load.d") ;;
     keycap)
       # The keyboard map, installed by install/system.sh and not by keycap's own installer (see the header).
       dir="$HERE"
       script=install/system.sh
       blurb="the keyboard map: its program and service, the rule that lets you restart it, and /usr/lib/keycap/keycap.toml (Caps Lock switches the input method)"
-      args=(keycap --prefix "$prefix")
+      args=(keycap --prefix "$(root_prefix)")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       args+=(--siblings "$siblings")
-      writes=("$destdir$prefix" "$destdir/usr/lib/systemd/system" "$destdir/etc/polkit-1/rules.d" "$destdir/usr/lib/keycap") ;;
+      writes=("$destdir$(root_prefix)" "$destdir/usr/lib/systemd/system" "$destdir/etc/polkit-1/rules.d" "$destdir/usr/lib/keycap") ;;
     anyview)
       script=dist/install.sh
       args=(--prefix "$prefix")
@@ -326,6 +338,11 @@ for name in "${selected[@]}"; do
       esac ;;
   esac
   [ -z "$blurb" ] || printf '             %s\n' "$blurb"
+  case "$name" in
+    turnstile | keycap)
+      [ "$(root_prefix)" = "$prefix" ] || printf '             note: %s runs as root, so its program goes under %s, not %s (a folder you can write would let you replace it)\n' \
+        "$name" "$(root_prefix)" "$prefix" ;;
+  esac
 done
 fonts_state=skipped fonts_root=""
 if [ "$fonts_wanted" = 1 ]; then
