@@ -630,7 +630,7 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   `/etc/modprobe.d exact 99-palmrest.conf`: `/usr/lib/systemd/system exact palmrest.service`, `/usr/lib/systemd/user ending .service`
   and `/usr/lib/systemd/user/xdg-desktop-portal.service.d exact 10-quire.conf`. `check-system-list.sh` fails against slipway until
   slipway's `ALLOWED_SYSTEM_FILES` carries them in the same order, and a release that holds such a file cannot be installed by a helper
-  that lacks them. Until then do not cut a release from this tree.
+  that lacks them. slipway's branch pr1 (1c9273a) has them in that order (`release/check-system-list.sh --slipway` reports the 21 rules equal), and its helper replaces a link into the install root where a file is placed (never writing through it) and refuses a release that both links and places a path; the pin and the helper on every computer move with it. Until the pinned slipway is that one, do not cut a release from this tree.
 - **Units named by a caller row are plain files in a release.** A staged `lib/systemd/user/X.service` is exported as a link under
   `/usr/lib/systemd/user`; the unit manager's judge (`peephole-bus` `fragment`, `trust_of_path` over `symlink_metadata`) reads a link
   (mode 0777) as `Writable`, so the unit never proves `Full` (the unverified note of NEW-PI-1 is now settled the other way for a link:
