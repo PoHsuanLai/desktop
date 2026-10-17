@@ -49,10 +49,10 @@ mkdir -p "$sib/detent/target/release"; : >"$sib/detent/target/release/detent"; c
 # and their programs, already built (so no compiler runs here). keycap's own installer, stubbed above, must never run.
 mkdir -p "$sib/turnstile/dist" "$sib/turnstile/target/release" "$sib/keycap/dist" "$sib/keycap/target/release"
 printf '[Socket]\nListenSequentialPacket=/run/turnstile/input.sock\nSocketMode=0666\n' >"$sib/turnstile/dist/turnstile.socket"
-printf '[Service]\nExecStart=/usr/local/bin/turnstile\nUser=root\n' >"$sib/turnstile/dist/turnstile.service"
+printf '[Service]\nExecStart=/usr/local/bin/turnstile\nUser=root\n%s\n' "$unset_line" >"$sib/turnstile/dist/turnstile.service"
 printf 'KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0600", GROUP="root", TAG-="uaccess", OPTIONS+="static_node=uinput"\n' >"$sib/turnstile/dist/72-turnstile.rules"
 printf 'uinput\n' >"$sib/turnstile/dist/turnstile-modules.conf"
-printf '[Service]\nExecStart=/usr/local/bin/keycap\nDynamicUser=yes\n' >"$sib/keycap/dist/keycap.service"
+printf '[Service]\nExecStart=/usr/local/bin/keycap\nDynamicUser=yes\n%s\n' "$unset_line" >"$sib/keycap/dist/keycap.service"
 printf '// polkit\n' >"$sib/keycap/dist/keycap.polkit.rules"
 printf 'KERNEL=="uinput", GROUP="input", MODE="0660"\n' >"$sib/keycap/dist/70-keycap.rules"
 printf '[Service]\nDeviceAllow=/dev/uinput rw\n' >"$sib/keycap/dist/keycap.uinput.conf"
