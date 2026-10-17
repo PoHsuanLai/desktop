@@ -21,14 +21,14 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "22709bcc34409bc438ff6d7025f8563b8ac4bee3"
+rev = "43acb75df79214e139d424abcaa8124bd262b18e"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "0a3bf12f573ce31f1628e0151017c0903ce4110f"
+rev = "04f676c83c0aedada5f6c7c83b4b8f9ca2b5324a"
 branch = "master"
 gate = "lane"
 
@@ -40,13 +40,13 @@ gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "00105544dada71afd2efb61531066f5a78f3050f"
+rev = "3236bed60fa5c2189ef2c1000fbe50bd010aec3b"
 branch = "main"
 gate = "lane"
 
 [repo.palmrest]
 url = "https://github.com/PoHsuanLai/palmrest.git"
-rev = "0f2e43252302ce8a9752f106247fe8fd98e22892"
+rev = "7be19a7789a6c77f9e82e7ac93f7fc08affb97cb"
 branch = "master"
 gate = "lane"
 
@@ -54,7 +54,7 @@ gate = "lane"
 # The root input service: owns /dev/uinput and hands keycap and palmrest their virtual devices over a socket
 # (caller identity through peephole). Socket-activated system unit; the daemon is exported to /usr/local/bin.
 url = "https://github.com/PoHsuanLai/turnstile.git"
-rev = "78b472dcad11a4348f31dce39b55ac53516bb69a"
+rev = "5f20c3860e55ccdf78a6006ca875838b2d74bb0c"
 branch = "master"
 gate = "lane"
 
@@ -85,7 +85,7 @@ gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "0d4958261f995c16624d3fbd40e76a5074f2ce7b"
+rev = "c12ef0f2ec2522012526322928246c51f5c08a44"
 branch = "master"
 gate = "lane"
 
@@ -117,7 +117,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "3f0976744e49dcd0c2a0030b7b1481acfcbbc1f0"
+rev = "4d966155a3e3125b8522a1b754be3ecad943d2f9"
 branch = "master"
 gate = "none"
 
@@ -153,13 +153,13 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "82fb1c2963257a582415ebe5dc45d70e9b3e8afa"
+rev = "e0d17e6e24eba966739e39d10d51c5f1108fb9e4"
 branch = "master"
 gate = "lane"
 
 [repo.slipway]
 # The updater: installs and switches signed release bundles (release/ in this repo builds them).
 url = "https://github.com/PoHsuanLai/slipway.git"
-rev = "13d70923cadbf2f65ac12cdd9bf18389d781c435"
+rev = "8eb3ccb3caec0a38957a349ea3010343fe9c59e2"
 branch = "master"
 gate = "none"
