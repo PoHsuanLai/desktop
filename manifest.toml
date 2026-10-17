@@ -160,6 +160,6 @@ gate = "lane"
 [repo.slipway]
 # The updater: installs and switches signed release bundles (release/ in this repo builds them).
 url = "https://github.com/PoHsuanLai/slipway.git"
-rev = "6aed2b21b1f64354c45d8cc6da8f9c941ce5e382"
+rev = "e2126af0337a14bbe42e26bc43ce49e1cd9f7dc2"
 branch = "master"
 gate = "none"
