@@ -1,8 +1,4 @@
 # Units that do not yet carry the full UnsetEnvironment= line (gate/check-loader-unset.sh), each waiting for the repository named.
 # The unit and the repository per line. Delete a line when its repository lands the line; the check fails if one stays after.
-accountd.service porter
 keycap.service keycap
-org.quire.Settings.service detent
 turnstile.service turnstile
-sill.service sill
-casement.service casement

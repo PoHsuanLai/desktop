@@ -40,8 +40,10 @@ stub mailo/dist/install.sh mailo
 stub palmrest/install.sh palmrest
 # The two units the session installer puts in /etc/systemd/user, as the casement and sill checkouts ship them.
 mkdir -p "$sib/casement/dist" "$sib/sill/dist"
-printf '[Service]\nExecStart=/usr/bin/casement $CASEMENT_SESSION_ARGS\n' >"$sib/casement/dist/casement.service"
-printf '[Service]\nExecStart=/usr/bin/sill run\n' >"$sib/sill/dist/sill.service"
+# the stub units carry the loader line the real ones do (peephole's list), so the loader step below checks them as it would a release
+unset_line='UnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT GCONV_PATH GIO_EXTRA_MODULES GTK_MODULES GTK_PATH GST_PLUGIN_PATH GST_PLUGIN_SYSTEM_PATH LIBGL_DRIVERS_PATH MESA_LOADER_DRIVER_OVERRIDE __EGL_VENDOR_LIBRARY_DIRS __EGL_VENDOR_LIBRARY_FILENAMES GBM_BACKENDS_PATH LIBVA_DRIVERS_PATH VK_ICD_FILENAMES VK_DRIVER_FILES VK_ADD_DRIVER_FILES VK_LAYER_PATH VK_ADD_LAYER_PATH VK_INSTANCE_LAYERS VK_LOADER_LAYERS_ENABLE'
+printf '[Service]\nExecStart=/usr/bin/casement $CASEMENT_SESSION_ARGS\n%s\n' "$unset_line" >"$sib/casement/dist/casement.service"
+printf '[Service]\nExecStart=/usr/bin/sill run\n%s\n' "$unset_line" >"$sib/sill/dist/sill.service"
 mkdir -p "$sib/detent/target/release"; : >"$sib/detent/target/release/detent"; chmod +x "$sib/detent/target/release/detent"
 # The input service and the keyboard map: the files install/system.sh takes from their checkouts (the unit as each repo ships it),
 # and their programs, already built (so no compiler runs here). keycap's own installer, stubbed above, must never run.
