@@ -40,13 +40,13 @@ gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "3236bed60fa5c2189ef2c1000fbe50bd010aec3b"
+rev = "9c85e76d95a84ec681bc14375c397d670331f6ac"
 branch = "main"
 gate = "lane"
 
 [repo.palmrest]
 url = "https://github.com/PoHsuanLai/palmrest.git"
-rev = "7be19a7789a6c77f9e82e7ac93f7fc08affb97cb"
+rev = "4e8a4df071c025153862a9824c0e65416f66b032"
 branch = "master"
 gate = "lane"
 
@@ -54,7 +54,7 @@ gate = "lane"
 # The root input service: owns /dev/uinput and hands keycap and palmrest their virtual devices over a socket
 # (caller identity through peephole). Socket-activated system unit; the daemon is exported to /usr/local/bin.
 url = "https://github.com/PoHsuanLai/turnstile.git"
-rev = "5f20c3860e55ccdf78a6006ca875838b2d74bb0c"
+rev = "dae7cbccdddaaf2a1054aeafba9e68e5514b76d8"
 branch = "master"
 gate = "lane"
 
@@ -85,7 +85,7 @@ gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "c12ef0f2ec2522012526322928246c51f5c08a44"
+rev = "40f4b8ffe7ea56874c6c403fb6289119426f50d9"
 branch = "master"
 gate = "lane"
 
@@ -117,7 +117,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "4d966155a3e3125b8522a1b754be3ecad943d2f9"
+rev = "1065db935a1c9ffb09e6d1fd53cbf6d5cc7ed95c"
 branch = "master"
 gate = "none"
 
@@ -131,7 +131,7 @@ gate = "none"
 # The portal backend (xdg-desktop-portal implementation "quire"): screen sharing, screenshots, remote desktop,
 # settings and the keep-awake inhibit; replaces the interim xdg-desktop-portal-wlr. Builds against libpipewire.
 url = "https://github.com/PoHsuanLai/transom.git"
-rev = "2d9c1e0b741cab670705f7c0e2aedaccc1c548c5"
+rev = "4c5cf7bd2b497b8848de21dacb2abb18b7cf7f07"
 branch = "master"
 gate = "lane"
 
@@ -153,7 +153,7 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "e0d17e6e24eba966739e39d10d51c5f1108fb9e4"
+rev = "f70b2998845ecfc28177384c25a373ec5dc958c2"
 branch = "master"
 gate = "lane"
 
