@@ -45,9 +45,10 @@ unset_line='UnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT GCONV_PATH GIO_
 printf '[Service]\nExecStart=/usr/bin/casement $CASEMENT_SESSION_ARGS\n%s\n' "$unset_line" >"$sib/casement/dist/casement.service"
 printf '[Service]\nExecStart=/usr/bin/sill run\n%s\n' "$unset_line" >"$sib/sill/dist/sill.service"
 mkdir -p "$sib/detent/target/release"; : >"$sib/detent/target/release/detent"; chmod +x "$sib/detent/target/release/detent"
-# The input service and the keyboard map: the files install/system.sh takes from their checkouts (the unit as each repo ships it),
-# and their programs, already built (so no compiler runs here). keycap's own installer, stubbed above, must never run.
-mkdir -p "$sib/turnstile/dist" "$sib/turnstile/target/release" "$sib/keycap/dist" "$sib/keycap/target/release"
+# The input service, the keyboard map and the touchpad service: the files install/system.sh takes from their checkouts (the unit as
+# each repo ships it), and their programs, already built (so no compiler runs here). keycap's and palmrest's own installers,
+# stubbed above, must never run.
+mkdir -p "$sib/turnstile/dist" "$sib/turnstile/target/release" "$sib/keycap/dist" "$sib/keycap/target/release" "$sib/palmrest/dist" "$sib/palmrest/target/release"
 printf '[Socket]\nListenSequentialPacket=/run/turnstile/input.sock\nSocketMode=0666\n' >"$sib/turnstile/dist/turnstile.socket"
 printf '[Service]\nExecStart=/usr/local/bin/turnstile\nUser=root\n%s\n' "$unset_line" >"$sib/turnstile/dist/turnstile.service"
 printf 'KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0600", GROUP="root", TAG-="uaccess", OPTIONS+="static_node=uinput"\n' >"$sib/turnstile/dist/72-turnstile.rules"
@@ -56,7 +57,10 @@ printf '[Service]\nExecStart=/usr/local/bin/keycap\nDynamicUser=yes\n%s\n' "$uns
 printf '// polkit\n' >"$sib/keycap/dist/keycap.polkit.rules"
 printf 'KERNEL=="uinput", GROUP="input", MODE="0660"\n' >"$sib/keycap/dist/70-keycap.rules"
 printf '[Service]\nDeviceAllow=/dev/uinput rw\n' >"$sib/keycap/dist/keycap.uinput.conf"
-for b in turnstile keycap; do printf '#!/bin/sh\n' >"$sib/$b/target/release/$b"; chmod +x "$sib/$b/target/release/$b"; done
+printf '[Service]\nExecStart=/usr/local/bin/palmrest\nDynamicUser=yes\n%s\n' "$unset_line" >"$sib/palmrest/dist/palmrest.service"
+printf 'SUBSYSTEM=="hidraw", KERNELS=="0005:004C:0269.*", GROUP="input", MODE="0660"\n' >"$sib/palmrest/dist/70-palmrest.rules"
+printf 'options hid_magicmouse emulate_scroll_wheel=0 emulate_3button=1\n' >"$sib/palmrest/dist/99-palmrest.conf"
+for b in turnstile keycap palmrest; do printf '#!/bin/sh\n' >"$sib/$b/target/release/$b"; chmod +x "$sib/$b/target/release/$b"; done
 # A sudo that fails the check when called.
 printf '#!/bin/sh\necho sudo >>"%s"\nexit 1\n' "$log" >"$tmp/bin/sudo"; chmod +x "$tmp/bin/sudo"
 export PATH="$tmp/bin:$PATH" HOME="$home" XDG_CONFIG_HOME="$home/.config"
@@ -72,10 +76,9 @@ order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n'
 printf '%s\n' "$plan" | grep -q 'callers .*runs .*install/system.sh callers --destdir' || fail "the callers table is not placed first, into the staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'turnstile .*runs .*install/system.sh turnstile --prefix /usr/local --destdir' || fail "the input service does not run into a staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'keycap .*runs .*install/system.sh keycap --prefix /usr/local --destdir' || fail "the keyboard map is not placed by the desktop's own script: $plan"
-printf '%s\n' "$plan" | grep -q 'palmrest .*yourself (it puts the program in /usr/local/bin' || fail "the palmrest text does not say what its installer does: $plan"
-! printf '%s\n' "$plan" | grep -i 'palmrest .*yourself' | grep -q 'under your home' || fail "palmrest is still said to be installed under the home: $plan"
+printf '%s\n' "$plan" | grep -q 'palmrest .*runs .*install/system.sh palmrest --prefix /usr/local --destdir' || fail "the touchpad service is not placed by the desktop's own script, into the staging root: $plan"
+! printf '%s\n' "$plan" | grep -i 'palmrest' | grep -q 'your home' || fail "palmrest is still said to be installed under the home: $plan"
 printf '%s\n' "$plan" | grep -q 'sill .*yourself' || fail "sill is not left to the person"
-printf '%s\n' "$plan" | grep -q 'palmrest .*yourself' || fail "palmrest is not left to the person"
 printf '%s\n' "$plan" | grep -q 'porter .*runs .*scripts/install.sh --prefix /usr/local --sysconfdir /etc --destdir' || fail "porter does not get the desktop prefix and /etc: $plan"
 printf '%s\n' "$plan" | grep -q 'stoker .*runs .*scripts/install.sh --prefix /usr/local --sysconfdir /etc --destdir' || fail "stoker does not get the desktop prefix, /etc and the destdir: $plan"
 ! printf '%s\n' "$plan" | grep -q 'note: .* is not on the session' || fail "the default prefix got the search-path note: $plan"
@@ -94,6 +97,7 @@ printf '%s\n' "$plan" | grep -q 'cd .*porter && asroot .*scripts/install.sh --pr
 printf '%s\n' "$plan" | grep -q 'callers .*yourself (needs root: /etc/quire' || fail "the callers table was not left to the person without root: $plan"
 printf '%s\n' "$plan" | grep -q '&& asroot .*install/system.sh callers *$' || fail "the callers root command does not go through the escalation program: $plan"
 printf '%s\n' "$plan" | grep -q '&& asroot .*install/system.sh turnstile --prefix /usr --siblings' || fail "the input service root command is missing: $plan"
+printf '%s\n' "$plan" | grep -q '&& asroot .*install/system.sh palmrest --prefix /usr --siblings' || fail "the touchpad service root command is missing: $plan"
 
 # 2b. without a staging root almanac, docket and cua are left to the person, as themselves: their installers refuse to
 # run as root and ask for sudo for /etc/quire themselves, so no root command is printed for them.
@@ -122,10 +126,10 @@ done
 [ ! -e "$home/.config/environment.d" ] || fail "the note was written, not printed"
 
 # 2e. a program root runs never lives where the person can replace it. A user-owned prefix (--prefix ~/.local) is refused by
-# install/system.sh for the input service and the keyboard map, and install.sh puts those two under /usr/local instead and says so;
+# install/system.sh for the input service, the keyboard map and the touchpad service, and install.sh puts those three under /usr/local instead and says so;
 # a prefix root holds is kept. (Without a staging root: the check judges the real folders.)
 mkdir -p "$tmp/user-prefix/bin"
-for part in turnstile keycap; do
+for part in turnstile keycap palmrest; do
   if "$HERE/../install/system.sh" "$part" --dry-run --prefix "$tmp/user-prefix" --siblings "$sib" >"$tmp/out-unheld.log" 2>&1; then
     fail "install/system.sh $part accepted a prefix the person owns: $(cat "$tmp/out-unheld.log")"
   fi
@@ -174,6 +178,7 @@ grep -q "^detent/scripts/install.sh  PREFIX=/opt/d DESTDIR=$dest" "$log" || fail
 grep -q "^transom/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "transom did not get the prefix and destdir"
 grep -q "MAILO_PREFIX=$dest/opt/d" "$log" || fail "mailo did not get its prefix"
 ! grep -q "^keycap/install.sh" "$log" || fail "keycap's own installer ran: it gives the input group /dev/uinput and the service a drop-in to open it"
+! grep -q "^palmrest/install.sh" "$log" || fail "palmrest's own installer ran: the desktop places the touchpad service with install/system.sh"
 grep -q "^transom/scripts/install.sh" "$log" || fail "no component ran"
 # the desktop's own system files: the callers table (an exact copy, 644), the input service and the keyboard map
 cmp -s "$HERE/../dist/desktop-callers.toml" "$dest/etc/quire/desktop-callers.toml" || fail "the callers table was not staged as it is in dist/"
@@ -185,13 +190,28 @@ done
 grep -q '^ExecStart=/opt/d/bin/turnstile$' "$dest/usr/lib/systemd/system/turnstile.service" || fail "turnstile.service does not start the installed program: $(cat "$dest/usr/lib/systemd/system/turnstile.service")"
 grep -q '^ExecStart=/opt/d/bin/keycap$' "$dest/usr/lib/systemd/system/keycap.service" || fail "keycap.service does not start the installed program"
 grep -q 'rules = \[ { when = "capslock", then = "ctrl+space" } \]\|when = "capslock", then = "ctrl+space"' "$dest/usr/lib/keycap/keycap.toml" || fail "the vendor keycap.toml has no Caps Lock rule"
+grep -q 'when = "shift+capslock", then = "capslock"' "$dest/usr/lib/keycap/keycap.toml" || fail "the vendor keycap.toml has no Shift+Caps Lock rule (keycap refuses a Shift trigger in a user layer)"
 cmp -s "$HERE/../dist/keycap.toml" "$dest/usr/lib/keycap/keycap.toml" || fail "the vendor keycap.toml was not staged as it is in dist/"
 [ "$(stat -c %a "$dest/usr/lib/keycap/keycap.toml")" = 644 ] || fail "the vendor keycap.toml is not mode 644"
+# the touchpad service is a system service like keycap: the program, the unit (a plain file, started by the installed program), the rule
+# that gives the mouse's raw node to the input group and no person, and the module options; nothing for /dev/uinput, and no user unit
+for f in opt/d/bin/palmrest usr/lib/systemd/system/palmrest.service etc/udev/rules.d/70-palmrest.rules etc/modprobe.d/99-palmrest.conf; do
+  [ -f "$dest/$f" ] || fail "$f was not staged"
+done
+grep -q '^ExecStart=/opt/d/bin/palmrest$' "$dest/usr/lib/systemd/system/palmrest.service" || fail "palmrest.service does not start the installed program: $(cat "$dest/usr/lib/systemd/system/palmrest.service")"
+[ ! -e "$dest/etc/systemd/user/palmrest.service" ] || fail "a user unit for palmrest was staged"
+grep -q 'GROUP="input"' "$dest/etc/udev/rules.d/70-palmrest.rules" || fail "the hidraw rule does not give the node to the input group"
+! grep -q 'uaccess' "$dest/etc/udev/rules.d/70-palmrest.rules" || fail "the hidraw rule gives the node to the person"
+[ -z "$(find "$dest" -name 'palmrest-modules.conf' -o -name 'palmrest.conf')" ] || fail "palmrest's own module list was staged (the input service loads uinput)"
 # keycap.service is the same file from install.sh and from a release (slipway replaces a system file only when it is absent, equal or its own
 # earlier one): the path is the one slipway's list names, and at the default prefix the installed unit is the checkout's unit byte for byte,
 # which is what build.sh stages (no retarget; /usr/local/bin/keycap is the link exports.toml makes to bin/keycap)
 grep -qE '^/usr/lib/systemd/system +exact +keycap\.service$' "$HERE/../release/system-files.list" || fail "slipway's list (release/system-files.list) does not name /usr/lib/systemd/system/keycap.service"
-inst --destdir "$tmp/dest-default" --prefix /usr/local --only keycap >"$tmp/out-default.log" 2>&1 || { cat "$tmp/out-default.log" >&2; fail "the keyboard map step failed at the default prefix"; }
+inst --destdir "$tmp/dest-default" --prefix /usr/local --only keycap,palmrest >"$tmp/out-default.log" 2>&1 || { cat "$tmp/out-default.log" >&2; fail "the keyboard map or touchpad step failed at the default prefix"; }
+cmp -s "$sib/palmrest/dist/palmrest.service" "$tmp/dest-default/usr/lib/systemd/system/palmrest.service" || fail "palmrest.service from install.sh at the default prefix is not the unit a release stages: $(cat "$tmp/dest-default/usr/lib/systemd/system/palmrest.service" 2>&1)"
+grep -qE '^/usr/lib/systemd/system +exact +palmrest\.service$' "$HERE/../release/system-files.list" || fail "slipway's list (release/system-files.list) does not name /usr/lib/systemd/system/palmrest.service"
+grep -qF 'put_system 644 "$d/dist/palmrest.service" /usr/lib/systemd/system/palmrest.service' "$HERE/../release/build.sh" || fail "release/build.sh does not stage palmrest.service at /usr/lib/systemd/system"
+! grep -q 'retarget.*palmrest\.service' "$HERE/../release/build.sh" || fail "release/build.sh rewrites palmrest.service's ExecStart: install.sh's unit and the release's would differ"
 cmp -s "$sib/keycap/dist/keycap.service" "$tmp/dest-default/usr/lib/systemd/system/keycap.service" || fail "keycap.service from install.sh at the default prefix is not the unit a release stages: $(cat "$tmp/dest-default/usr/lib/systemd/system/keycap.service" 2>&1)"
 grep -qF 'put_system 644 "$d/dist/keycap.service" /usr/lib/systemd/system/keycap.service' "$HERE/../release/build.sh" || fail "release/build.sh does not stage keycap.service at /usr/lib/systemd/system"
 ! grep -q 'retarget.*keycap\.service' "$HERE/../release/build.sh" || fail "release/build.sh rewrites keycap.service's ExecStart: install.sh's unit and the release's would differ"
@@ -215,7 +235,11 @@ cmp -s "$HERE/../dist/keycap.toml" "$dest/usr/lib/keycap/keycap.toml" || fail "a
 [ -f "$dest/etc/keycap/keycap.toml" ] || fail "the administrator's keycap.toml was removed"
 "$HERE/../install/system.sh" --remove turnstile --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out3.log" 2>&1 || fail "removing the input service failed"
 [ ! -e "$dest/etc/udev/rules.d/72-turnstile.rules" ] || fail "the device rule was kept by the removal"
-inst --destdir "$dest" --prefix /opt/d --only keycap,turnstile >/dev/null 2>&1 || fail "the input steps did not run again"
+"$HERE/../install/system.sh" --remove palmrest --destdir "$dest" --prefix /opt/d --siblings "$sib" >"$tmp/out3.log" 2>&1 || { cat "$tmp/out3.log" >&2; fail "removing the touchpad service failed"; }
+[ ! -e "$dest/opt/d/bin/palmrest" ] || fail "the touchpad program was kept by the removal"
+[ ! -e "$dest/usr/lib/systemd/system/palmrest.service" ] || fail "the touchpad unit was kept by the removal"
+[ ! -e "$dest/etc/udev/rules.d/70-palmrest.rules" ] || fail "the hidraw rule was kept by the removal"
+inst --destdir "$dest" --prefix /opt/d --only keycap,turnstile,palmrest >/dev/null 2>&1 || fail "the input steps did not run again"
 ! grep -q sudo "$log" || fail "sudo was called"
 [ ! -e "$home/.config" ] || fail "something wrote the scratch ~/.config"
 grep -q 'left to you.*sill' "$tmp/out.log" || fail "the summary does not name what is left"

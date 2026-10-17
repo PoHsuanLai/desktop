@@ -18,9 +18,8 @@ and `--locked` builds, the installed path (never the destdir-prefixed one) insid
 - keycap (`install.sh`): stages under DESTDIR but at `/etc` and `/usr/local`, not under a prefix, and builds
   unlocked. Needs `--prefix` so the binary, the unit (with `ExecStart` for that prefix), the udev and
   polkit rules go under it.
-- palmrest (`install.sh`): writes `~/.local/bin` and `~/.config/systemd/user`, enables the service, builds
-  unlocked. Needs the same prefix/destdir staging and no `systemctl` in staging; the unit's `ExecStart` is
-  `%h/.local/bin/palmrest` (build.sh rewrites it).
+- palmrest: SUPERSEDED 2026-10-17. It is a system service like keycap; `install/system.sh palmrest` places it and
+  build.sh stages its unit as a system file (see "palmrest as a system service" below).
 - mailo (`dist/install.sh`): `MAILO_PREFIX` as a destdir writes the destdir-prefixed path into
   `org.quire.Mail.service` (build.sh seds it out). Needs a real `--destdir` beside the prefix.
 - porter (`scripts/install.sh`): fine, but builds without `--locked` (build.sh builds locked first and passes
@@ -613,3 +612,40 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
 - **ROOT-06 and ROOT-09: nothing new in code.** ROOT-06's remaining half is the per-file `size` in `[[file]]` (a format bump with a new helper on every machine, slipway
   FINDINGS 18, not started). ROOT-09's remaining half is the owner's one-time setup and the second-signer decision. ROOT-07 is closed by NEW-ROOT-2 and NEW-ROOT-3 above
   (the list now also bounds who may supply the files, and the second path through polkit's actions folder is gone).
+
+## palmrest as a system service, plain units, Shift+Caps Lock (lane pr1, 2026-10-17)
+
+- **palmrest is a system service (owner decision 2026-10-17).** Its unit is a system file at `/usr/lib/systemd/system/palmrest.service`
+  (a dynamic user, `/system.slice/palmrest.service`), so the input service (turnstile) recognises it by the same proof as keycap
+  and no person's process can fill its control group. Desktop side: `install/system.sh palmrest` (program, unit, `70-palmrest.rules`
+  giving the mouse's raw node to the `input` group and to no person, `99-palmrest.conf`; `--prefix`, `--destdir`, `--remove`, the
+  root-held prefix rule NEW-ROOT-1 applies to it too; `install.sh` plans it with the other system parts and moves a user-owned
+  prefix to `/usr/local`), `release/build.sh` stages the unit with `put_system` and no `retarget` (the same bytes as install.sh at
+  the default prefix), no user unit is staged any more, and `gate/installer-check.sh` covers the install, the removal, the plan and
+  the byte equality (its stub unit carries the loader line). Release jobs: `root` is split into `turnstile`, `keycap` and `palmrest`
+  (NEW-ROOT-2: each program the system manager starts supplies only its own paths; `release/stage-owners.list`, the workflow matrix
+  and `release/selftest.sh` agree). Not done: the settings the person writes in their home (`~/.config/palmrest/gestures.toml`) and
+  the programs a gesture runs in the session; both are open in palmrest's FINDINGS ("Open after the move to a system service").
+- **Needs slipway (a new helper on every computer).** `release/system-files.list` gained three rules, in this order after
+  `/etc/modprobe.d exact 99-palmrest.conf`: `/usr/lib/systemd/system exact palmrest.service`, `/usr/lib/systemd/user ending .service`
+  and `/usr/lib/systemd/user/xdg-desktop-portal.service.d exact 10-quire.conf`. `check-system-list.sh` fails against slipway until
+  slipway's `ALLOWED_SYSTEM_FILES` carries them in the same order, and a release that holds such a file cannot be installed by a helper
+  that lacks them. Until then do not cut a release from this tree.
+- **Units named by a caller row are plain files in a release.** A staged `lib/systemd/user/X.service` is exported as a link under
+  `/usr/lib/systemd/user`; the unit manager's judge (`peephole-bus` `fragment`, `trust_of_path` over `symlink_metadata`) reads a link
+  (mode 0777) as `Writable`, so the unit never proves `Full` (the unverified note of NEW-PI-1 is now settled the other way for a link:
+  it reads writable). `release/build.sh` `plain_units` stages every unit that a `unit =` row of `dist/desktop-callers.toml` names
+  (sill, casement, transom, Settings, accountd, syncd, inferd, memoryd, intentd, companiond, cuad) as a system file at
+  `/usr/lib/systemd/user/X.service`, with its `sandbox.conf` drop-ins appended to its text (the same to systemd, and a drop-in that is
+  a link would also read as writable), and the portal frontend's drop-in at `.../xdg-desktop-portal.service.d/10-quire.conf`; it
+  stops if a named unit is still staged where it would be exported. The paths are in `release/stage-owners.list` by exact name.
+  `install/install.sh` already copied casement.service and sill.service as plain files to `/etc/systemd/user`; the other units of a
+  source install are put in `<prefix>/lib/systemd/user` by their own installers and the printed hint for a prefix off the search
+  paths still says `ln -sf`, which makes links that do not prove `Full` (left; change the hint to copy the named units when a
+  source install is meant to run the services at `Full`). On a machine that already holds the old links, slipway-apply must replace
+  a link by a file at the same path (slipway's side).
+- **The three rows.** `settings` (its unit row), `pad_daemon` and `keymap_daemon` already carried both a `unit` and an `exe`; the
+  second `settings` row has no unit on purpose (a launcher; the updater asks for it at `Exe`). Nothing to change in the table beyond
+  the palmrest comment. `gate/check-callers-table.sh` and `gate/check-loader-unset.sh` pass.
+- **Shift+Caps Lock** (`dist/keycap.toml`): `{ when = "shift+capslock", then = "capslock" }` next to the Caps Lock rule. It moved from
+  sill's user layer because keycap refuses a Shift trigger in a user layer (NEW-PI-5). sill must drop it from its forwarded layer.

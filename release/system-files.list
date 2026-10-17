@@ -11,7 +11,11 @@
 # input-service change (its FINDINGS 25, commit c36aaa0): until the pinned slipway has them, `check-system-list.sh`
 # fails against that pin, so this file and the pin move in the same step. /usr/lib/keycap/keycap.toml is the
 # desktop's vendor defaults for the keyboard daemon (slipway's 18th rule); /etc/keycap stays the administrator's and
-# no release places a file there.
+# no release places a file there. palmrest.service is the touchpad daemon's system unit (owner decision 2026-10-17: a system
+# service like keycap), and the two /usr/lib/systemd/user rules are how a user unit named by a row of
+# dist/desktop-callers.toml, and the portal frontend's drop-in, reach the computer as plain root-owned files (a link into
+# /opt/quire/current reads as writable to the unit manager's judge, so such a unit never proves `Full`; release/build.sh
+# `plain_units`). All three need a new slipway helper on every computer, and slipway's list changes with them, in this order.
 /etc/pam.d                 exact   sill
 /etc/udev/rules.d          exact   60-sill-ddc.rules
 /etc/modules-load.d        exact   sill-ddc.conf
@@ -26,6 +30,9 @@
 /etc/modules-load.d        exact   turnstile.conf
 /etc/udev/rules.d          exact   70-palmrest.rules
 /etc/modprobe.d            exact   99-palmrest.conf
+/usr/lib/systemd/system    exact   palmrest.service
+/usr/lib/systemd/user      ending  .service
+/usr/lib/systemd/user/xdg-desktop-portal.service.d exact 10-quire.conf
 /etc/porter                exact   callers.toml
 /etc/porter                exact   inferd-callers.toml
 /etc/quire                 ending  -callers.toml

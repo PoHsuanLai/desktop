@@ -20,7 +20,7 @@
 # porter's accounts), cua (the computer-use daemon cuad, for apps that are not ours, and its caller table), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
 # scripts/install.sh builds it), turnstile (the input service that makes virtual keyboards and pads, from install/system.sh), keycap (the
-# keyboard map, also from install/system.sh), anyview, mailo, palmrest, and last the session itself (this repo's
+# keyboard map, also from install/system.sh), anyview, mailo, palmrest (the touchpad service, also from install/system.sh), and last the session itself (this repo's
 # install/install.sh: the desktop-session script, the user target and the login entry "sill (casement)"). Each
 # component's installer is its
 # own: this script passes the prefix and the staging root through and nothing else, and stops at the first
@@ -33,6 +33,10 @@
 # fontconfig already has a COLRv1 Noto Color Emoji (Fedora does; Ubuntu and Arch ship a bitmap build our renderer
 # cannot draw). It is the step named "fonts".
 #
+# palmrest is a system service like keycap and is installed the same way (install/system.sh palmrest), not by its own
+# installer: the program, its service in /usr/lib/systemd/system, the rule that gives the mouse's raw node to the `input`
+# group and the module options. It runs as a dynamic user, not as you, and not in your session.
+#
 # keycap is not installed by keycap's own installer: that one gives the `input` group the device file /dev/uinput and the service a
 # drop-in to open it, which the desktop closes (the input service owns the node). install/system.sh puts the program, the service,
 # the restart rule and /usr/lib/keycap/keycap.toml (Caps Lock; keycap's vendor file, under the administrator's
@@ -40,7 +44,7 @@
 #
 # Builds. The repos pin Rust 1.98.1 and need rustup (a distro's rust package is the wrong version). Some
 # repos' cargo config asks for clang and mold, which is how they are worked on. An install never reads it
-# and never asks for a linker: what this script builds itself (detent, turnstile, keycap) runs from / with --manifest-path
+# and never asks for a linker: what this script builds itself (detent, turnstile, keycap, palmrest) runs from / with --manifest-path
 # (install/cargo.sh), and each component's own installer does the same for its own build.
 #
 # Root. This script never runs sudo and never writes under ~/.config or /etc itself. A component runs
@@ -48,13 +52,12 @@
 # listed as "yourself" with the exact command, to run with the privileges they need (sudo, doas or
 # pkexec, whichever is installed; $SUDO names another):
 #   - needs root: the destination is not writable by you (a system prefix, /etc/systemd/user, /etc)
-#   - sill, palmrest: installers with fixed destinations that ask for sudo or write your home themselves (palmrest: the program in
-#     /usr/local/bin through sudo, its service in your home)
-#   - callers, turnstile, keycap: install/system.sh puts files in /etc, /usr/lib/systemd/system and /usr/local; it never runs sudo itself, so
-#     outside a --destdir the root command is printed
-#     turnstile and keycap are started as root, so their programs go only where root alone can replace them: when --prefix has a
-#     folder the person owns or can write (~/.local), these two go under /usr/local instead and the plan says so; install/system.sh
-#     refuses such a prefix on its own (re-audit NEW-ROOT-1)
+#   - sill: an installer with fixed destinations that asks for sudo or writes your home itself
+#   - callers, turnstile, keycap, palmrest: install/system.sh puts files in /etc, /usr/lib/systemd/system and /usr/local; it never runs sudo
+#     itself, so outside a --destdir the root command is printed
+#     turnstile and keycap are started as root, and palmrest is believed by the input service for being a root-owned file, so their
+#     programs go only where root alone can replace them: when --prefix has a folder the person owns or can write (~/.local), these
+#     three go under /usr/local instead and the plan says so; install/system.sh refuses such a prefix on its own (re-audit NEW-ROOT-1)
 #   - stoker: the catalogue goes under the prefix; its installer asks for sudo, doas or pkexec itself for a system
 #     prefix, so outside a --destdir it is left to you, run as yourself
 #   - almanac, docket, cua: their caller tables go to /etc/quire (always replaced) and docket's default settings to
@@ -119,9 +122,10 @@ case "$prefix" in /*) ;; *) die "--prefix must be an absolute path" ;; esac
 destdir=${destdir%/}
 prefix=${prefix%/}
 
-# root_prefix: where a program that root runs goes (turnstile, keycap). Their services run as root, so anyone who can replace the
-# program could run their own code as root: the prefix is used only when every folder up to / is root's alone (a staging root
-# is the packager's to hold, so it is not checked). Otherwise (--prefix ~/.local, say) it is /usr/local, the release's place.
+# root_prefix: where a program that root runs, or that the input service believes for being root's file, goes (turnstile, keycap,
+# palmrest). Anyone who can replace the program could run their own code in its place: the prefix is used only when every
+# folder up to / is root's alone (a staging root is the packager's to hold, so it is not checked). Otherwise (--prefix
+# ~/.local, say) it is /usr/local, the release's place.
 root_prefix() {
   if [ -n "$destdir" ] || ! not_root_held "$prefix/bin" >/dev/null; then printf '%s' "$prefix"; else printf '%s' /usr/local; fi
 }
@@ -225,8 +229,14 @@ describe() {
       envs=("MAILO_PREFIX=$destdir$prefix" "MAILO_UNIT_DIR=$destdir/etc/systemd/user")
       writes=("$destdir$prefix" "$destdir/etc/systemd/user") ;;
     palmrest)
-      script=install.sh
-      yourself="it puts the program in /usr/local/bin (through sudo: the input service serves only a palmrest that only root can change), its service in your home, and prints the root commands for the device rules" ;;
+      # The touchpad service, installed by install/system.sh and not by palmrest's own installer (see the header).
+      dir="$HERE"
+      script=install/system.sh
+      blurb="the touchpad service: Magic Mouse scrolling and gestures, a system service like the keyboard map, with the rule that gives the mouse's raw node to the input group; it serves only the person at the seat"
+      args=(palmrest --prefix "$(root_prefix)")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      args+=(--siblings "$siblings")
+      writes=("$destdir$(root_prefix)" "$destdir/usr/lib/systemd/system" "$destdir/etc/udev/rules.d" "$destdir/etc/modprobe.d") ;;
     session)
       # This repo's own session installer (never sudo; it stops with the root command when a place is not writable).
       dir="$HERE"
@@ -339,7 +349,7 @@ for name in "${selected[@]}"; do
   esac
   [ -z "$blurb" ] || printf '             %s\n' "$blurb"
   case "$name" in
-    turnstile | keycap)
+    turnstile | keycap | palmrest)
       [ "$(root_prefix)" = "$prefix" ] || printf '             note: %s runs as root, so its program goes under %s, not %s (a folder you can write would let you replace it)\n' \
         "$name" "$(root_prefix)" "$prefix" ;;
   esac
@@ -381,15 +391,16 @@ esac
 command -v rustup >/dev/null || echo "note: rustup was not found. Building from source needs it (the repos pin Rust 1.98.1): $RUSTUP_LINE"
 [ "$dry" = 0 ] || exit 0
 
-# build_if_needed NAME: for a component this script builds itself, as you (detent, turnstile, keycap): build its program when it
-# is not there, so the component's installer, which only copies, has it. Anything else: nothing to do. $DETENT_BIN, $TURNSTILE_BIN
-# and $KEYCAP_BIN name a program built elsewhere. The input service is built with no feature at all (its `fake` is for tests).
+# build_if_needed NAME: for a component this script builds itself, as you (detent, turnstile, keycap, palmrest): build its program when it
+# is not there, so the component's installer, which only copies, has it. Anything else: nothing to do. $DETENT_BIN, $TURNSTILE_BIN,
+# $KEYCAP_BIN and $PALMREST_BIN name a program built elsewhere. The input service is built with no feature at all (its `fake` is for tests).
 build_if_needed() {
   local name=$1 tree="$siblings/$1" var args=()
   case "$name" in
     detent) var=DETENT_BIN ;;
     turnstile) var=TURNSTILE_BIN; args=(-p turnstile) ;;
     keycap) var=KEYCAP_BIN ;;
+    palmrest) var=PALMREST_BIN ;;
     *) return 0 ;;
   esac
   [ -z "${!var:-}" ] || return 0

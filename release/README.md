@@ -46,7 +46,7 @@ password, so no release can add one (slipway's own comes from its `scripts/insta
 `[[system]]` (`path`): a file slipway's helper copies, as root, to an absolute path on the computer. Its
 contents are the bundle file `system/<path>` (so `system/etc/pam.d/sill` lands at `/etc/pam.d/sill`); every
 file under `system/` must be listed and every listed path needs its file. The path must be named by a rule of
-`system-files.list`, which is slipway's `ALLOWED_SYSTEM_FILES` word for word: eighteen rules, each a folder and either an
+`system-files.list`, which is slipway's `ALLOWED_SYSTEM_FILES` word for word: twenty-one rules, each a folder and either an
 exact file name or a name ending (`/etc/quire/*-callers.toml`, `/etc/xdg/quire/*.toml`). A path no rule names
 refuses the whole release, at `pack`, at `verify` and in the helper. Because the helper is installed by hand and is
 never replaced by a release, adding a system file means changing slipway's list, installing the new helper on every
@@ -56,10 +56,18 @@ the input service's `turnstile.socket`, `turnstile.service`, `72-turnstile.rules
 and `turnstile.conf` (loads `uinput`), with its `/usr/local/bin/turnstile` export (`exports.toml`), the table of the desktop's own programs
 `/etc/quire/desktop-callers.toml` (from `dist/`; the update service, the screen-sharing service and the input service refuse every caller
 without it),
-palmrest's udev rule and module options, sill's PAM service and its external-monitor brightness files (the udev rule
+palmrest's unit (a system service since 2026-10-17, like keycap), its udev rule (the mouse's raw node to the `input` group, no person) and module options, sill's PAM service and its external-monitor brightness files (the udev rule
 `60-sill-ddc.rules` and the `i2c-dev` module list) porter's, almanac's, docket's and cua's caller tables (`/etc/quire`) and docket's default settings (`/etc/xdg/quire`) there. The session component also
 stages the colour emoji font at `share/fonts/quire/Noto-COLRv1.ttf` (with its licence), which is exported to
 `/usr/share/fonts/quire/`, a folder quire's emoji search reads.
+
+A unit that a row of `dist/desktop-callers.toml` names (the shell, the compositor, the portal backend, the accounts, intent, companion and memory services, Settings, the
+computer-use daemon) must be a **plain root-owned file**, not a link: a staged `lib/systemd/user/X.service` is exported as a link under `/usr/lib/systemd/user`, and the
+unit manager's judge reads a link (mode 0777) as a fragment anyone could change, so the unit never proves `Full` and its callers are refused. `build.sh`'s `plain_units`
+therefore stages those units, with the `sandbox.conf` drop-ins appended to their text, as system files at `/usr/lib/systemd/user/X.service` (the rule `/usr/lib/systemd/user
+ending .service` of the list), and the portal frontend's drop-in at `/usr/lib/systemd/user/xdg-desktop-portal.service.d/10-quire.conf`; the build stops if a named unit is
+still staged where it would be exported. Units that no row names (`mailo-watch.service`, the session target) stay exported links. The system units of turnstile, keycap
+and palmrest are system files in `/usr/lib/systemd/system` and were never links.
 
 ## What you do once
 
@@ -144,8 +152,7 @@ gh workflow run release.yml --repo PoHsuanLai/desktop -f version=0.2.0 -f notes=
 
 or tag: `git tag -a v0.2.0 -m "What changed" && git push origin v0.2.0` (the tag's message is the notes).
 The notes for the next release are kept in `docs/release-notes.md` while it is prepared; use them as the text.
-The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket, stoker and cua, turnstile with
-keycap (the two programs root runs, a job of their own), and the small ones together, with xwayland-satellite, which is built from its public repository at the commit in `build.sh`, `SATELLITE_REV`, the one `SATELLITE_TAG` names) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
+The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket, stoker and cua, turnstile, keycap and palmrest (the programs the system manager starts, a job each), and the small ones together, with xwayland-satellite, which is built from its public repository at the commit in `build.sh`, `SATELLITE_REV`, the one `SATELLITE_TAG` names) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
 Arch as well), checks their glibc and library needs, packs and signs, verifies, installs the signed release with
 slipway's helper in clean Ubuntu 24.04, Fedora 44 and Arch containers, and only then creates the release
 `v0.2.0` in desktop-releases. Watch it with

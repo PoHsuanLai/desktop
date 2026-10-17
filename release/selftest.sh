@@ -143,17 +143,27 @@ mk_tar() { # JOB PATH...: stage-JOB.tar of those files, each below stage/opt/qui
   tar -C "$d" -cf "$so/stage-$job.tar" stage components.d
 }
 owners() { python3 -I "$HERE/stage-owners.py" check "$HERE/stage-owners.list" "$@"; }
-mk_tar root components.d/turnstile.txt bin/turnstile bin/keycap system/usr/lib/systemd/system/turnstile.service system/etc/udev/rules.d/72-turnstile.rules
-mk_tar small bin/slipway bin/detent system/etc/quire/desktop-callers.toml components.d/desktop.txt
+mk_tar turnstile components.d/turnstile.txt bin/turnstile system/usr/lib/systemd/system/turnstile.service system/etc/udev/rules.d/72-turnstile.rules
+mk_tar keycap components.d/keycap.txt bin/keycap system/usr/lib/systemd/system/keycap.service
+mk_tar palmrest components.d/palmrest.txt bin/palmrest system/usr/lib/systemd/system/palmrest.service system/etc/udev/rules.d/70-palmrest.rules
+mk_tar small bin/slipway bin/detent system/etc/quire/desktop-callers.toml components.d/desktop.txt system/usr/lib/systemd/user/transom.service
 mk_tar mailo bin/mailo share/quire/skills/mail/SKILL.md
-owners "$so"/stage-root.tar "$so"/stage-small.tar "$so"/stage-mailo.tar >/dev/null 2>&1 || check "the stage tars of the right shape were refused"
-for bad in bin/turnstile bin/keycap system/usr/lib/systemd/system/turnstile.service system/usr/lib/systemd/system/keycap.service \
-  system/etc/udev/rules.d/72-turnstile.rules system/etc/quire/desktop-callers.toml system/etc/polkit-1/rules.d/00-all.rules bin/anything; do
+owners "$so"/stage-turnstile.tar "$so"/stage-keycap.tar "$so"/stage-palmrest.tar "$so"/stage-small.tar "$so"/stage-mailo.tar >/dev/null 2>&1 || check "the stage tars of the right shape were refused"
+for bad in bin/turnstile bin/keycap bin/palmrest system/usr/lib/systemd/system/turnstile.service system/usr/lib/systemd/system/keycap.service \
+  system/usr/lib/systemd/system/palmrest.service system/etc/udev/rules.d/72-turnstile.rules system/etc/udev/rules.d/70-palmrest.rules \
+  system/etc/quire/desktop-callers.toml system/etc/polkit-1/rules.d/00-all.rules bin/anything; do
   for job in mailo anyview casement sill porter agents small; do
     [ "$job" = small ] && case "$bad" in system/etc/quire/desktop-callers.toml) continue ;; esac
     mk_tar "$job" "$bad"
     owners "$so/stage-$job.tar" >/dev/null 2>&1 && check "job $job was allowed to supply $bad"
   done
+done
+# the three system programs do not reach one another's files, and a user unit the table names is a system file of the job that builds it
+for pair in turnstile:bin/keycap turnstile:bin/palmrest keycap:bin/turnstile keycap:system/usr/lib/systemd/system/palmrest.service \
+  palmrest:bin/turnstile palmrest:system/usr/lib/systemd/system/keycap.service palmrest:lib/systemd/user/palmrest.service \
+  mailo:system/usr/lib/systemd/user/sill.service sill:lib/systemd/user/sill.service casement:system/usr/lib/systemd/user/sill.service; do
+  mk_tar "${pair%%:*}" "${pair#*:}"
+  owners "$so/stage-${pair%%:*}.tar" >/dev/null 2>&1 && check "job ${pair%%:*} was allowed to supply ${pair#*:}"
 done
 mk_tar sill share/quire/intents/org.quire.Shell.toml
 mk_tar anyview share/quire/intents/org.quire.Shell.toml
@@ -171,4 +181,4 @@ grep -o '{ name: [a-z]*, only' "$HERE/../.github/workflows/release.yml" | sed 's
 cmp -s "$tmp/jobs.list" "$tmp/matrix.list" || check "stage-owners.list and the build matrix of release.yml name different jobs: $(tr '\n' ' ' <"$tmp/jobs.list") / $(tr '\n' ' ' <"$tmp/matrix.list")"
 
 [ "$fail" = 0 ] || exit 1
-echo "release selftest: pass (deterministic pack, verify, 27 hostile releases refused)"
+echo "release selftest: pass (deterministic pack, verify, hostile releases refused)"

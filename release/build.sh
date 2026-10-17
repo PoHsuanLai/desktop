@@ -109,8 +109,8 @@ build_casement() {
   local d; d=$(repo_dir casement)
   cargo_in "$d" casement -p casement -p casementctl
   # INTERIM: casement has no installer here; it ships dist/casement.service with ExecStart=/usr/bin/casement
-  # $CASEMENT_SESSION_ARGS (retarget keeps the arguments). The unit is root-held in the bundle's lib/systemd/user
-  # (exported to /usr/lib/systemd/user), as the account service requires of a fixed role.
+  # $CASEMENT_SESSION_ARGS (retarget keeps the arguments). The unit is root-held, as the account service requires of a fixed
+  # role: staged in lib/systemd/user here, and made a plain system file at /usr/lib/systemd/user by plain_units below.
   put 755 "$(tdir casement)/casement" bin/casement
   put 755 "$(tdir casement)/casementctl" bin/casementctl
   put 644 "$d/dist/casement.service" lib/systemd/user/casement.service
@@ -139,7 +139,7 @@ build_sill() {
   put_system 644 "$d/dist/udev/60-sill-ddc.rules" /etc/udev/rules.d/60-sill-ddc.rules
   put_system 644 "$d/dist/modules-load.d/sill-ddc.conf" /etc/modules-load.d/sill-ddc.conf
   put 644 "$d/dist/keycap/keycap.toml" share/sill/keycap.toml
-  # The shell's unit, root-held like casement's (the account service trusts fixed roles only from such units).
+  # The shell's unit, root-held like casement's (the account service trusts fixed roles only from such units; plain_units below).
   put 644 "$d/dist/sill.service" lib/systemd/user/sill.service
   retarget "$root/lib/systemd/user/sill.service" /usr/bin/sill
 }
@@ -299,12 +299,14 @@ build_keycap() {
 build_palmrest() {
   local d; d=$(repo_dir palmrest)
   cargo_in "$d" palmrest
-  # INTERIM: install.sh writes the user's systemd directory and enables the service. The unit's ExecStart is a root-owned
-  # program (the input service serves only a palmrest only root can change): /usr/local/bin/palmrest, or the older
-  # %h/.local/bin/palmrest of an earlier rev; either becomes the installed one.
+  # INTERIM: install.sh stages under DESTDIR but at /etc and /usr/local, outside the prefix. palmrest is a system service like
+  # keycap (owner decision 2026-10-17): its unit is a system file in /usr/lib/systemd/system, staged as palmrest ships it,
+  # starting /usr/local/bin/palmrest, the link exports.toml makes to bin/palmrest (that is also what install/system.sh writes at
+  # the default prefix, so slipway sees the same file from a release and from install.sh). The input service serves only a
+  # palmrest only root can change, and believes it only in /system.slice/palmrest.service. Its device rule gives the mouse's
+  # raw node to the `input` group and to no person; no rule for /dev/uinput and no module list (turnstile's loads uinput).
   put 755 "$(tdir palmrest)/palmrest" bin/palmrest
-  put 644 "$d/dist/palmrest.service" lib/systemd/user/palmrest.service
-  retarget "$root/lib/systemd/user/palmrest.service" /usr/local/bin/palmrest '%h/.local/bin/palmrest'
+  put_system 644 "$d/dist/palmrest.service" /usr/lib/systemd/system/palmrest.service
   put_system 644 "$d/dist/70-palmrest.rules" /etc/udev/rules.d/70-palmrest.rules
   put_system 644 "$d/dist/99-palmrest.conf" /etc/modprobe.d/99-palmrest.conf
 }
@@ -347,10 +349,53 @@ build_satellite() {
   echo "xwayland-satellite $SATELLITE_REV" >"$out/components.d/xwayland-satellite.txt"
 }
 
+# plain_units: every user unit that dist/desktop-callers.toml names (a `unit =` row, so it can be proven at `Full`) travels as a
+# system file that slipway-apply copies, as a plain root-owned file, to /usr/lib/systemd/user. A file staged in lib/systemd/user
+# is exported as a link into /opt/quire/current instead, and the unit manager's judge reads a link as writable (its mode is
+# 0777), so a unit laid out that way, or with a drop-in that is such a link, is refused at `Full`: the shell, the compositor,
+# the portal backend and the accounts services would not be trusted. The drop-ins of a unit staged here (the sandbox.conf
+# of each background service) are appended to the unit's own text, in file-name order, which systemd reads the same as
+# the drop-in; a drop-in of a unit staged elsewhere (the portal frontend is the distribution's) is a system file of its own, which
+# a rule of release/system-files.list must name. Other user units (mailo-watch.service, desktop-session.target) stay exported
+# links. Runs in every job on whatever that job staged.
+callers_units() { awk '$1 == "unit" { gsub(/"/, "", $3); print $3 }' "$ROOT/dist/desktop-callers.toml" | sort -u; }
+plain_units() {
+  local unit src dropin merged
+  for unit in $(callers_units); do
+    src="$root/lib/systemd/user/$unit"
+    if [ -f "$src" ]; then
+      merged=$(mktemp)
+      cat "$src" >"$merged"
+      if [ -d "$src.d" ]; then
+        for dropin in "$src.d"/*; do
+          [ -f "$dropin" ] || die "$dropin: a drop-in of $unit that is not a plain file"
+          { printf '\n# From %s.d/%s\n' "$unit" "$(basename "$dropin")"; cat "$dropin"; } >>"$merged"
+          rm -f -- "$dropin"
+        done
+        rmdir "$src.d"
+      fi
+      put_system 644 "$merged" "/usr/lib/systemd/user/$unit"
+      rm -f -- "$merged" "$src"
+    elif [ -d "$src.d" ]; then
+      for dropin in "$src.d"/*; do
+        [ -f "$dropin" ] || die "$dropin: a drop-in of $unit that is not a plain file"
+        put_system 644 "$dropin" "/usr/lib/systemd/user/$unit.d/$(basename "$dropin")"
+        rm -f -- "$dropin"
+      done
+      rmdir "$src.d"
+    fi
+  done
+  # Nothing named by the table may stay behind as an exported link.
+  for unit in $(callers_units); do
+    [ ! -e "$root/lib/systemd/user/$unit" ] && [ ! -e "$root/lib/systemd/user/$unit.d" ] || die "$unit is still staged in lib/systemd/user, where it would be exported as a link"
+  done
+}
+
 for name in "${selected[@]}"; do
   echo "=== $name"
   "build_$name"
 done
+plain_units
 
 # Nothing may land outside the prefix, and the bundle has no links.
 stray=$(cd "$stage" && find . -mindepth 1 -not -path "./opt" -not -path "./opt/quire" -not -path "./opt/quire/current*" | head -n 3)

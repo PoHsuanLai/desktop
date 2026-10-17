@@ -91,10 +91,14 @@ jobs:
           - { name: mailo, only: mailo }
           - { name: porter, only: porter }
           - { name: agents, only: "almanac,docket,stoker,cua" }
-          # The two programs root runs have a job of their own: release/stage-owners.list lets only this job supply them and their
-          # system files, so a build script that runs in another job cannot put code of its own there (re-audit NEW-ROOT-2).
-          - { name: root, only: "turnstile,keycap" }
-          - { name: small, only: "session,detent,transom,palmrest,slipway,satellite" }
+          # Each program the system manager starts has a job of its own: release/stage-owners.list lets only that job supply it and
+          # its system files, so a build script that runs in another job cannot put code of its own there, nor into another
+          # system program (re-audit NEW-ROOT-2). turnstile and keycap run as root; palmrest is a dynamic user whose unit the
+          # input service believes.
+          - { name: turnstile, only: turnstile }
+          - { name: keycap, only: keycap }
+          - { name: palmrest, only: palmrest }
+          - { name: small, only: "session,detent,transom,slipway,satellite" }
     steps:
       - name: Git and certificates (the checkout needs them)
         run: |
