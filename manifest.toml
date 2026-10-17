@@ -21,14 +21,14 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "43acb75df79214e139d424abcaa8124bd262b18e"
+rev = "1b02231cfcf116b45c8692d8e3fbb54342a508d3"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "04f676c83c0aedada5f6c7c83b4b8f9ca2b5324a"
+rev = "f3cbe63ac2eeb6dce36ef359d4cb0d17e8025e98"
 branch = "master"
 gate = "lane"
 
@@ -40,13 +40,13 @@ gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "9c85e76d95a84ec681bc14375c397d670331f6ac"
+rev = "b04bf0696a7af0b2086d5930bf821b092e34cd6d"
 branch = "main"
 gate = "lane"
 
 [repo.palmrest]
 url = "https://github.com/PoHsuanLai/palmrest.git"
-rev = "4e8a4df071c025153862a9824c0e65416f66b032"
+rev = "1de6d4f5e606f3c9ea3cb53a7599cb69584bed78"
 branch = "master"
 gate = "lane"
 
@@ -60,7 +60,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "72f5ec918567becf2a1dc1bbc8ad3674b131026f"
+rev = "d6085f70b12efdca986ca0fbbeba55e821cf4880"
 branch = "master"
 gate = "lane"
 
@@ -72,20 +72,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "b739cbdb8c3d9ed2a1b1d275aeed729964b13ef2"
+rev = "2b8dc7530962ecbdee1c870b39d96d8d2a01e3dc"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "97a134120205f8544d0fa9bbdfeab5fa9efcb9d5"
+rev = "e7d323a72a1bb69d8163069cd39b0e4ca838311c"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "40f4b8ffe7ea56874c6c403fb6289119426f50d9"
+rev = "3cd98ce2da64c1f7eecbbf1abe677815795bf199"
 branch = "master"
 gate = "lane"
 
@@ -111,19 +111,19 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "b710d9ed18ed38c9701a493e38d1684291f090eb"
+rev = "fed0fa72e4374155ae263636595aeae567535c03"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "1065db935a1c9ffb09e6d1fd53cbf6d5cc7ed95c"
+rev = "37f0f12bbcdf75947b188fba37083721fc05a227"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "591cdd21297c18c91dcc4d262c7035519e9349d7"
+rev = "957fc9489bcc347ada5278b2fb097007ff6ebd69"
 branch = "main"
 gate = "none"
 
@@ -131,7 +131,7 @@ gate = "none"
 # The portal backend (xdg-desktop-portal implementation "quire"): screen sharing, screenshots, remote desktop,
 # settings and the keep-awake inhibit; replaces the interim xdg-desktop-portal-wlr. Builds against libpipewire.
 url = "https://github.com/PoHsuanLai/transom.git"
-rev = "4c5cf7bd2b497b8848de21dacb2abb18b7cf7f07"
+rev = "ec7ceb067252fa52d2cf537395df0eae6d67f76d"
 branch = "master"
 gate = "lane"
 
@@ -153,7 +153,7 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "f70b2998845ecfc28177384c25a373ec5dc958c2"
+rev = "fd3458927942f1503dc8c5a60e316899e5944ed4"
 branch = "master"
 gate = "lane"
 
