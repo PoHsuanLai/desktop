@@ -4,3 +4,5 @@ accountd.service porter
 keycap.service keycap
 org.quire.Settings.service detent
 turnstile.service turnstile
+sill.service sill
+casement.service casement
