@@ -190,7 +190,7 @@ rm "$so/out/stage-mailo/stage-turnstile.tar"
 owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "an artifact holding nothing was accepted"
 mk_tar mailo bin/mailo; mv "$so/out/stage-mailo/stage-mailo.tar" "$so/mailo.real"; ln -s ../../mailo.real "$so/out/stage-mailo/stage-mailo.tar"
 owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "an artifact whose tar is a link was accepted"
-mk_tar mailo bin/mailo
+rm "$so/out/stage-mailo/stage-mailo.tar"; mk_tar mailo bin/mailo
 owners "$so/out/stage-mailo" >/dev/null 2>&1 || check "an artifact holding exactly its own tar was refused"
 # The job names in the list are the matrix of the workflow, no more and no fewer.
 python3 -I "$HERE/stage-owners.py" jobs "$HERE/stage-owners.list" >"$tmp/jobs.list"
