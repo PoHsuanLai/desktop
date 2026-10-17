@@ -37,10 +37,11 @@ table (repo -> rev, from `manifest.toml`, plus the repos built that it does not 
 relative to `/opt/quire/current`). The bundle is a tar.zst of regular files and directories only (no links),
 clean relative paths, owner 0, mtime 0, modes 0644 or 0755. Exports may only go under
 `/usr/share/wayland-sessions`, `/usr/share/xdg-desktop-portal`, `/usr/share/dbus-1/services`,
-`/usr/lib/systemd/user`, `/usr/share/applications`, `/usr/share/polkit-1/actions`, `/usr/share/quire`,
+`/usr/lib/systemd/user`, `/usr/share/applications`, `/usr/share/quire`,
 `/usr/share/porter`, `/usr/share/stoker`, `/usr/share/fonts` and `/usr/local/bin`; every file staged under
-the first ten directories (as `share/...` or `lib/systemd/user`) is exported to the same path under `/usr`,
-and `exports.toml` adds the rest.
+the first nine directories (as `share/...` or `lib/systemd/user`) is exported to the same path under `/usr`,
+and `exports.toml` adds the rest. There is no polkit actions folder in the list: an action can make `pkexec` run a program as root with no
+password, so no release can add one (slipway's own comes from its `scripts/install.sh`).
 
 `[[system]]` (`path`): a file slipway's helper copies, as root, to an absolute path on the computer. Its
 contents are the bundle file `system/<path>` (so `system/etc/pam.d/sill` lands at `/etc/pam.d/sill`); every

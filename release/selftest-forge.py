@@ -29,6 +29,8 @@ elif case == "absolute":
     files["/etc/evil"] = (b"x", 0o644)
 elif case == "export":
     exports.append(("/etc/cron.d/evil", "bin/tool"))
+elif case == "export-polkit":
+    exports.append(("/usr/share/polkit-1/actions/org.example.root-for-all.policy", "bin/tool"))
 elif case == "export-target":
     exports.append(("/usr/local/bin/ghost", "bin/ghost"))
 elif case == "export-dir":

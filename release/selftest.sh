@@ -77,6 +77,12 @@ done
 rmdir "$top/system/etc/polkit-1/rules.d" "$top/system/etc/polkit-1" "$top/system/etc/pam.d" "$top/system/etc/quire" 2>/dev/null || true
 pack "$tmp/c2" >/dev/null 2>&1 || check "pack no longer works after the unnamed files were taken away"
 
+# A polkit action in the stage is not exported: nothing a release ships becomes an action (re-audit NEW-ROOT-3).
+mkdir -p "$top/share/polkit-1/actions"; printf '<policyconfig/>\n' >"$top/share/polkit-1/actions/org.example.policy"
+pack "$tmp/c3" >/dev/null 2>&1 || check "a stage with a polkit action in it no longer packs"
+! grep -q 'polkit-1/actions' <(grep '^link' "$tmp/c3/release.toml") || check "a polkit action was exported as a link"
+rm -rf "$top/share/polkit-1"
+
 # The committed list is slipway's: the same text in slipway's format passes, one rule missing or added does not.
 rust="$tmp/slipway/crates/slipway-core/src/release/system.rs"
 mkdir -p "$(dirname "$rust")"
@@ -95,7 +101,7 @@ render '{ print } END { print "/etc/polkit-1/rules.d exact 00-all.rules" }'
 # The forger itself is sound: with no fault, its release verifies (so a refusal above is for the fault).
 python3 -I "$HERE/selftest-forge.py" "$tmp/h-good" good "$tmp/key.sec" && "$HERE/verify.sh" "$tmp/h-good" --pubkey "$tmp/key.pub" >/dev/null || check "the forger's fault-free release does not verify"
 python3 -I "$HERE/selftest-forge.py" "$tmp/h-system-good" system-good "$tmp/key.sec" && "$HERE/verify.sh" "$tmp/h-system-good" --pubkey "$tmp/key.pub" >/dev/null || check "the forger's release with a system file does not verify"
-for hostile in extra digest size symlink dotdot absolute setuid export export-dir export-target tamper reserved mode-writable mode-unreadable version-zero version-pre date notes-big notes-del legacy system-dir system-xdg-other system-unnamed system-nested system-unlisted system-nosource; do
+for hostile in extra digest size symlink dotdot absolute setuid export export-polkit export-dir export-target tamper reserved mode-writable mode-unreadable version-zero version-pre date notes-big notes-del legacy system-dir system-xdg-other system-unnamed system-nested system-unlisted system-nosource; do
   python3 -I "$HERE/selftest-forge.py" "$tmp/h-$hostile" "$hostile" "$tmp/key.sec" || { check "could not forge $hostile"; continue; }
   if "$HERE/verify.sh" "$tmp/h-$hostile" --pubkey "$tmp/key.pub" >/dev/null 2>&1; then check "verify accepted the hostile release '$hostile'"; fi
 done
@@ -165,4 +171,4 @@ grep -o '{ name: [a-z]*, only' "$HERE/../.github/workflows/release.yml" | sed 's
 cmp -s "$tmp/jobs.list" "$tmp/matrix.list" || check "stage-owners.list and the build matrix of release.yml name different jobs: $(tr '\n' ' ' <"$tmp/jobs.list") / $(tr '\n' ' ' <"$tmp/matrix.list")"
 
 [ "$fail" = 0 ] || exit 1
-echo "release selftest: pass (deterministic pack, verify, 26 hostile releases refused)"
+echo "release selftest: pass (deterministic pack, verify, 27 hostile releases refused)"

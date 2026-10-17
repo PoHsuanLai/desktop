@@ -35,16 +35,17 @@ MAX_NOTES = 16 * 1024
 MAX_RELEASE_TOML = 24 << 20
 MAX_TOTAL = 16 << 30
 PART = re.compile(r"^[A-Za-z0-9._+@=,~-]+$")
-# Must be the same list as slipway-core's ALLOWED_LINK_DIRS (release/export.rs).
+# Must be the same list as slipway-core's ALLOWED_LINK_DIRS (release/export.rs). No polkit actions folder: an action can make
+# pkexec run a program as root with no password, so a release never adds one (re-audit NEW-ROOT-3).
 EXPORT_ROOTS = (
     "/usr/share/wayland-sessions", "/usr/share/xdg-desktop-portal", "/usr/share/dbus-1/services",
-    "/usr/lib/systemd/user", "/usr/share/applications", "/usr/share/polkit-1/actions", "/usr/local/bin",
+    "/usr/lib/systemd/user", "/usr/share/applications", "/usr/local/bin",
     "/usr/share/quire", "/usr/share/porter", "/usr/share/stoker", "/usr/share/fonts",
 )
 # A staged directory that maps to the same path under /usr, with no listing needed.
 AUTO_EXPORT_DIRS = (
     "share/wayland-sessions", "share/xdg-desktop-portal", "share/dbus-1/services", "lib/systemd/user",
-    "share/applications", "share/polkit-1/actions", "share/quire", "share/porter", "share/stoker", "share/fonts",
+    "share/applications", "share/quire", "share/porter", "share/stoker", "share/fonts",
 )
 # The tree of files slipway-apply copies (not links) to a system folder. A file is accepted only when a rule of
 # system-files.list names it: that file is a committed copy of slipway-core's ALLOWED_SYSTEM_FILES
