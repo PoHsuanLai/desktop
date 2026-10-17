@@ -21,14 +21,14 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "77c954c2e4c69ecf2d050ae563fdd4683eae8dc0"
+rev = "3ad1c327522996806a2ac29c696487edacad824b"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "daaacfdf7a31343e544a746143c79a78fc501a15"
+rev = "82ca59a8c288324db8c4076bff845c7f1a527b3d"
 branch = "master"
 gate = "lane"
 
@@ -40,13 +40,13 @@ gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "be632d80546928860197eaae8ef4e350641b08f5"
+rev = "00105544dada71afd2efb61531066f5a78f3050f"
 branch = "main"
 gate = "lane"
 
 [repo.palmrest]
 url = "https://github.com/PoHsuanLai/palmrest.git"
-rev = "213b974788cead54a8bc9a1426918761e2b1be37"
+rev = "0f2e43252302ce8a9752f106247fe8fd98e22892"
 branch = "master"
 gate = "lane"
 
@@ -54,13 +54,13 @@ gate = "lane"
 # The root input service: owns /dev/uinput and hands keycap and palmrest their virtual devices over a socket
 # (caller identity through peephole). Socket-activated system unit; the daemon is exported to /usr/local/bin.
 url = "https://github.com/PoHsuanLai/turnstile.git"
-rev = "a5301c56a363536f1767ad9943c62e045853895d"
+rev = "78b472dcad11a4348f31dce39b55ac53516bb69a"
 branch = "master"
 gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "7e05cbf78edf66318de94d47e556b2feb88802f1"
+rev = "abb164b9d8e876dba394cce8de38bebff8af424e"
 branch = "master"
 gate = "lane"
 
@@ -72,26 +72,26 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "00465eadbbd94f43f390df7a6eedeed1c8749b10"
+rev = "611766578576c5fa8a4441296093355dfc3816f6"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "b1b9ddf2ff79fccc07693634fe3e4c6af5b11a1e"
+rev = "38a7226825a85c1b5cda6ffa7bb8f8e3b25b25a9"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "e134676ca6932070ddb689053e9eb3fa26d8b8ff"
+rev = "ca7c420dfbd1dee04dd72f2ca9daee89d7c57f2d"
 branch = "master"
 gate = "lane"
 
 [repo.latchkey]
 url = "https://github.com/PoHsuanLai/latchkey.git"
-rev = "99cc9deb198860293253c534c4d26b382ec8b87e"
+rev = "c6cad1521f1efdc66fcc0f398029324e315a12ab"
 branch = "master"
 gate = "lane"
 
@@ -111,19 +111,19 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "dc60ca9809a8d4373db0031d81a5e2e40d52b82a"
+rev = "b4b4c1e2b407ae53377f50b0ebecd94549ba52af"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "d050184b3ebf8b1ecfdee77794fcaad2da3a26e5"
+rev = "93dfba5561d6c08000d6a78ab6f674fbc0b12185"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "aa76b06906b1539a9ca280e9bac697fd7effc9b6"
+rev = "e337c00bd71a3443319f0a88b6a1a5fbfe6b0f0d"
 branch = "main"
 gate = "none"
 
@@ -131,7 +131,7 @@ gate = "none"
 # The portal backend (xdg-desktop-portal implementation "quire"): screen sharing, screenshots, remote desktop,
 # settings and the keep-awake inhibit; replaces the interim xdg-desktop-portal-wlr. Builds against libpipewire.
 url = "https://github.com/PoHsuanLai/transom.git"
-rev = "0a355ccda6808752f9837228cd4dedf8da5a8c96"
+rev = "2d9c1e0b741cab670705f7c0e2aedaccc1c548c5"
 branch = "master"
 gate = "lane"
 
@@ -145,7 +145,7 @@ gate = "none"
 
 [repo.casement-protocols]
 url = "https://github.com/PoHsuanLai/casement-protocols.git"
-rev = "8cebc9b498e4e5d5b9ec1b1d7b52e2641d5c094b"
+rev = "890a4632c8d10705c7003b78b312b5c024c4f3a9"
 branch = "master"
 gate = "none"
 
@@ -153,13 +153,13 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "bb316f3c600661b0c63b7fa7b8458f9a699d1cf0"
+rev = "7fed12065f05b938889fbfe253c45af12465ed2f"
 branch = "master"
 gate = "lane"
 
 [repo.slipway]
 # The updater: installs and switches signed release bundles (release/ in this repo builds them).
 url = "https://github.com/PoHsuanLai/slipway.git"
-rev = "e2126af0337a14bbe42e26bc43ce49e1cd9f7dc2"
+rev = "13d70923cadbf2f65ac12cdd9bf18389d781c435"
 branch = "master"
 gate = "none"
