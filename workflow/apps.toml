@@ -1,0 +1,110 @@
+# The apps the workflow timing measures, one app table per entry (workflow/README.md explains the numbers).
+#
+#   key         the short name used with run.sh --apps (firefox, foot, blender, gtk4, qt6, x11)
+#   title       the name shown in the summary
+#   kind        wayland | x11: how the app talks to the desktop (x11 goes through the X11 bridge)
+#   timeout_s   how long to wait for the app's window after launching it
+#
+# Each candidate is one program that can stand in for the app; the first one that is installed wins,
+# so a fallback follows its primary.
+#
+#   binary       the program that must be on PATH (Flatpak and Snap exports count as installed too)
+#   desktop_ids  desktop entry ids to try, without ".desktop", in order; sill launch takes one of these.
+#                An empty list means the program has no desktop entry and cannot be launched by sill.
+#   app_ids      extra window ids to match (the entry's StartupWMClass and the id itself always count)
+#   package      the distribution package that provides the program: apt (Ubuntu), dnf (Fedora),
+#                pacman (Arch); only the install hint printed for a missing app uses it
+#
+# Sources: the blender, kwrite and kcalc ids were read from /usr/share/applications on this Fedora 44
+# machine. Every other id and package name comes from the upstream desktop files and the distributions'
+# package lists as the author knows them, not from an installed Ubuntu or Arch; entries marked
+# "unverified" are the ones most likely to need a fix on the first real run.
+
+[[app]]
+key = "firefox"
+title = "Firefox"
+kind = "wayland"
+timeout_s = 60
+
+[[app.candidate]]
+binary = "firefox"
+# firefox.desktop: Fedora, Arch, Ubuntu (deb build). org.mozilla.firefox: the Flatpak.
+# firefox_firefox: the Ubuntu 24.04 Snap (unverified).
+desktop_ids = ["firefox", "org.mozilla.firefox", "firefox_firefox"]
+package = { apt = "firefox", dnf = "firefox", pacman = "firefox" }
+
+[[app]]
+key = "foot"
+title = "foot"
+kind = "wayland"
+timeout_s = 60
+
+[[app.candidate]]
+binary = "foot"
+desktop_ids = ["foot"]
+package = { apt = "foot", dnf = "foot", pacman = "foot" }
+
+[[app]]
+key = "blender"
+title = "Blender"
+kind = "wayland"
+timeout_s = 120
+
+[[app.candidate]]
+binary = "blender"
+# blender.desktop (StartupWMClass=Blender) is on this machine's Fedora 44; org.blender.Blender: the Flatpak.
+desktop_ids = ["blender", "org.blender.Blender"]
+package = { apt = "blender", dnf = "blender", pacman = "blender" }
+
+[[app]]
+key = "gtk4"
+title = "GTK4 app"
+kind = "wayland"
+timeout_s = 60
+
+[[app.candidate]]
+binary = "gnome-text-editor"
+desktop_ids = ["org.gnome.TextEditor"]
+package = { apt = "gnome-text-editor", dnf = "gnome-text-editor", pacman = "gnome-text-editor" }
+
+[[app.candidate]]
+# The GTK4 demo. Unverified: the Fedora package that ships gtk4-demo is believed to be gtk4-devel-tools.
+binary = "gtk4-demo"
+desktop_ids = ["org.gtk.Demo4"]
+package = { apt = "gtk-4-examples", dnf = "gtk4-devel-tools", pacman = "gtk4-demos" }
+
+[[app]]
+key = "qt6"
+title = "Qt6 app"
+kind = "wayland"
+timeout_s = 60
+
+[[app.candidate]]
+# Unverified on Ubuntu 24.04: its KDE apps are Qt5 builds (Qt6 KDE apps start with Ubuntu 25.04).
+binary = "kwrite"
+desktop_ids = ["org.kde.kwrite"]
+package = { apt = "kwrite", dnf = "kwrite", pacman = "kwrite" }
+
+[[app.candidate]]
+binary = "kcalc"
+desktop_ids = ["org.kde.kcalc"]
+package = { apt = "kcalc", dnf = "kcalc", pacman = "kcalc" }
+
+[[app]]
+key = "x11"
+title = "X11 app"
+kind = "x11"
+timeout_s = 60
+
+[[app.candidate]]
+binary = "xterm"
+# xterm.desktop on Fedora and Arch; debian-xterm.desktop on older Ubuntu releases (unverified for 24.04).
+desktop_ids = ["xterm", "debian-xterm"]
+package = { apt = "xterm", dnf = "xterm", pacman = "xterm" }
+
+[[app.candidate]]
+# xeyes ships no desktop entry on any of the three, so sill cannot launch it: run.sh reports that and
+# skips. It is listed because the brief asked for it as the fallback.
+binary = "xeyes"
+desktop_ids = []
+package = { apt = "x11-apps", dnf = "xeyes", pacman = "xorg-xeyes" }

@@ -1,0 +1,28 @@
+part	app	phase	round	stage	value_ms	text
+launch	firefox	cold	0	first_frame_to_settled	400	
+launch	firefox	warm	1	first_frame_to_settled	100	
+launch	firefox	warm	2	first_frame_to_settled	110	
+launch	firefox	warm	3	first_frame_to_settled	120	
+launch	firefox	warm	4	first_frame_to_settled	130	
+launch	firefox	warm	5	first_frame_to_settled	200	
+launch	firefox	cold	0	connected_to_first_commit	90	
+launch	firefox	warm	1	connected_to_first_commit	30	
+launch	firefox	warm	2	connected_to_first_commit	30	
+launch	firefox	warm	3	connected_to_first_commit	30	
+launch	firefox	warm	4	connected_to_first_commit	30	
+launch	firefox	warm	5	connected_to_first_commit	39	
+launch	firefox	cold	0	spawned_to_connected	900	
+launch	firefox	warm	1	spawned_to_connected	500	
+launch	firefox	warm	2	spawned_to_connected	500	
+launch	firefox	warm	3	spawned_to_connected	500	
+launch	firefox	warm	4	spawned_to_connected	500	
+launch	firefox	warm	5	spawned_to_connected	550	
+launch	foot	warm	1	first_commit_to_first_frame	60	
+launch	foot	warm	2	first_commit_to_first_frame	70	
+launch	foot	warm	3	first_commit_to_first_frame	80	
+launch	foot	warm	4	first_commit_to_first_frame	90	
+launch	foot	warm	5	first_commit_to_first_frame	100	
+login	login	boot	0	start_to_shell_connected	450.0	
+login	login	boot	0	shell_connected_to_shell_ready	650.0	
+login	login	boot	0	start_to_shell_ready	1100.0	
+launch	firefox	warm	1	gpu		Intel [i915, 0000:00:02.0]

@@ -1,0 +1,24 @@
+part	app	phase	round	stage	value_ms	text
+launch	firefox	cold	0	first_frame_to_settled	390	
+launch	firefox	warm	1	first_frame_to_settled	90	
+launch	firefox	warm	2	first_frame_to_settled	95	
+launch	firefox	warm	3	first_frame_to_settled	100	
+launch	firefox	warm	4	first_frame_to_settled	100	
+launch	firefox	warm	5	first_frame_to_settled	100	
+launch	firefox	cold	0	connected_to_first_commit	88	
+launch	firefox	warm	1	connected_to_first_commit	30	
+launch	firefox	warm	2	connected_to_first_commit	30	
+launch	firefox	warm	3	connected_to_first_commit	30	
+launch	firefox	warm	4	connected_to_first_commit	30	
+launch	firefox	warm	5	connected_to_first_commit	30	
+launch	firefox	cold	0	spawned_to_connected	880	
+launch	firefox	warm	1	spawned_to_connected	500	
+launch	firefox	warm	2	spawned_to_connected	500	
+launch	firefox	warm	3	spawned_to_connected	500	
+launch	firefox	warm	4	spawned_to_connected	500	
+launch	firefox	warm	5	spawned_to_connected	500	
+launch	foot	warm	1	first_commit_to_first_frame	50	
+launch	foot	warm	2	first_commit_to_first_frame	55	
+launch	foot	warm	3	first_commit_to_first_frame	60	
+launch	foot	warm	4	first_commit_to_first_frame	65	
+launch	foot	warm	5	first_commit_to_first_frame	70	

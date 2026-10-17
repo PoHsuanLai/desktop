@@ -1,0 +1,7 @@
+pos:	0
+flags:	02100002
+mnt_id:	27
+ino:	1236
+drm-driver:	amdgpu
+drm-pdev:	0000:03:00.0
+drm-client-id:	43

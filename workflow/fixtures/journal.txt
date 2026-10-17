@@ -1,0 +1,14 @@
+Oct 17 10:00:00 host casement[900]: not a timing line: launch failed reason=no_such_file
+2026-10-17T10:00:01.000000Z  INFO casement: listening on wayland-1
+2026-10-17T10:00:01.100000Z  INFO timing: session-ready started_at=1000000000 shell_connected_at=1450000000 shell_ready_at=2100000000
+launch desktop_id=firefox unit=app-firefox-1.scope requested_at=100000000000 spawned_at=100030000000 pid=5001
+2026-10-17T10:01:40.200000Z  INFO timing: window-ready app_id=firefox pid=4000 connected_at=50000000000 first_commit_at=100500000000 first_frame_at=100516000000 settled_at=100716000000
+2026-10-17T10:01:40.300000Z  INFO timing: window-ready app_id=foot pid=5002 connected_at=100200000000 first_commit_at=100300000000 first_frame_at=100316000000 settled_at=100416000000
+2026-10-17T10:01:40.700000Z  INFO timing: window-ready app_id=firefox pid=5001 connected_at=100400000000 first_commit_at=100700000000 first_frame_at=100716000000 settled_at=100916000000
+[2m2026-10-17T10:01:40.900000Z[0m [32m INFO[0m [2mtiming[0m[2m:[0m window-ready app_id=firefox pid=5001 connected_at=100450000000 first_commit_at=100800000000 first_frame_at=100816000000 settled_at=101016000000
+2026-10-17T10:03:20.000000Z  INFO timing: key-window app_id=foot cause=keyboard input_at=200100000000 focused_at=200105000000 presented_at=200125000000
+2026-10-17T10:03:21.000000Z  INFO timing: key-window app_id=firefox cause=keyboard input_at=201000000000 focused_at=201012000000 presented_at=201040000000
+2026-10-17T10:03:22.000000Z  INFO timing: key-window app_id=foot cause=pointer input_at=202000000000 focused_at=202002000000 presented_at=202018000000
+2026-10-17T10:03:23.000000Z  INFO timing: key-window app_id=firefox cause=request input_at=0 focused_at=203000000000 presented_at=203030000000
+2026-10-17T10:05:00.000000Z  INFO timing: key-window app_id=foot cause=keyboard input_at=300000000000 focused_at=300005000000 presented_at=300025000000
+2026-10-17T10:06:00.000000Z  INFO timing: xwayland-ready requested_at=400000000000 ready_at=400250000000
