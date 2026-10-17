@@ -79,13 +79,13 @@ gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "90f6052f61386ed63d5c5e93c223cb959798f3e4"
+rev = "b1b9ddf2ff79fccc07693634fe3e4c6af5b11a1e"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "21ba011384747877f271d9f598bbf3e2cbc5266f"
+rev = "e134676ca6932070ddb689053e9eb3fa26d8b8ff"
 branch = "master"
 gate = "lane"
 
