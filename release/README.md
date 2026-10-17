@@ -143,13 +143,18 @@ gh workflow run release.yml --repo PoHsuanLai/desktop -f version=0.2.0 -f notes=
 
 or tag: `git tag -a v0.2.0 -m "What changed" && git push origin v0.2.0` (the tag's message is the notes).
 The notes for the next release are kept in `docs/release-notes.md` while it is prepared; use them as the text.
-The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket, stoker and cua, and the small
-ones together, with xwayland-satellite, which is built from its public repository at the commit in `build.sh`, `SATELLITE_REV`, the one `SATELLITE_TAG` names) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
+The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket, stoker and cua, turnstile with
+keycap (the two programs root runs, a job of their own), and the small ones together, with xwayland-satellite, which is built from its public repository at the commit in `build.sh`, `SATELLITE_REV`, the one `SATELLITE_TAG` names) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
 Arch as well), checks their glibc and library needs, packs and signs, verifies, installs the signed release with
 slipway's helper in clean Ubuntu 24.04, Fedora 44 and Arch containers, and only then creates the release
 `v0.2.0` in desktop-releases. Watch it with
 `gh run watch --repo PoHsuanLai/desktop`. A tag that already exists in desktop-releases fails the last step;
 nothing is overwritten.
+
+Each build job may supply only the paths `release/stage-owners.list` gives it. Before the stage tars are merged, the pack job runs
+`release/stage-owners.py check` on them and stops when a tar holds a path outside its job's lines (a build script in one job writing
+`bin/turnstile` or `turnstile.service`, say), anything that is not a plain file or folder, or a path that two jobs both supply. A component
+that starts to install a new file needs a line for it in that list.
 
 ## First install on a machine
 

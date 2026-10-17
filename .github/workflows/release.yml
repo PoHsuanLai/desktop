@@ -91,7 +91,10 @@ jobs:
           - { name: mailo, only: mailo }
           - { name: porter, only: porter }
           - { name: agents, only: "almanac,docket,stoker,cua" }
-          - { name: small, only: "session,detent,transom,turnstile,keycap,palmrest,slipway,satellite" }
+          # The two programs root runs have a job of their own: release/stage-owners.list lets only this job supply them and their
+          # system files, so a build script that runs in another job cannot put code of its own there (re-audit NEW-ROOT-2).
+          - { name: root, only: "turnstile,keycap" }
+          - { name: small, only: "session,detent,transom,palmrest,slipway,satellite" }
     steps:
       - name: Git and certificates (the checkout needs them)
         run: |
@@ -240,6 +243,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p desktop/build/release
+          # Each job may supply only the paths release/stage-owners.list gives it, and no path may come from two jobs. Before
+          # anything is extracted: a stage tar is the output of a build script that dependencies of the job run.
+          python3 -I desktop/release/stage-owners.py check desktop/release/stage-owners.list staged/stage-*.tar
           for t in staged/stage-*.tar; do tar -C desktop/build/release -xf "$t"; done
           cat desktop/build/release/components.d/*.txt >desktop/build/release/components.txt
 

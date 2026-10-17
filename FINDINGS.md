@@ -560,3 +560,14 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   becomes is the packager's to hold). Test: `gate/installer-check.sh` 2e (a user-owned prefix is refused for both parts, `/usr` is accepted, the plan
   moves them to `/usr/local` and says so, a staged prefix is kept). Not covered: root-owned but group-writable folders (the test cannot make one without
   root); the function was run by hand over `/tmp`, `~/.local`, `/usr/local` and a missing path.
+- **NEW-ROOT-2: a build job supplies only its own paths.** `pack` used to extract all seven stage tars into one tree and sign it, so a build script run by
+  a dependency of one job (mailo, say) could write `bin/turnstile` or `turnstile.service` into its tar and have it signed as root-run code.
+  `release/stage-owners.list` is the table of path patterns per job and `release/stage-owners.py check` runs in the Merge step before any extraction:
+  it refuses a member outside its job's lines, a member that is not a plain file or folder, a path outside `stage/opt/quire/current` and `components.d`,
+  and a path two jobs both supply. `turnstile` and `keycap` moved out of the `small` job into a job of their own (`root`), so nothing built beside them
+  can reach their program, units, udev rules or the polkit rule; `system/etc/quire/desktop-callers.toml` (the trust table) is in the `small` list
+  only (the session builds it) and no wider pattern of another job matches it. Tests: `release/selftest.sh` (every root-run path refused for every
+  other job, a duplicate, a link, a stray path, an unknown job, and the list's job names equal the workflow's matrix). Not run on a runner: the lists
+  were written from `build.sh` and the installers it runs, so the first run may stop on a file a component installs that no line names (add the
+  line; the fault names the job and the path). Left as is: inside one job a compromised component can still write another component's paths (the
+  `small` job holds six components); only the root-run parts and the trust table were separated.

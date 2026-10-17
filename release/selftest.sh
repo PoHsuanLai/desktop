@@ -123,5 +123,46 @@ rm "$h/usr/libexec/slipway-health"
 printf '#!/bin/sh\n' >"$h/usr/libexec/slipway-health"; chmod 775 "$h/usr/libexec/slipway-health"
 "$HERE/check-helpers.sh" --root "$h" >/dev/null 2>&1 && check "a group-writable slipway-health was accepted"
 
+# Each build job supplies only its own paths (stage-owners.list): a tar with a path outside its job's lines, a path two jobs
+# both supply, a link, a path outside the stage or a job nobody knows is refused; a tar of the right shape passes.
+so="$tmp/owners"; mkdir -p "$so"
+mk_tar() { # JOB PATH...: stage-JOB.tar of those files, each below stage/opt/quire/current (or components.d/NAME.txt)
+  local job=$1 d p; shift; d="$so/$job"; rm -rf -- "${d:?}"; mkdir -p "$d/components.d" "$d/stage/opt/quire/current"
+  for p in "$@"; do
+    case "$p" in
+      components.d/*) printf x >"$d/$p" ;;
+      *) mkdir -p "$d/stage/opt/quire/current/$(dirname "$p")"; printf x >"$d/stage/opt/quire/current/$p" ;;
+    esac
+  done
+  tar -C "$d" -cf "$so/stage-$job.tar" stage components.d
+}
+owners() { python3 -I "$HERE/stage-owners.py" check "$HERE/stage-owners.list" "$@"; }
+mk_tar root components.d/turnstile.txt bin/turnstile bin/keycap system/usr/lib/systemd/system/turnstile.service system/etc/udev/rules.d/72-turnstile.rules
+mk_tar small bin/slipway bin/detent system/etc/quire/desktop-callers.toml components.d/desktop.txt
+mk_tar mailo bin/mailo share/quire/skills/mail/SKILL.md
+owners "$so"/stage-root.tar "$so"/stage-small.tar "$so"/stage-mailo.tar >/dev/null 2>&1 || check "the stage tars of the right shape were refused"
+for bad in bin/turnstile bin/keycap system/usr/lib/systemd/system/turnstile.service system/usr/lib/systemd/system/keycap.service \
+  system/etc/udev/rules.d/72-turnstile.rules system/etc/quire/desktop-callers.toml system/etc/polkit-1/rules.d/00-all.rules bin/anything; do
+  for job in mailo anyview casement sill porter agents small; do
+    [ "$job" = small ] && case "$bad" in system/etc/quire/desktop-callers.toml) continue ;; esac
+    mk_tar "$job" "$bad"
+    owners "$so/stage-$job.tar" >/dev/null 2>&1 && check "job $job was allowed to supply $bad"
+  done
+done
+mk_tar sill share/quire/intents/org.quire.Shell.toml
+mk_tar anyview share/quire/intents/org.quire.Shell.toml
+owners "$so/stage-sill.tar" >/dev/null 2>&1 || check "sill alone was refused the path it owns"
+owners "$so/stage-sill.tar" "$so/stage-anyview.tar" >/dev/null 2>&1 && check "a path supplied by two jobs was accepted"
+mk_tar mailo bin/mailo; ln -s mailo "$so/mailo/stage/opt/quire/current/bin/link"; tar -C "$so/mailo" -cf "$so/stage-mailo.tar" stage components.d
+owners "$so/stage-mailo.tar" >/dev/null 2>&1 && check "a link in a stage tar was accepted"
+mk_tar mailo bin/mailo; mkdir -p "$so/mailo/etc"; printf x >"$so/mailo/etc/passwd"; tar -C "$so/mailo" -cf "$so/stage-mailo.tar" stage components.d etc
+owners "$so/stage-mailo.tar" >/dev/null 2>&1 && check "a path outside the stage was accepted"
+mk_tar rogue bin/mailo
+owners "$so/stage-rogue.tar" >/dev/null 2>&1 && check "the tar of a job nobody knows was accepted"
+# The job names in the list are the matrix of the workflow, no more and no fewer.
+python3 -I "$HERE/stage-owners.py" jobs "$HERE/stage-owners.list" >"$tmp/jobs.list"
+grep -o '{ name: [a-z]*, only' "$HERE/../.github/workflows/release.yml" | sed 's/{ name: //; s/, only//' | sort >"$tmp/matrix.list"
+cmp -s "$tmp/jobs.list" "$tmp/matrix.list" || check "stage-owners.list and the build matrix of release.yml name different jobs: $(tr '\n' ' ' <"$tmp/jobs.list") / $(tr '\n' ' ' <"$tmp/matrix.list")"
+
 [ "$fail" = 0 ] || exit 1
 echo "release selftest: pass (deterministic pack, verify, 26 hostile releases refused)"

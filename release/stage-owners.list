@@ -1,0 +1,140 @@
+# Which paths each build job of the release may supply (re-audit NEW-ROOT-2). The pack job merges the seven stage tars into
+# one tree and signs it; release/stage-owners.py refuses the merge when a tar holds a path outside its job's lines below,
+# or a path that two jobs both supply. So a build script that a dependency of one job runs cannot put a program or a unit
+# that root runs (turnstile, keycap, their services, the udev rules, the callers table) into the signed bundle.
+#
+#   JOB PATTERN
+#
+# JOB is the matrix name in .github/workflows/release.yml (release/selftest.sh checks that the two agree). PATTERN is a path
+# below opt/quire/current in the stage, or components.d/NAME.txt; `*` stands for any run of characters inside one path
+# segment, `**` for anything. Every line names what the job's components install (release/build.sh and the installers it
+# runs): add a line with the file when a component starts to ship a new one, or the pack stops.
+#
+# The root-run parts have a job of their own (root: turnstile and keycap), so nothing built beside them can reach them.
+# Paths under system/ are copies slipway-apply places as root; the trust table system/etc/quire/desktop-callers.toml
+# belongs to the session alone, and no other job's list holds a pattern that matches it.
+
+casement components.d/casement.txt
+casement bin/casement
+casement bin/casementctl
+casement lib/systemd/user/casement.service
+
+sill components.d/sill.txt
+sill bin/sill
+sill lib/systemd/user/sill.service
+sill share/quire/intents/org.quire.Shell.toml
+sill share/quire/settings/sill.settings.toml
+sill share/quire/skills/focused-app-menus/**
+sill share/quire/skills/screenshots/**
+sill share/quire/skills/windows-spaces/**
+sill share/sill/keycap.toml
+sill system/etc/pam.d/sill
+sill system/etc/udev/rules.d/60-sill-ddc.rules
+sill system/etc/modules-load.d/sill-ddc.conf
+
+anyview components.d/anyview.txt
+anyview components.d/mpv.txt
+anyview bin/anyview
+anyview libexec/anyview/**
+anyview share/anyview/**
+anyview share/applications/*.desktop
+anyview share/metainfo/*.xml
+anyview share/doc/anyview/**
+anyview share/dbus-1/services/*.service
+anyview share/icons/**
+anyview share/quire/helpers/anyview.toml
+anyview share/quire/intents/*.toml
+anyview share/quire/skills/files-viewer/**
+
+mailo components.d/mailo.txt
+mailo bin/mailo
+mailo lib/systemd/user/mailo-watch.service
+mailo share/applications/mailo.desktop
+mailo share/icons/**
+mailo share/dbus-1/services/org.quire.Mail.service
+mailo share/quire/intents/org.quire.Mail.toml
+mailo share/quire/skills/mail/**
+
+porter components.d/porter.txt
+porter libexec/quire/accountd
+porter libexec/quire/syncd
+porter libexec/quire/inferd
+porter lib/systemd/user/*.service
+porter lib/systemd/user/*.service.d/*
+porter share/dbus-1/services/*.service
+porter share/porter/**
+porter share/quire/settings/inferd.settings.toml
+porter share/doc/porter/**
+porter system/etc/porter/*.toml
+porter system/etc/porter/*.toml.dist
+
+agents components.d/stoker.txt
+agents components.d/almanac.txt
+agents components.d/docket.txt
+agents components.d/cua.txt
+agents libexec/quire/memoryd
+agents libexec/quire/intentd
+agents libexec/quire/companiond
+agents libexec/quire/readerd
+agents libexec/quire/actions-mcp
+agents libexec/quire/cuad
+agents bin/quire-do
+agents bin/docket-acp
+agents lib/systemd/user/*.service
+agents lib/systemd/user/*.service.d/*
+agents share/dbus-1/services/*.service
+agents share/dbus-1/interfaces/*
+agents share/quire/**
+agents share/stoker/**
+agents share/bash-completion/**
+agents share/zsh/**
+agents share/fish/**
+agents system/etc/quire/memory-callers.toml
+agents system/etc/quire/intentd-callers.toml
+agents system/etc/quire/companiond-callers.toml
+agents system/etc/quire/readerd-callers.toml
+agents system/etc/quire/acp-callers.toml
+agents system/etc/quire/cuad-callers.toml
+agents system/etc/xdg/quire/*.toml
+
+root components.d/turnstile.txt
+root components.d/keycap.txt
+root bin/turnstile
+root bin/keycap
+root share/keycap/keycap.plasma.toml
+root system/usr/lib/systemd/system/turnstile.socket
+root system/usr/lib/systemd/system/turnstile.service
+root system/usr/lib/systemd/system/keycap.service
+root system/etc/udev/rules.d/72-turnstile.rules
+root system/etc/modules-load.d/turnstile.conf
+root system/etc/polkit-1/rules.d/keycap.polkit.rules
+root system/usr/lib/keycap/keycap.toml
+
+small components.d/desktop.txt
+small components.d/detent.txt
+small components.d/transom.txt
+small components.d/palmrest.txt
+small components.d/slipway.txt
+small components.d/xwayland-satellite.txt
+small bin/desktop-session
+small bin/detent
+small bin/palmrest
+small bin/slipway
+small bin/xwayland-satellite
+small libexec/transom
+small lib/systemd/user/desktop-session.target
+small lib/systemd/user/org.quire.Settings.service
+small lib/systemd/user/transom.service
+small lib/systemd/user/palmrest.service
+small share/wayland-sessions/*.desktop
+small share/xdg-desktop-portal/quire-portals.conf
+small share/xdg-desktop-portal/portals/quire.portal
+small share/fonts/quire/*
+small share/applications/org.quire.Settings.desktop
+small share/quire/intents/org.quire.Settings.toml
+small share/dbus-1/services/org.quire.Settings.service
+small share/dbus-1/services/org.freedesktop.impl.portal.desktop.quire.service
+small share/licenses/xwayland-satellite/*
+small system/etc/quire/desktop-callers.toml
+small system/etc/udev/rules.d/70-palmrest.rules
+small system/etc/modprobe.d/99-palmrest.conf
