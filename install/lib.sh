@@ -67,6 +67,8 @@ files() {
   echo "755 $SRC/desktop-session $prefix/bin/desktop-session"
   echo "644 $SRC/quire-portals.conf $prefix/share/xdg-desktop-portal/quire-portals.conf"
   echo "644 $SRC/desktop-session.target $sysconfdir/systemd/user/desktop-session.target"
+  # Root-held, so the portal frontend's unit proves Full to the portal backend: it throws away the loader variables.
+  echo "644 $SRC/xdg-desktop-portal.service.d/10-quire.conf $sysconfdir/systemd/user/xdg-desktop-portal.service.d/10-quire.conf"
   echo "644 $(unit_source casement) $sysconfdir/systemd/user/casement.service"
   echo "644 $(unit_source sill) $sysconfdir/systemd/user/sill.service"
   echo "644 $SRC/sill-casement.desktop $sessions_dir/sill-casement.desktop"

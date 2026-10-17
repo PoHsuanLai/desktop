@@ -105,7 +105,7 @@ fresh_machine() {
   root="/opt/quire-scenario-$1"
   rm -rf -- "$root" "$tmp/home"
   mkdir -p "$tmp/home"
-  install -d /etc/slipway
+  install -d -m 755 /etc/slipway
   printf 'root = "%s"\npubkey_path = "/usr/share/slipway/release.pub"\n' "$root" >/etc/slipway/config.toml
   /usr/libexec/slipway-apply "$tmp/release-1.0.0" >/dev/null
   /usr/libexec/slipway-apply "$tmp/release-2.0.0" >/dev/null

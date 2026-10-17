@@ -6,7 +6,7 @@
 #   desktop-gate.sh --phase P<n> [--only REPO] [--keep]
 #
 # --self    the jail's selftest (inside, 2 fabricated GPUs), its negative check (outside), the
-#           manifest's shape, install.sh against stub installers (gate/installer-check.sh), release/selftest.sh (a SKIP, exit 2, when minisign is missing), the distro helpers (gate/distro-check.sh), the three input and caller checks (gate/check-callers-table.sh: every role of peephole's list has a row in dist/desktop-callers.toml; gate/check-no-fake.sh; gate/check-no-uinput-access.sh) with their own test on generated trees, and every scenario in the jail (an unlisted SKIP fails). The table check needs a peephole checkout (exit 2, a SKIP that fails, without one).
+#           manifest's shape, install.sh against stub installers (gate/installer-check.sh), release/selftest.sh (a SKIP, exit 2, when minisign is missing), the distro helpers (gate/distro-check.sh), the three input and caller checks (gate/check-callers-table.sh: every role of peephole's list has a row in dist/desktop-callers.toml; gate/check-no-fake.sh; gate/check-no-uinput-access.sh; gate/check-loader-unset.sh: every trusted unit throws away peephole's loader variables) with their own test on generated trees, and every scenario in the jail (an unlisted SKIP fails). The table check needs a peephole checkout (exit 2, a SKIP that fails, without one).
 # --merge   --self, plus each manifest repo with `gate = "lane"` checked out at its manifest rev
 #           (a detached git worktree under $DESKTOP_GATE_DIR, siblings side by side so path
 #           dependencies resolve at the manifest's revs) and run through
@@ -193,6 +193,7 @@ step "legacy-free check (generated trees)" "$HERE/legacy-free-selftest.sh" || tr
 step "distro helpers (family, package table, check mode)" "$HERE/distro-check.sh" || true
 step "input and caller checks (generated trees)" "$HERE/input-checks-selftest.sh" || true
 step "the table of the desktop's own programs: every role has a row" "$HERE/check-callers-table.sh" || true
+step "every trusted unit and the portal frontend's drop-in unset all loader variables (peephole's list)" "$HERE/check-loader-unset.sh" || true
 step "no stand-in (fake feature) in what is built or shipped" "$HERE/check-no-fake.sh" || true
 step "nothing shipped opens /dev/uinput to the person or a group" "$HERE/check-no-uinput-access.sh" || true
 step "expected-skips resolve" skip_entries_resolve || true

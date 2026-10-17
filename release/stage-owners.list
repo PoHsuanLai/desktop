@@ -125,6 +125,7 @@ small libexec/transom
 small lib/systemd/user/desktop-session.target
 small lib/systemd/user/org.quire.Settings.service
 small lib/systemd/user/transom.service
+small lib/systemd/user/xdg-desktop-portal.service.d/10-quire.conf
 small lib/systemd/user/palmrest.service
 small share/wayland-sessions/*.desktop
 small share/xdg-desktop-portal/quire-portals.conf

@@ -33,7 +33,7 @@ install_emoji_font() {
   local src dir
   src=$(emoji_font_src)
   dir=$destdir$(emoji_font_dir)
-  install -d "$dir"
+  install -d -m 755 "$dir"
   install -m 644 "$src/Noto-COLRv1.ttf" "$dir/Noto-COLRv1.ttf"
   install -m 644 "$src/OFL.txt" "$dir/OFL-Noto-COLRv1.txt"
   if [ -z "$destdir" ] && command -v fc-cache >/dev/null; then fc-cache -f "$dir" || echo "install.sh: fc-cache failed; log out and in, or run: fc-cache -f $dir" >&2; fi
@@ -43,7 +43,7 @@ emoji_font_commands() {
   local src dir
   src=$(emoji_font_src)
   dir=$(emoji_font_dir)
-  as_root_hint install -d "$dir"
+  as_root_hint install -d -m 755 "$dir"
   as_root_hint install -m 644 "$src/Noto-COLRv1.ttf" "$dir/Noto-COLRv1.ttf"
   as_root_hint install -m 644 "$src/OFL.txt" "$dir/OFL-Noto-COLRv1.txt"
   as_root_hint fc-cache -f "$dir"

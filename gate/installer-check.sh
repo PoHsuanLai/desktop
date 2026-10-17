@@ -152,6 +152,14 @@ grep -q "^casement/scripts/install.sh --prefix /opt/d --locked --destdir $dest" 
 # the session step is this repo's own installer: really run, into the staging root
 [ -x "$dest/opt/d/bin/desktop-session" ] || fail "desktop-session was not staged under the prefix"
 [ -f "$dest/etc/systemd/user/desktop-session.target" ] || fail "the user target was not staged"
+# the portal frontend's own unit gets a root-held drop-in that unsets the loader variables (NEW-PI-1): staged next to the units, the
+# same bytes as the repo's, and complete against peephole's list (the check skips, exit 2, when no peephole checkout is beside this one)
+dropin="$dest/etc/systemd/user/xdg-desktop-portal.service.d/10-quire.conf"
+[ -f "$dropin" ] || fail "the portal frontend's drop-in was not staged"
+cmp -s "$HERE/../session/xdg-desktop-portal.service.d/10-quire.conf" "$dropin" || fail "the staged portal drop-in is not the repo's"
+[ "$(stat -c %a "$dropin")" = 644 ] || fail "the portal drop-in is not mode 644"
+rc=0; "$HERE/check-loader-unset.sh" --siblings "$sib" --dropin "$dropin" >"$tmp/loader.log" 2>&1 || rc=$?
+[ "$rc" = 0 ] || [ "$rc" = 2 ] || fail "the staged portal drop-in does not unset every loader variable: $(cat "$tmp/loader.log")"
 grep -q '^Wants=slipway.service$' "$dest/etc/systemd/user/desktop-session.target" || fail "the user target does not want the update service"
 [ -f "$dest/usr/share/wayland-sessions/sill-casement.desktop" ] || fail "the login entry was not staged"
 grep -q '^ExecStart=/opt/d/bin/casement \$CASEMENT_SESSION_ARGS$' "$dest/etc/systemd/user/casement.service" || fail "casement.service was not staged with the prefix and the session arguments: $(cat "$dest/etc/systemd/user/casement.service" 2>&1)"
@@ -248,6 +256,28 @@ PATH="$tmp/fcbin:$PATH" inst --prefix "$tmp/user" --only fonts >"$tmp/out.log" 2
 [ ! -e "$tmp/user/share/fonts" ] || fail "the font was installed although fontconfig has a COLRv1 one"
 grep -q 'fontconfig already has' "$tmp/out.log" || fail "the skip was not said"
 : >"$log"
+
+# 3d. the loader-variable check itself, on generated trees: a unit that lacks one name of the list is a fault, a complete one passes, a
+# unit on the debt list that is complete is a fault, and the drop-in is held to the same list.
+lt="$tmp/loader"; mkdir -p "$lt/peephole/peephole-core/src" "$lt/sibs/x/dist" "$lt/sibs/y/dist" "$lt/sibs/desktop"
+printf 'pub const LOADER_VARIABLES: [&str; 3] = [\n    "LD_PRELOAD",\n    "LD_LIBRARY_PATH",\n    "GTK_PATH",\n];\n' >"$lt/peephole/peephole-core/src/facts.rs"
+printf '[[peer]]\napp = "a"\nunit = "a.service"\nexe = ["/usr/bin/a"]\nrole = "r"\n[[peer]]\napp = "b"\nunit = "b.service"\nexe = ["/usr/bin/b"]\nrole = "r"\n' >"$lt/table.toml"
+printf '[Service]\nUnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH\nUnsetEnvironment=GTK_PATH\n' >"$lt/sibs/x/dist/a.service"
+printf '[Service]\nUnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH\n' >"$lt/sibs/y/dist/b.service"
+printf '[Service]\nUnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH GTK_PATH\n' >"$lt/dropin.conf"
+: >"$lt/pending.txt"
+loader() { "$HERE/check-loader-unset.sh" --peephole "$lt/peephole" --siblings "$lt/sibs" --table "$lt/table.toml" --pending "$lt/pending.txt" "$@" >"$lt/out.log" 2>&1; }
+loader && fail "a unit that lacks GTK_PATH passed the loader check: $(cat "$lt/out.log")"
+grep -q 'b.service .*does not unset: GTK_PATH' "$lt/out.log" || fail "the loader check does not name the unit and the variable: $(cat "$lt/out.log")"
+printf 'b.service y\n' >"$lt/pending.txt"
+loader || fail "a pending unit that is still missing a name broke the check: $(cat "$lt/out.log")"
+printf 'UnsetEnvironment=GTK_PATH\n' >>"$lt/sibs/y/dist/b.service"
+loader && fail "a complete unit still on the debt list was accepted"
+: >"$lt/pending.txt"
+loader || fail "complete units were refused: $(cat "$lt/out.log")"
+printf '[Service]\nUnsetEnvironment=LD_PRELOAD\n' >"$lt/short.conf"
+loader --dropin "$lt/short.conf" && fail "an incomplete drop-in was accepted"
+loader --dropin "$lt/dropin.conf" || fail "a complete drop-in was refused: $(cat "$lt/out.log")"
 
 # 4. a failing component stops the run and is named.
 : >"$log"

@@ -582,3 +582,17 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   (`unset_session_args`). The reader is sill: it must skip `slipway confirm` when the variable is `safe` (interface ask to the sill lane, below in the report: sill's `release.rs`).
   Until sill lands that, nothing changes for the person. Test: `scenarios/session-crash-guard.sh` (the fake casement logs the variable: three `normal`, then `safe`; the sill
   stand-in sees `normal`). The non-nested `set-environment` call is not covered by a test (the scenario runs without a user manager).
+- **NEW-PI-1: every trusted unit throws away the loader variables, and the portal frontend gets a drop-in.** peephole proves `Full` only when a unit's `UnsetEnvironment=`
+  holds all 22 names of `LOADER_VARIABLES` (peephole-core `facts.rs`), and casement and transom require `Full`; the distro's `xdg-desktop-portal.service` has none, so
+  on a real install the frontend would be refused for every call. `session/xdg-desktop-portal.service.d/10-quire.conf` (generated from the constant, not typed) is
+  placed by `install/install.sh` at `<sysconfdir>/systemd/user/xdg-desktop-portal.service.d/10-quire.conf` (root-held, `/etc/systemd/user`) and by every release at
+  `lib/systemd/user/...`, which the packer exports as a link under `/usr/lib/systemd/user`: a folder slipway already allows, so no change to its list (a link there is
+  judged by peephole like any fragment; the manager reports a drop-in path the same way). `release/stage-owners.list` names it for the `small` job. The source of truth is
+  peephole's constant: `gate/check-loader-unset.sh` reads it from `peephole-core/src/facts.rs` and checks the drop-in and every `unit =` row of
+  `dist/desktop-callers.toml` (plus `turnstile.service`) whose file is in a sibling checkout; `gate/installer-check.sh` runs it on the staged drop-in and on generated
+  trees (3d); `gate/desktop-gate.sh --self` runs it. Units that live in other repositories and still lack the full line are on `gate/loader-unset-pending.txt`
+  (a debt list: accountd.service in porter, keycap.service in keycap, org.quire.Settings.service in detent, turnstile.service in turnstile, which has 3 of 22);
+  the check fails when one of them is complete and still listed. `slipway/dist/slipway.service` got the line in this lane. Not verified: that a drop-in that is a
+  symlink into `/opt/quire/current` is judged `RootOwned` (read: `trust_of_path` is the same for fragments and drop-ins, and casement.service is already such a link).
+- **ROOT-17 leftovers.** `install -d` without a mode in `install/install.sh`, `install/fonts.sh`, `release/smoke.sh` and `release/health-scenarios.sh` now says `-m 755`, and
+  `install/install.sh` and `install/system.sh` set `umask 022`, so a root umask of 077 no longer makes `<prefix>/share/xdg-desktop-portal` a 0700 folder.

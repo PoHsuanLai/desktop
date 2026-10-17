@@ -10,11 +10,15 @@
 # Also installed, root-held, in <sysconfdir>/systemd/user (/etc/systemd/user): casement.service and sill.service, from the
 # casement and sill checkouts beside this one (--siblings), so the account service can trust the compositor and the
 # shell as fixed roles (it accepts units only from root-held places, never ~/.config).
+# And, in the same place, xdg-desktop-portal.service.d/10-quire.conf: a drop-in for the portal frontend's own unit that unsets the
+# loader variables, so the portal backend (transom) can prove the frontend is the real one (NEW-PI-1).
 # Not installed here: the casement, sill and transom (the portal backend) programs themselves (their own installers and
 # packages), other sessions (left untouched), and
 # anything under $HOME. install/uninstall.sh removes exactly the files listed below.
 set -euo pipefail
 ORIG_ARGS=("$@")
+# Folders made here are readable by everybody whatever root's umask is (a 0700 share folder hides the files from the person).
+umask 022
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -47,7 +51,7 @@ while read -r mode source dest; do
   [ -f "$source" ] || { note "skipped: $destdir$dest (no $source)"; continue; }
   note "$destdir$dest ($mode)"
   [ "$dry" = 1 ] || {
-    install -d "$(dirname "$destdir$dest")"
+    install -d -m 755 "$(dirname "$destdir$dest")"
     content "$source" | install -m "$mode" /dev/stdin "$destdir$dest"
   }
 done < <(files)

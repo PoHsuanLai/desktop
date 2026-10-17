@@ -35,6 +35,8 @@
 # Exit: 0 done, 1 something failed or a place is not writable, 2 bad usage or a missing file.
 set -euo pipefail
 ORIG_ARGS=("$@")
+# Folders made here are readable by everybody whatever root's umask is (a 0700 share folder hides the files from the person).
+umask 022
 # shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 usage() { sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }

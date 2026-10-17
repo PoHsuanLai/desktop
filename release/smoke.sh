@@ -49,7 +49,7 @@ step "verify the release"
 
 step "install the key and the settings the helper reads"
 install -Dm644 "$pub" /usr/share/slipway/release.pub
-install -d /etc/slipway
+install -d -m 755 /etc/slipway
 printf 'root = "%s"\npubkey_path = "/usr/share/slipway/release.pub"\n' "$root" >/etc/slipway/config.toml
 
 step "slipway's own install: three programs and one polkit file"
