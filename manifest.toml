@@ -28,7 +28,7 @@ gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "f07e0b649fa9e6d31fc4148588fa476ee75065b5"
+rev = "daaacfdf7a31343e544a746143c79a78fc501a15"
 branch = "master"
 gate = "lane"
 
