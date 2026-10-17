@@ -32,7 +32,7 @@ say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 note() { printf '%s\n' "$*"; }
 fail() { FAILS=$((FAILS + 1)); note "  FAILED: $*"; }
 now_ns() { "${PY[@]}" now; }
-alive() { [ "$1" != - ] && [ -d "/proc/$1" ]; }
+alive() { [ "$1" != - ] && [ "$1" -gt 1 ] 2>/dev/null && [ -d "/proc/$1" ]; }
 
 parse_args() {
   while [ $# -gt 0 ]; do
@@ -131,6 +131,8 @@ launch_once() { # KEY DESKTOP_ID APP_IDS TIMEOUT KIND PHASE ROUND; PHASE - = sta
   rows=$("${PY[@]}" rows --kind launch --launch "$line" --ready "$ready" --app "$key" --phase "$phase" --round "$round")
   printf '%s\n' "$rows" >>"$RAW"
   read -r wpid < <("${PY[@]}" field "$ready" pid)
+  # An app started over D-Bus has no unit and no pid of sill's: close the window's process instead.
+  if [ "$LAST_PID" = 0 ] || [ "$LAST_PID" = - ]; then LAST_PID=$wpid; fi
   record_gpu "$key" "$phase" "$round" "$pid" "$wpid"
   if [ "$kind" = x11 ] && [ "$phase" = cold ]; then
     "${PY[@]}" xwayland --after "$requested" --app "$key" >>"$RAW" || note "  (no X11 bridge start seen: it was already running)"
