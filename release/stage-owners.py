@@ -1,10 +1,15 @@
 """Which build job may supply which path of a release (re-audit NEW-ROOT-2). Run with `python3 -I`; standard library only.
 
-  stage-owners.py check MANIFEST TAR...   each TAR is named stage-JOB.tar; refuse (exit 1) when a tar holds a member outside
+  stage-owners.py check MANIFEST DIR...   each DIR is one downloaded artifact, named stage-JOB, and the job is the folder's
+                                          name, never a name inside it. Refuse (exit 1) when a folder holds anything but
+                                          exactly its own stage-JOB.tar (a plain file), when a tar holds a member outside
                                           its job's lines in MANIFEST, a member that is not a plain file or folder, or a
                                           path that two tars both hold. Prints every fault, then exits.
   stage-owners.py jobs MANIFEST           the job names MANIFEST knows, one per line (release/selftest.sh compares them with
                                           the matrix of .github/workflows/release.yml)
+
+The workflow downloads each artifact into its own folder (no merging), so a build job cannot pass its tar off as another
+job's by what it names a file.
 
 The tar is what `tar -C build/release -cf stage-JOB.tar stage components.d` makes: members are stage/opt/quire/current/PATH
 and components.d/NAME.txt. A MANIFEST pattern is PATH below opt/quire/current (or components.d/NAME.txt); `*` is any run of
@@ -12,6 +17,7 @@ characters inside one segment, `**` anything.
 """
 import os
 import re
+import stat
 import sys
 import tarfile
 
@@ -67,16 +73,35 @@ def key_of(name):
     return None
 
 
-def check(manifest, tars):
+def own_tar(folder, job):
+    """(path, None) of the one tar a folder may hold, or (None, why) when it holds anything else."""
+    try:
+        entries = sorted(os.listdir(folder))
+    except OSError as e:
+        return None, f"cannot be read ({e.strerror})"
+    want = f"stage-{job}.tar"
+    if entries != [want]:
+        return None, f"must hold exactly {want}, holds {entries or 'nothing'}"
+    path = os.path.join(folder, want)
+    if not stat.S_ISREG(os.lstat(path).st_mode):
+        return None, f"{want} is not a plain file"
+    return path, None
+
+
+def check(manifest, folders):
     jobs = read_manifest(manifest)
     faults, seen = [], {}
-    for tar_path in tars:
-        base = os.path.basename(tar_path)
-        match = re.fullmatch(r"stage-([A-Za-z0-9_]+)\.tar", base)
+    for folder in folders:
+        base = os.path.basename(os.path.normpath(folder))
+        match = re.fullmatch(r"stage-([A-Za-z0-9_]+)", base)
         if not match or match.group(1) not in jobs:
-            faults.append(f"{base}: not the stage tar of a job {manifest} knows ({', '.join(sorted(jobs))})")
+            faults.append(f"{base}: not the artifact of a job {manifest} knows ({', '.join(sorted(jobs))})")
             continue
         job = match.group(1)
+        tar_path, why = own_tar(folder, job)
+        if tar_path is None:
+            faults.append(f"{base}: {why}")
+            continue
         names = set()
         with tarfile.open(tar_path) as tar:
             for member in tar:

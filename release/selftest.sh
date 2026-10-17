@@ -140,7 +140,7 @@ mk_tar() { # JOB PATH...: stage-JOB.tar of those files, each below stage/opt/qui
       *) mkdir -p "$d/stage/opt/quire/current/$(dirname "$p")"; printf x >"$d/stage/opt/quire/current/$p" ;;
     esac
   done
-  tar -C "$d" -cf "$so/stage-$job.tar" stage components.d
+  mkdir -p "$so/out/stage-$job"; tar -C "$d" -cf "$so/out/stage-$job/stage-$job.tar" stage components.d
 }
 owners() { python3 -I "$HERE/stage-owners.py" check "$HERE/stage-owners.list" "$@"; }
 mk_tar turnstile components.d/turnstile.txt bin/turnstile system/usr/lib/systemd/system/turnstile.service system/etc/udev/rules.d/72-turnstile.rules
@@ -148,14 +148,14 @@ mk_tar keycap components.d/keycap.txt bin/keycap system/usr/lib/systemd/system/k
 mk_tar palmrest components.d/palmrest.txt bin/palmrest system/usr/lib/systemd/system/palmrest.service system/etc/udev/rules.d/70-palmrest.rules
 mk_tar small bin/slipway bin/detent system/etc/quire/desktop-callers.toml components.d/desktop.txt system/usr/lib/systemd/user/transom.service
 mk_tar mailo bin/mailo share/quire/skills/mail/SKILL.md
-owners "$so"/stage-turnstile.tar "$so"/stage-keycap.tar "$so"/stage-palmrest.tar "$so"/stage-small.tar "$so"/stage-mailo.tar >/dev/null 2>&1 || check "the stage tars of the right shape were refused"
+owners "$so"/out/stage-turnstile "$so"/out/stage-keycap "$so"/out/stage-palmrest "$so"/out/stage-small "$so"/out/stage-mailo >/dev/null 2>&1 || check "the stage tars of the right shape were refused"
 for bad in bin/turnstile bin/keycap bin/palmrest system/usr/lib/systemd/system/turnstile.service system/usr/lib/systemd/system/keycap.service \
   system/usr/lib/systemd/system/palmrest.service system/etc/udev/rules.d/72-turnstile.rules system/etc/udev/rules.d/70-palmrest.rules \
   system/etc/quire/desktop-callers.toml system/etc/polkit-1/rules.d/00-all.rules bin/anything; do
   for job in mailo anyview casement sill porter agents small; do
     [ "$job" = small ] && case "$bad" in system/etc/quire/desktop-callers.toml) continue ;; esac
     mk_tar "$job" "$bad"
-    owners "$so/stage-$job.tar" >/dev/null 2>&1 && check "job $job was allowed to supply $bad"
+    owners "$so/out/stage-$job" >/dev/null 2>&1 && check "job $job was allowed to supply $bad"
   done
 done
 # the three system programs do not reach one another's files, and a user unit the table names is a system file of the job that builds it
@@ -163,18 +163,35 @@ for pair in turnstile:bin/keycap turnstile:bin/palmrest keycap:bin/turnstile key
   palmrest:bin/turnstile palmrest:system/usr/lib/systemd/system/keycap.service palmrest:lib/systemd/user/palmrest.service \
   mailo:system/usr/lib/systemd/user/sill.service sill:lib/systemd/user/sill.service casement:system/usr/lib/systemd/user/sill.service; do
   mk_tar "${pair%%:*}" "${pair#*:}"
-  owners "$so/stage-${pair%%:*}.tar" >/dev/null 2>&1 && check "job ${pair%%:*} was allowed to supply ${pair#*:}"
+  owners "$so/out/stage-${pair%%:*}" >/dev/null 2>&1 && check "job ${pair%%:*} was allowed to supply ${pair#*:}"
 done
 mk_tar sill share/quire/intents/org.quire.Shell.toml
 mk_tar anyview share/quire/intents/org.quire.Shell.toml
-owners "$so/stage-sill.tar" >/dev/null 2>&1 || check "sill alone was refused the path it owns"
-owners "$so/stage-sill.tar" "$so/stage-anyview.tar" >/dev/null 2>&1 && check "a path supplied by two jobs was accepted"
-mk_tar mailo bin/mailo; ln -s mailo "$so/mailo/stage/opt/quire/current/bin/link"; tar -C "$so/mailo" -cf "$so/stage-mailo.tar" stage components.d
-owners "$so/stage-mailo.tar" >/dev/null 2>&1 && check "a link in a stage tar was accepted"
-mk_tar mailo bin/mailo; mkdir -p "$so/mailo/etc"; printf x >"$so/mailo/etc/passwd"; tar -C "$so/mailo" -cf "$so/stage-mailo.tar" stage components.d etc
-owners "$so/stage-mailo.tar" >/dev/null 2>&1 && check "a path outside the stage was accepted"
+owners "$so/out/stage-sill" >/dev/null 2>&1 || check "sill alone was refused the path it owns"
+owners "$so/out/stage-sill" "$so/out/stage-anyview" >/dev/null 2>&1 && check "a path supplied by two jobs was accepted"
+mk_tar mailo bin/mailo; ln -s mailo "$so/mailo/stage/opt/quire/current/bin/link"; tar -C "$so/mailo" -cf "$so/out/stage-mailo/stage-mailo.tar" stage components.d
+owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "a link in a stage tar was accepted"
+mk_tar mailo bin/mailo; mkdir -p "$so/mailo/etc"; printf x >"$so/mailo/etc/passwd"; tar -C "$so/mailo" -cf "$so/out/stage-mailo/stage-mailo.tar" stage components.d etc
+owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "a path outside the stage was accepted"
 mk_tar rogue bin/mailo
-owners "$so/stage-rogue.tar" >/dev/null 2>&1 && check "the tar of a job nobody knows was accepted"
+owners "$so/out/stage-rogue" >/dev/null 2>&1 && check "the tar of a job nobody knows was accepted"
+# The job comes from the artifact's folder, never from a file name inside it: an artifact that is not a job's, or one that holds
+# another job's tar (all of it that job's own paths), another file besides its tar, two tars, nothing or a link is refused.
+mk_tar turnstile components.d/turnstile.txt bin/turnstile
+mkdir -p "$so/out/stage-x"; cp "$so/out/stage-turnstile/stage-turnstile.tar" "$so/out/stage-x/stage-turnstile.tar"
+owners "$so/out/stage-x" >/dev/null 2>&1 && check "an artifact stage-x holding stage-turnstile.tar was accepted"
+mk_tar mailo bin/mailo; cp "$so/out/stage-turnstile/stage-turnstile.tar" "$so/out/stage-mailo/stage-turnstile.tar"
+owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "an artifact holding a second tar was accepted"
+rm "$so/out/stage-mailo/stage-turnstile.tar"; printf x >"$so/out/stage-mailo/note.txt"
+owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "an artifact holding a file besides its tar was accepted"
+rm "$so/out/stage-mailo/note.txt"; mv "$so/out/stage-mailo/stage-mailo.tar" "$so/out/stage-mailo/stage-turnstile.tar"
+owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "an artifact whose tar is named for another job was accepted"
+rm "$so/out/stage-mailo/stage-turnstile.tar"
+owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "an artifact holding nothing was accepted"
+mk_tar mailo bin/mailo; mv "$so/out/stage-mailo/stage-mailo.tar" "$so/mailo.real"; ln -s ../../mailo.real "$so/out/stage-mailo/stage-mailo.tar"
+owners "$so/out/stage-mailo" >/dev/null 2>&1 && check "an artifact whose tar is a link was accepted"
+mk_tar mailo bin/mailo
+owners "$so/out/stage-mailo" >/dev/null 2>&1 || check "an artifact holding exactly its own tar was refused"
 # The job names in the list are the matrix of the workflow, no more and no fewer.
 python3 -I "$HERE/stage-owners.py" jobs "$HERE/stage-owners.list" >"$tmp/jobs.list"
 grep -o '{ name: [a-z]*, only' "$HERE/../.github/workflows/release.yml" | sed 's/{ name: //; s/, only//' | sort >"$tmp/matrix.list"

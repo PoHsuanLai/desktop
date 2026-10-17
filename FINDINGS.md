@@ -570,6 +570,11 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   were written from `build.sh` and the installers it runs, so the first run may stop on a file a component installs that no line names (add the
   line; the fault names the job and the path). Left as is: inside one job a compromised component can still write another component's paths (the
   `small` job holds six components); only the root-run parts and the trust table were separated.
+  N-1 (final audit): the job used to come from the tar's file name after a merged download, so an artifact `stage-x` holding `stage-turnstile.tar`
+  could pass as turnstile's. The workflow now downloads each artifact into its own folder and `check` takes the job from the folder name, refusing a
+  folder that holds anything but exactly its own `stage-JOB.tar` (a plain file). `selftest.sh` forges a foreign tar, a second tar, a stray file, a
+  wrongly named tar, an empty folder and a linked tar. Not run on a runner: that `download-artifact` v8 with a pattern and no merge makes one
+  folder per artifact, named for it, is from its documentation.
 - **NEW-ROOT-3 (desktop side).** `release/release.py`'s `EXPORT_ROOTS` and `AUTO_EXPORT_DIRS` lose `/usr/share/polkit-1/actions` (the same ten folders as slipway's
   `ALLOWED_LINK_DIRS`); `release/selftest.sh` forges `export-polkit` (verify refuses) and checks a staged `share/polkit-1/actions/*.policy` is packed but not
   exported. The desktop ships no polkit action; keycap's file is a rule (`/etc/polkit-1/rules.d/keycap.polkit.rules`, in the exact list). If one is ever needed it

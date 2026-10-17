@@ -162,7 +162,9 @@ nothing is overwritten.
 Each build job may supply only the paths `release/stage-owners.list` gives it. Before the stage tars are merged, the pack job runs
 `release/stage-owners.py check` on them and stops when a tar holds a path outside its job's lines (a build script in one job writing
 `bin/turnstile` or `turnstile.service`, say), anything that is not a plain file or folder, or a path that two jobs both supply. A component
-that starts to install a new file needs a line for it in that list.
+that starts to install a new file needs a line for it in that list. The job is taken from the artifact, not from a file name: the pack job
+downloads each `stage-JOB` artifact into a folder of its own (no `merge-multiple`) and the check refuses a folder that holds anything but
+exactly its own `stage-JOB.tar`, so an artifact `stage-x` holding a file `stage-turnstile.tar` is not turnstile's.
 
 ## First install on a machine
 
