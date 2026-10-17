@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "22817fdf8455e0c45d1c6b6e43843009c3af78fb"
+rev = "35e36f509db41d04991d69549d439f139b852d4d"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -60,7 +60,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "3bbbf4a525b8195ffbc4d68b793c73dcc05a16a7"
+rev = "7e05cbf78edf66318de94d47e556b2feb88802f1"
 branch = "master"
 gate = "lane"
 
@@ -72,20 +72,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "6f379cac7df8d98527d5ec483b3a6453d2215f22"
+rev = "00465eadbbd94f43f390df7a6eedeed1c8749b10"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "d95740278bb080e9223d67eb30b335ec50e00bf0"
+rev = "90f6052f61386ed63d5c5e93c223cb959798f3e4"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "87e21a89036940e0ec084a9a1f60918338134f6c"
+rev = "b72f2d08ebc31d3ed3547140b8c4009309f35f10"
 branch = "master"
 gate = "lane"
 
@@ -117,7 +117,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "557f4bcf50d2fa55edf85b3bee4e34ba1ecfdef8"
+rev = "d050184b3ebf8b1ecfdee77794fcaad2da3a26e5"
 branch = "master"
 gate = "none"
 
