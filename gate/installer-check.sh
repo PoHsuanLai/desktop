@@ -279,6 +279,22 @@ printf '[Service]\nUnsetEnvironment=LD_PRELOAD\n' >"$lt/short.conf"
 loader --dropin "$lt/short.conf" && fail "an incomplete drop-in was accepted"
 loader --dropin "$lt/dropin.conf" || fail "a complete drop-in was refused: $(cat "$lt/out.log")"
 
+# 3e. the session's settings file is read as data (ROOT-14): a line that would run a program is ignored, not run; the three
+# settings count, with or without quotes; a number setting needs a number. The function is taken out of the script and run alone.
+se="$tmp/session-env"; mkdir -p "$se"
+log() { printf '%s\n' "$*" >>"$se/log"; }
+eval "$(sed -n '/^read_settings() {$/,/^}$/p' "$HERE/../session/desktop-session")"
+printf '# a comment\nDESKTOP_SESSION_QUICK_SECS=7\nDESKTOP_SESSION_BACKEND_ARGS="--backend headless"\nDESKTOP_SESSION_FIRST_RUN_DELAY=soon\nPATH=/evil\ntouch %s/ran\n$(touch %s/ran2)\n' "$se" "$se" >"$se/session.env"
+( unset DESKTOP_SESSION_QUICK_SECS DESKTOP_SESSION_BACKEND_ARGS DESKTOP_SESSION_FIRST_RUN_DELAY
+  read_settings "$se/session.env"
+  [ "$DESKTOP_SESSION_QUICK_SECS" = 7 ] || exit 1
+  [ "$DESKTOP_SESSION_BACKEND_ARGS" = "--backend headless" ] || exit 2
+  [ -z "${DESKTOP_SESSION_FIRST_RUN_DELAY:-}" ] || exit 3
+  [ "$PATH" != /evil ] || exit 4 ) || fail "session.env was not read as the three settings (exit $?)"
+[ ! -e "$se/ran" ] && [ ! -e "$se/ran2" ] || fail "session.env ran a command"
+grep -q 'ignored PATH' "$se/log" || fail "the ignored name was not logged"
+unset -f log read_settings
+
 # 4. a failing component stops the run and is named.
 : >"$log"
 if STUB_FAIL=detent inst --destdir "$dest" >"$tmp/out.log" 2>&1; then fail "a failing component did not fail the run"; fi

@@ -596,3 +596,20 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   symlink into `/opt/quire/current` is judged `RootOwned` (read: `trust_of_path` is the same for fragments and drop-ins, and casement.service is already such a link).
 - **ROOT-17 leftovers.** `install -d` without a mode in `install/install.sh`, `install/fonts.sh`, `release/smoke.sh` and `release/health-scenarios.sh` now says `-m 755`, and
   `install/install.sh` and `install/system.sh` set `umask 022`, so a root umask of 077 no longer makes `<prefix>/share/xdg-desktop-portal` a 0700 folder.
+- **ROOT-14 finished: the session settings file is data.** `~/.config/desktop-session/session.env` was sourced as shell (everything it set exported, before the session
+  had started). `read_settings` now reads lines `NAME=VALUE` and takes only `DESKTOP_SESSION_QUICK_SECS`, `DESKTOP_SESSION_FIRST_RUN_DELAY` (whole numbers) and
+  `DESKTOP_SESSION_BACKEND_ARGS`; anything else is ignored with a line in the log, and nothing in the file is run. The other `DESKTOP_SESSION_*` knobs (casement command,
+  stubs, state folder) stay environment-only, which is how the harness sets them. Test: `gate/installer-check.sh` 3e takes the function out of the script and runs it on a
+  file that holds a command, a `$(...)`, `PATH=` and a bad number. Still open, not ours: porter's unit-path check (porter ask in the ROOT-14 entry above, on hold);
+  `CASEMENT_SESSION_ARGS` in the user manager is same-user writable and casement refuses a floor not owned by root, so no bypass.
+- **ROOT-18 (more places, still a deny-list).** `harness/secret-paths.list` grew by browser profiles, cloud and secret-manager tool folders and token files (43 lines).
+  The allow-list (show only `/usr`, the worktree and scratch) still needs a pass over the scenarios to learn what each reads: left, as the plan says.
+- **ROOT-15 (sill's i2c `uaccess` rule): accepted by default, owner may overrule.** `sill/dist/udev/60-sill-ddc.rules` tags i2c-dev nodes `uaccess`, so the person at the
+  seat can talk to the monitor's controller: the same as every distro that ships ddcutil's rule. The alternative is a root broker for brightness like turnstile; that
+  is a design and an owner decision. Nothing changed here (the file is in sill).
+- **ROOT-16 (keycap's polkit rule allows `restart`): kept.** The shell restarts a failed keymap itself (`RestartUnit` in sill's `keycap/backend`, tested in
+  `keycap_systemd_bus.rs`), so dropping the verb breaks recovery. Left as is: a same-user process can restart (not replace) keycap, bounded by the unit's
+  `StartLimitBurst`; the rule lives in keycap's `dist/keycap.polkit.rules`.
+- **ROOT-06 and ROOT-09: nothing new in code.** ROOT-06's remaining half is the per-file `size` in `[[file]]` (a format bump with a new helper on every machine, slipway
+  FINDINGS 18, not started). ROOT-09's remaining half is the owner's one-time setup and the second-signer decision. ROOT-07 is closed by NEW-ROOT-2 and NEW-ROOT-3 above
+  (the list now also bounds who may supply the files, and the second path through polkit's actions folder is gone).
