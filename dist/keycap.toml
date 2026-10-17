@@ -4,9 +4,14 @@
 # from a person's own file over the socket (anyone's program could type with it), so it lives in a file only
 # root can write. This one is the vendor file: it lays over keycap's built-in mapping and under the
 # administrator's /etc/keycap/keycap.toml, so only the difference is listed. Every install and release
-# replaces it; change the rule in /etc/keycap/keycap.toml, which is never touched.
+# replaces it; change the rules in /etc/keycap/keycap.toml, which is never touched.
+#
+# Shift+Caps Lock is the real Caps Lock (it toggles the lock itself). That rule used to live in sill's user layer; it moved here
+# because keycap refuses a trigger of Shift and a key in a person's file (NEW-PI-5): Shift is held for every capital letter, so only
+# Command, Option and Control make a shortcut there. keycap's own tests and docs/personal-config.md show this pair of rules.
 
 [profile.default]
 rules = [
   { when = "capslock", then = "ctrl+space" },
+  { when = "shift+capslock", then = "capslock" },
 ]
