@@ -12,6 +12,10 @@
 #   /opt/quire/current/...      the name the release's units start (a link to the release in use)
 #   /usr/local/...              a build from source with the default prefix, and the release's export links
 #   /usr/...                    a distribution's package
+# A unit named here must be a plain root-owned file (and any drop-in too): the unit manager's judge reads a symlink, whose mode
+# is 0777, as a file anyone could change, and such a unit never proves `Full`. A release therefore places these units as system
+# files (release/build.sh `plain_units`) and install/install.sh copies them to /etc/systemd/user; the system units
+# (palmrest, keycap, turnstile) are copied to /usr/lib/systemd/system.
 # A row with no `unit` is a program known by its image alone; its ceiling is `Exe`. Only `settings` (a second
 # row, for Settings started by a launcher), `updater_cli`, `sandbox_launcher` and `manager` have such a row.
 # `exe` is required, every path is absolute, and a `*` stands for any run of characters inside one path segment.
@@ -128,7 +132,7 @@ exe  = [
 ]
 role = "updater_cli"
 
-# The touchpad daemon (a user service).
+# The touchpad daemon (a system service, like the keymap daemon: a dynamic user in /system.slice/palmrest.service).
 [[peer]]
 app  = "org.quire.Palmrest"
 unit = "palmrest.service"
