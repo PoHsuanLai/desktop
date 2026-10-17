@@ -571,3 +571,14 @@ screen or changes the displays (casement ARCHITECTURE "Consent"). Nobody answers
   were written from `build.sh` and the installers it runs, so the first run may stop on a file a component installs that no line names (add the
   line; the fault names the job and the path). Left as is: inside one job a compromised component can still write another component's paths (the
   `small` job holds six components); only the root-run parts and the trust table were separated.
+- **NEW-ROOT-3 (desktop side).** `release/release.py`'s `EXPORT_ROOTS` and `AUTO_EXPORT_DIRS` lose `/usr/share/polkit-1/actions` (the same ten folders as slipway's
+  `ALLOWED_LINK_DIRS`); `release/selftest.sh` forges `export-polkit` (verify refuses) and checks a staged `share/polkit-1/actions/*.policy` is packed but not
+  exported. The desktop ships no polkit action; keycap's file is a rule (`/etc/polkit-1/rules.d/keycap.polkit.rules`, in the exact list). If one is ever needed it
+  is an exact rule in slipway's `system.rs` and `release/system-files.list` for that file name, and `check-helpers.py`'s test (no `allow_active=yes` on a privileged
+  action) has to be applied to it first. Nothing to name today.
+- **NEW-ROOT-4: the shell is told when the run is the safe fallback.** `session/desktop-session` sets `QUIRE_SESSION_MODE` to `normal` before each casement start and to
+  `safe` before `casement --safe`, in the user manager's environment (`systemctl --user set-environment`, the route `CASEMENT_SESSION_ARGS` takes; sill.service reads the
+  manager's environment when it starts, and so does a restart by the manager) and exported for the nested test path; both variables are unset at every way out
+  (`unset_session_args`). The reader is sill: it must skip `slipway confirm` when the variable is `safe` (interface ask to the sill lane, below in the report: sill's `release.rs`).
+  Until sill lands that, nothing changes for the person. Test: `scenarios/session-crash-guard.sh` (the fake casement logs the variable: three `normal`, then `safe`; the sill
+  stand-in sees `normal`). The non-nested `set-environment` call is not covered by a test (the scenario runs without a user manager).

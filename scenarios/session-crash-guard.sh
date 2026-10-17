@@ -31,6 +31,8 @@ SELF="$HERE/$(basename "${BASH_SOURCE[0]}")"
 if [ "${1:-}" = --fake-casement ]; then
   shift
   real="${FAKE_CASEMENT_TOOLS:?}/bin/casement"
+  # What the session told its children about the kind of run (NEW-ROOT-4): one line per start.
+  [ -z "${FAKE_CASEMENT_MODE_LOG:-}" ] || echo "${QUIRE_SESSION_MODE:-unset}" >>"$FAKE_CASEMENT_MODE_LOG"
   safe=0
   for arg in "$@"; do [ "$arg" != --safe ] || safe=1; done
   if [ "$safe" = 1 ] && [ "${FAKE_CASEMENT_ALWAYS_PANIC:-}" != 1 ]; then
@@ -98,7 +100,7 @@ start_session() {
   STATE="$OUT_DIR/state-$name"
   rm -rf "$STATE"
   env XDG_RUNTIME_DIR="$RUN" DESKTOP_SESSION_NESTED=1 DESKTOP_SESSION_STATE="$STATE" \
-    DESKTOP_SESSION_QUICK_SECS=30 FAKE_CASEMENT_TOOLS="$SCEN_TOOLS" \
+    DESKTOP_SESSION_QUICK_SECS=30 FAKE_CASEMENT_TOOLS="$SCEN_TOOLS" FAKE_CASEMENT_MODE_LOG="$OUT_DIR/modes-$name.log" \
     DESKTOP_SESSION_CASEMENT_CMD="$SELF --fake-casement" \
     DESKTOP_SESSION_BACKEND_ARGS="--backend headless --clock wall --outputs A-1:800x600@60000:120:0,0;B-1:800x600@60000:120:800,0 --system-dir $FLOOR_DIR" \
     "$@" "$HERE/../session/desktop-session" >"$OUT_DIR/session-$name.log" 2>&1 &
@@ -123,6 +125,10 @@ guard_reaches_safe() {
   [ "$(count 'starting casement (quick' "$STATE/guard.log")" = 3 ] || { echo "not three normal starts first:" >&2; cat "$STATE/guard.log" >&2; return 1; }
   [ "$(count 'exited [1-9][0-9]* after' "$STATE/guard.log")" -ge 3 ] || { echo "the normal runs did not fail:" >&2; cat "$STATE/guard.log" >&2; return 1; }
   wait_for 200 grep -q 'starting casement --safe' "$STATE/guard.log" || return 1
+  # The shell is told: three normal runs, then the safe one (the shell does not confirm the update in a safe run).
+  wait_for 100 grep -q '^safe$' "$OUT_DIR/modes-safe.log" || { echo "the safe run was not told it is safe:" >&2; cat "$OUT_DIR/modes-safe.log" >&2; return 1; }
+  [ "$(count '^normal$' "$OUT_DIR/modes-safe.log")" = 3 ] || { echo "the three normal runs were not told they are normal:" >&2; cat "$OUT_DIR/modes-safe.log" >&2; return 1; }
+  [ "$(count '^unset$' "$OUT_DIR/modes-safe.log")" = 0 ] || { echo "a run was not told its mode:" >&2; cat "$OUT_DIR/modes-safe.log" >&2; return 1; }
 }
 
 safe_stays_up_on_one_output() {
@@ -175,7 +181,7 @@ stub_components() {
     printf '#!/bin/sh\necho "%s $*" >>"%s"\n[ "%s" = pam_kwallet_init ] || [ "%s" = detent ] || exec sleep 300\n' \
       "$n" "$OUT_DIR/stubs.log" "$n" "$n" >"$d/$n"
   done
-  printf '#!/bin/sh\necho "sill $*" >>"%s"\nif [ ! -e "%s/sill-ran" ]; then : >"%s/sill-ran"; exit 1; fi\nexec sleep 300\n' \
+  printf '#!/bin/sh\necho "sill $* mode=${QUIRE_SESSION_MODE:-unset}" >>"%s"\nif [ ! -e "%s/sill-ran" ]; then : >"%s/sill-ran"; exit 1; fi\nexec sleep 300\n' \
     "$OUT_DIR/stubs.log" "$OUT_DIR" "$OUT_DIR" >"$d/sill"
   printf '#!/bin/sh\necho "systemd-inhibit $*" >>"%s"\nexec sleep 300\n' "$OUT_DIR/stubs.log" >"$d/systemd-inhibit"
   # systemctl stands in for the user manager's sill.service: `start` runs the sill stand-in detached and remembers
@@ -207,7 +213,7 @@ components_start_and_end_with_the_session() {
     || { echo "sill was not started again after it exited:" >&2; cat "$log" >&2; return 1; }
   # ksecretd starts only after the wallet has waited 5 s for an owner of the Secret Service.
   wait_for 100 grep -q '^ksecretd' "$log" || true
-  for want in 'systemctl --user start sill.service' 'systemd-inhibit --what=handle-power-key --who=desktop-session' \
+  for want in 'systemctl --user start sill.service' '^sill run mode=normal$' 'systemd-inhibit --what=handle-power-key --who=desktop-session' \
     '^pam_kwallet_init' '^ksecretd'; do
     grep -q -- "$want" "$log" || { echo "missing: $want" >&2; cat "$log" >&2; return 1; }
   done

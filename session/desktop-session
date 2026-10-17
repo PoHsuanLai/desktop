@@ -85,7 +85,11 @@
 #   DESKTOP_SESSION_NESTED=1       no systemd (casement is a direct child), no login-shell re-exec, no sill (tests)
 #   DESKTOP_SESSION_UNIT           the casement unit (default casement.service)
 # Set by this script in the user manager (not by you): CASEMENT_SESSION_ARGS, the arguments of the casement run now
-# starting; unset when the session ends.
+# starting, and QUIRE_SESSION_MODE, `normal` or `safe` (the run is `casement --safe`, the crash guard's last step); both are
+# unset when the session ends. The shell reads the mode: in `safe` it does not tell the update service that the version
+# started well, because a computer that only gets to the safe fallback has not (NEW-ROOT-4). The shell is a user service,
+# so it sees the variable through the manager's environment, like the session variables above; the nested test path
+# exports it to its direct children instead.
 #   DESKTOP_SESSION_OS_RELEASE     the os-release file read for the wallet hint (default /etc/os-release; tests)
 #
 # casement.service and sill.service come from their repos (dist/); install/install.sh renders them for the prefix and
@@ -143,6 +147,8 @@ read -r -a backend_args <<<"${DESKTOP_SESSION_BACKEND_ARGS---backend tty}"
 unit="${DESKTOP_SESSION_UNIT:-casement.service}"
 # The arguments of this run, which casement.service reads as $CASEMENT_SESSION_ARGS from the user manager's environment.
 session_args_var=CASEMENT_SESSION_ARGS
+# Which kind of run this is, for the shell: normal, or safe (casement --safe). Same route as the arguments.
+session_mode_var=QUIRE_SESSION_MODE
 # What an earlier version of this script wrote: a drop-in in the runtime folder. It would shadow the unit's ExecStart
 # and make accountd distrust the unit, so it is removed at the start (remove_old_dropin).
 old_dropin_dir="${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}/systemd/user/$unit.d"
@@ -397,9 +403,9 @@ start_components() {
 
 # --- casement as the unit casement.service (the real session) ---------------------------------------
 
-# Take this run's arguments out of the user manager's environment (harmless when they are not there).
+# Take this run's arguments and mode out of the user manager's environment (harmless when they are not there).
 unset_session_args() {
-    systemctl --user unset-environment "$session_args_var" 2>/dev/null || true
+    systemctl --user unset-environment "$session_args_var" "$session_mode_var" 2>/dev/null || true
 }
 
 # Stop the unit and drop the arguments (also run at logout; harmless when nothing runs).
@@ -439,6 +445,15 @@ XDG_SESSION_CLASS PATH"
 # environment, where the unit's ExecStart reads them as $CASEMENT_SESSION_ARGS.
 set_session_args() {
     systemctl --user set-environment "$session_args_var=${backend_args[*]} $*"
+}
+
+# Tell the shell which kind of run this is (MODE: normal or safe): in the user manager's environment, where the shell's
+# unit reads it when it starts (a restart of the shell by the manager sees it too), and in this script's own, for the
+# direct children of the nested test path. Set before each casement start, so a fallback to --safe changes it before
+# the shell starts again.
+set_session_mode() {
+    export "$session_mode_var=$1"
+    [ -n "$nested" ] || systemctl --user set-environment "$session_mode_var=$1" || log "could not tell the shell the session mode"
 }
 
 # The socket casement announced in the unit's STATUS= text ("listening on wayland-1"); empty if it has not yet.
@@ -551,6 +566,7 @@ remove_old_dropin
 quick=0
 mode=normal
 while :; do
+    set_session_mode "$mode"
     if [ "$mode" = safe ]; then
         guard "starting casement --safe (pixman, no effects, one output)"
         run_casement --safe
