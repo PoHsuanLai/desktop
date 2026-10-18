@@ -349,6 +349,10 @@ step_models() {
 step_stack() {
   local providers=${W2_PROVIDERS:-$SCEN_SIB/porter/providers} extra=()
   [ ! -d "$providers" ] || extra+=(--providers "$providers")
+  # The screen helper's action, installed where the router reads apps' actions (as cua's installer does under
+  # <prefix>/share/quire/intents): without it the assistant has no way to use an app on the screen.
+  mkdir -p "$AGENTS/data/quire/intents"
+  cp "$SCEN_SIB/cua/manifests/org.quire.Cua.toml" "$AGENTS/data/quire/intents/" || return 1
   env -u DBUS_SESSION_BUS_ADDRESS -u DBUS_SYSTEM_BUS_ADDRESS "$BRINGUP" up --bus "$BUS" --root "$AGENTS" \
     --shell-pid "$SILL_PID" --catalog "$RUN/catalog" "${extra[@]}" >"$RUN/bringup.log" 2>&1 \
     || { tail -8 "$RUN/bringup.log" >&2; return 1; }
