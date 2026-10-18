@@ -438,6 +438,11 @@ EOF
   local pid=$!
   record cuad "$pid"
   sleep 2
+  # What the screen helper reads to tell who is calling: the fake /proc's processes and units, kept for the report.
+  { find "$AGENTS/proc" -maxdepth 2 | sed "s|$AGENTS/||" | sort
+    for u in "$AGENTS"/proc/units/*; do printf '%s %s\n' "${u##*/}" "$(cat "$u")"; done
+    for c in "$AGENTS"/proc/[0-9]*/cgroup; do printf '%s %s\n' "$c" "$(cat "$c")"; done | sed "s|$AGENTS/||"
+  } >"$RUN/proc-tree.txt" 2>&1
   kill -0 "$pid" 2>/dev/null || { tail -5 "$RUN/cuad.log" >&2; echo "the screen helper did not start (see $RUN/cuad.log)" >&2; return 1; }
 }
 
