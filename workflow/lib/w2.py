@@ -82,6 +82,9 @@ def browser_prefs(download_dir, homepage=None):
         ("browser.preonboarding.enabled", False),
         # Zen's own first-run page ("Welcome to a calmer internet") is shown until this is set.
         ("zen.welcome-screen.seen", True),
+        ("zen.updates.show-update-notification", False),
+        # The bar that says the content sandbox is off (it is, in the jail) only covers the page.
+        ("security.sandbox.warn_unprivileged_namespaces", False),
         ("browser.startup.page", 1),
         ("browser.startup.firstrunSkipsHomepage", True),
         ("browser.startup.couldRestoreSession.count", 0),
