@@ -31,7 +31,7 @@ has "help: names both model variables" "$out" "W1_PLANNER_URL"
 out=$("${W1[@]}" --nonsense 2>&1); code "options: an unknown option is refused" 2 $?
 out=$("${W1[@]}" --timeout abc 2>&1); code "options: a timeout that is no number is refused" 2 $?
 out=$("${W1[@]}" --print-build 2>&1); code "print-build: exit 0" 0 $?
-for p in "-p casement -p casementctl" "--bin fake-logind" "-p sill --features debug" "-p cuad --features docket-dbus/fixture-callers" "-p docket-accept --bins"; do
+for p in "-p casement -p casementctl" "--bin fake-logind" "-p sill --features debug" "-p cuad --features fixture-callers" "-p docket-accept --bins"; do
   has "print-build: $p" "$out" "$p"
 done
 has "print-build: casement is a plain build" "$out" "a plain build"

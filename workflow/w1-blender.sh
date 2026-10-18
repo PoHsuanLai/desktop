@@ -80,7 +80,7 @@ print_build() {
 # 3. the shell (bar, dock, launcher)
 (cd $SIB/sill && CARGO_TARGET_DIR=$T_SILL nice cargo build -p sill --features debug)
 # 4. the screen helper
-(cd $SIB/cua && CARGO_TARGET_DIR=$T_CUA nice cargo build -p cuad --features docket-dbus/fixture-callers)
+(cd $SIB/cua && CARGO_TARGET_DIR=$T_CUA nice cargo build -p cuad --features fixture-callers)
 # 5. the assistant's services, the bring-up tool and the terminal command
 (cd $SIB/docket && CARGO_TARGET_DIR=$T_DOCKET nice cargo build -p docket-accept --bins)
 EOF

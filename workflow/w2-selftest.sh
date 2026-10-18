@@ -38,7 +38,7 @@ out=$("${SCEN[@]}" --print-build 2>&1); code "print-build: exit 0" 0 $?
 has "print-build: the one-line way" "$out" "harness/scenario-build.sh --w2"
 has "print-build: casement's test build" "$out" "dev/bootstrap.sh --build-only"
 has "print-build: sill with its test features" "$out" "-p sill --features debug"
-has "print-build: the screen helper with the fixture callers" "$out" "-p cuad --features docket-dbus/fixture-callers"
+has "print-build: the screen helper with the fixture callers" "$out" "-p cuad --features fixture-callers"
 has "print-build: the assistant's services as test builds" "$out" "-p docket-accept --bins"
 has "print-build: the drawing app" "$out" "build-excalidraw.sh"
 lacks "print-build: not W1's plain casement build" "$out" "-p casementctl"
@@ -54,7 +54,7 @@ out=$("${LAUNCH[@]}" --help 2>&1); code "launcher help: exit 0" 0 $?
 has "launcher help: no default model" "$out" "There is no default model"
 out=$("${LAUNCH[@]}" --nonsense 2>&1); code "launcher options: unknown option refused" 2 $?
 out=$("${LAUNCH[@]}" --print-build 2>&1); code "launcher print-build: exit 0" 0 $?
-has "launcher print-build: same list" "$out" "-p cuad --features docket-dbus/fixture-callers"
+has "launcher print-build: same list" "$out" "-p cuad --features fixture-callers"
 out=$(env -u W2_PLANNER_SOCK -u W2_PLANNER_URL -u W2_SCREEN_SOCK -u W2_SCREEN_URL "${LAUNCH[@]}" --run-dir "$scratch/r1" 2>&1); code "no model: refused, exit 2" 2 $?
 has "no model: names the assistant model" "$out" "W2_PLANNER_SOCK"
 has "no model: names the screen model" "$out" "W2_SCREEN_SOCK"
