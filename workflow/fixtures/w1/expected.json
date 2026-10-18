@@ -3,5 +3,15 @@
   "bbox_mm": [285, 160, 228],
   "tolerance": 0.10,
   "min_objects": 5,
-  "units": [1, 10, 1000]
+  "units": [1, 10, 1000],
+  "drawing": {
+    "view": "front",
+    "key_sizes_mm": [285, 160, 228],
+    "base_width_mm": 160,
+    "total_height_mm": 228,
+    "shade_width_mm": 110,
+    "overall_width_mm": 285,
+    "min_shapes": 4,
+    "tolerance": 0.15
+  }
 }

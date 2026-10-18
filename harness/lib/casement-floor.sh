@@ -43,6 +43,7 @@ floor_powers() {
     wtype) echo keys ;;
     fcitx5) echo typing_help keys ;; # the input method, and the virtual keyboard it forwards keys through
     wlr-randr | kanshi) echo displays ;;
+    cuad) echo screen keys windows ;; # the screen helper: looks at windows, types and clicks in them (W2)
     wlrctl | lswt | casement-probe) echo windows ;; # casement-probe: `workspaces` (ext_workspace_manager)
     swaylock | demo_lock) echo lock ;;
     sill | detent | demo_* | casement-shell-exec) ;; # the desktop's programs, the demos and their launcher: the role below, no power
@@ -99,6 +100,7 @@ floor_image() {
     accountd | inferd | syncd) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/porter-target/debug/$1" ;;
     xdg-desktop-portal) path=/usr/libexec/xdg-desktop-portal ;;
     casement) path="${SCEN_TOOLS:?floor_image: scenario.sh is not sourced}/bin/casement" ;;
+    cuad) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/cua-target/debug/cuad" ;;
     fake-shell) path=$(command -v python3 2>/dev/null) || return 1 ;;
     detent) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/detent-target/debug/detent" ;;
     demo_*) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/shell-host-target/debug/examples/$1" ;;

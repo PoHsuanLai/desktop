@@ -200,6 +200,8 @@ step "expected-skips resolve" skip_entries_resolve || true
 # The scenarios' artefacts are built outside the jail (plan A7); DESKTOP_GATE_NO_BUILD=1 skips it.
 if [ -z "${DESKTOP_GATE_NO_BUILD:-}" ]; then step "scenario artefacts (built outside the jail)" "$ROOT/harness/scenario-build.sh" || true; fi
 for s in "$ROOT"/scenarios/*.sh; do
+  # A scenario with an `# opt-in:` header line is run on demand only (it needs a model, a browser...): the gate skips it.
+  if grep -q '^# opt-in:' "$s"; then echo "  not run by the gate (opt-in): $(basename "$s" .sh)"; continue; fi
   STEP_BUDGET=$(scenario_budget "$s") step "scenario $(basename "$s" .sh)" run_scenario "$(basename "$s" .sh)" || true
 done
 

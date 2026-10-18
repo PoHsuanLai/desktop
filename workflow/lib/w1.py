@@ -13,7 +13,8 @@ Commands:
   inferd-config ...                 the text of inferd's configuration for this run
   cuad-settings ...                 the text of the computer-use settings for this run
   sentence --outdir DIR             the sentence the person says to the assistant
-  serve --dir D --port-file F       serve D on 127.0.0.1 (free port, written to F) until stopped
+  serve --dir D --port-file F       serve D on 127.0.0.1 (free port, written to F) until stopped;
+                                    --mount /PREFIX/=FOLDER (repeatable) serves a folder under a path instead
   blender-expr                      the Python Blender runs, in the background, to read the exported file
   glb-compare --line L --expected F compare Blender's reading of the file with the page's sizes
   guard --text-file F ...           the guard's words found in the assistant's last words
@@ -204,9 +205,54 @@ def cmd_sentence(args):
     return 0
 
 
+def mounted_handler(default_dir, mounts):
+    """A static-file handler that serves each PREFIX/ from its own folder, the longest prefix first.
+
+    mounts is a list of (prefix, folder), a prefix like "/lamp/". A path under no prefix falls to default_dir
+    (and is a 404 when there is none).
+    """
+    ordered = sorted(mounts, key=lambda m: len(m[0]), reverse=True)
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def translate_path(self, path):
+            clean = path.split("?", 1)[0].split("#", 1)[0]
+            for prefix, folder in ordered:
+                if clean == prefix.rstrip("/"):  # /lamp -> /lamp/
+                    return str(Path(folder) / "index.html")
+                if clean.startswith(prefix):
+                    self.directory = folder
+                    return super().translate_path("/" + clean[len(prefix):])
+            if default_dir is None:
+                return str(Path("/nonexistent-w1-mount"))
+            self.directory = default_dir
+            return super().translate_path(path)
+
+        def log_message(self, *a, **k):
+            pass
+
+    return Handler
+
+
+def parse_mounts(items):
+    """[(prefix, folder)] from PREFIX=FOLDER words; a prefix starts and ends with a slash."""
+    mounts = []
+    for item in items:
+        prefix, _, folder = item.partition("=")
+        if not (prefix.startswith("/") and prefix.endswith("/") and folder):
+            raise ValueError(f"a mount is /PREFIX/=FOLDER, not {item!r}")
+        mounts.append((prefix, folder))
+    return mounts
+
+
 def cmd_serve(args):
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=args.dir)
-    handler.log_message = lambda *a, **k: None
+    mounts = parse_mounts(args.mount)
+    if not args.dir and not mounts:
+        raise ValueError("serve wants --dir or at least one --mount")
+    if mounts:
+        handler = mounted_handler(args.dir or None, mounts)
+    else:
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=args.dir)
+        handler.log_message = lambda *a, **k: None
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     Path(args.port_file).write_text(f"{server.server_address[1]}\n")
     try:
@@ -400,11 +446,11 @@ def read_stamps(path):
     return stamps
 
 
-def stage_rows(stamps):
+def stage_rows(stamps, stages=None):
     """(plain name, seconds since the previous mark, seconds since the start) for the marks present."""
     rows, previous = [], None
     start = stamps.get("start")
-    for key, label in STAGES:
+    for key, label in (stages or STAGES):
         if key not in stamps:
             continue
         now = stamps[key][0]
@@ -546,7 +592,8 @@ def build_parser():
     command("cuad-settings", cmd_cuad_settings, (["--app"], {"action": "append", "default": [], "help": "APP=ask|session|always"}),
             (["--steps"], {"type": int, "default": 400}), (["--active-s"], {"type": int, "default": 3600}))
     command("sentence", cmd_sentence, (["--outdir"], {"required": True}))
-    command("serve", cmd_serve, (["--dir"], {"required": True}), (["--port-file"], {"required": True}))
+    command("serve", cmd_serve, (["--dir"], {"default": ""}), (["--mount"], {"action": "append", "default": [], "help": "/PREFIX/=FOLDER"}),
+            (["--port-file"], {"required": True}))
     command("blender-expr", cmd_blender_expr)
     command("glb-compare", cmd_glb_compare, (["--line"], {"default": ""}), (["--file"], {"default": ""}),
             (["--expected"], {"required": True}))

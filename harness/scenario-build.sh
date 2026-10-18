@@ -16,15 +16,19 @@
 #   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
 #
 #   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig)
+#   scenario-build.sh --w2         only what scenarios/w2-excalidraw.sh needs (casement, the checkouts, sill, and the two below):
+#   build/cua-target/debug/cuad                                          cuad (the screen helper) with docket-dbus/fixture-callers: a plain build identifies nobody
+#   build/docket-target/debug/{docket-bringup,accept-*}                  docket-accept's test builds (the assistant's services on a fake /proc, quire-do)
 #
 # The siblings are the checkouts beside this one (<this>/../sill, ...): the lane's symlinks, or ~ itself.
 # Exit codes: 0 built, 2 run inside a jail, 3 a host tool is missing or a build failed.
 set -euo pipefail
-only_accounts=0
+only_accounts=0 only_w2=0
 case "${1:-}" in
   "") ;;
   --accounts) only_accounts=1 ;;
-  *) echo "usage: scenario-build.sh [--accounts]" >&2; exit 64 ;;
+  --w2) only_w2=1 ;;
+  *) echo "usage: scenario-build.sh [--accounts|--w2]" >&2; exit 64 ;;
 esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/all.sh
@@ -155,18 +159,38 @@ build_porter() {
   (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p porter-rig)
 }
 
+# cuad, the screen helper, from the sibling checkout. The fixture-callers feature makes it read caller identities from a fake
+# /proc (CUAD_TEST_PROC_ROOT): nothing in the jail runs in a systemd scope. A test build, never shipped.
+build_cuad() {
+  (cd "$SCEN_SIB/cua" && CARGO_TARGET_DIR="$SCEN_BUILD/cua-target" nice cargo build -p cuad --features docket-dbus/fixture-callers)
+}
+
+# The assistant's services as docket-accept builds (fixture identities, scripted stand-ins), docket-bringup and quire-do's
+# test twin, from the sibling checkout.
+build_docket() {
+  (cd "$SCEN_SIB/docket" && CARGO_TARGET_DIR="$SCEN_BUILD/docket-target" nice cargo build -p docket-accept --bins)
+}
+
 # sill at its pin: the accounts-* scenarios need the accounts sheet, which the sibling's HEAD may lack.
 build_sill_pin() {
   (cd "$SCEN_BUILD/pin/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-pin-target" cargo build -p sill --features debug,ds-blitz/debug-probe)
 }
 
 # foot is the scenarios' terminal: say how to get it before the long builds, not after.
-if [ "$only_accounts" = 0 ] && [ ! -x "$SCEN_BUILD/tools/bin/foot" ] && ! command -v foot >/dev/null && [ "$(distro_family)" != fedora ]; then
+if [ "$only_accounts" = 0 ] && [ "$only_w2" = 0 ] && [ ! -x "$SCEN_BUILD/tools/bin/foot" ] && ! command -v foot >/dev/null && [ "$(distro_family)" != fedora ]; then
   echo "scenario-build: foot (a terminal the scenarios start) is not installed: $(install_hint foot | tr '\n' ' ')" >&2
   exit 3
 fi
 
 stage "casement (bootstrap --build-only)" build_casement
+if [ "$only_w2" = 1 ]; then
+  stage "checkouts of sill and shell-host" checkouts
+  stage "sill (--features debug)" build_sill
+  stage "cuad (--features docket-dbus/fixture-callers)" build_cuad
+  stage "docket-accept (the assistant's services, test builds)" build_docket
+  echo "scenario-build: done for W2 ($SCEN_BUILD)"
+  exit 0
+fi
 if [ "$only_accounts" = 0 ]; then
   stage "foot" fetch_foot
   stage "checkouts of sill and shell-host" checkouts

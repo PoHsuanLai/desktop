@@ -166,3 +166,63 @@ windows are read from the desktop window's log; if that build does not write the
 
 Exit codes: 0 every checked criterion passed, 1 the run did not finish or a criterion failed, 2 bad usage, a missing
 program or model, or not a Wayland desktop.
+
+## W2: from a product page to a drawing
+
+The same lamp page, a different job: you ask the assistant to get the lamp's specs and draw its front view, with sizes,
+in a drawing app, using a few helpers, and to save the drawing. The drawing app is Excalidraw, built offline from pinned
+packages, so it needs no graphics card, no account and no network. The assistant uses it only through the screen: it
+opens the drawing tab, and its helpers draw the base, the arms, the joint and the shade by looking and clicking. Nothing
+in the script talks to the drawing app; the saved file is read once, afterwards, to check it.
+
+**It runs in the test jail**, not on your login. A nested window on your real session cannot trust a shell built from the
+source tree, so there the launcher and the questions would never appear. In the jail the desktop is the headless test
+build, and nobody is there to press buttons: the script answers every confirmation sheet for you with "Allow once" (the
+brief sheet with "Use this brief", which sends the brief's words back unchanged) and writes each one into the report.
+Pictures of the desktop at each stage change, and every `W2_SHOT_EVERY` seconds, go in the run folder.
+
+    # once: the offline drawing app (needs node and npm)
+    workflow/fixtures/w2/build-excalidraw.sh
+    # once, and after a change in the sources: the test builds (outside the jail)
+    workflow/w2-excalidraw.sh --print-build        # the list; `harness/scenario-build.sh --w2` does it all
+    # a run
+    W2_PLANNER_SOCK=... W2_SCREEN_SOCK=... workflow/w2-excalidraw.sh
+    workflow/w2-selftest.sh                        # checks the script's own parts on canned input; needs no session
+
+What it needs:
+
+- **The screen model.** There is no default, and the script refuses plainly without it (and without the assistant's own
+  model). The jail has no network, so each model is reached through a Unix socket on this computer, which the jail
+  bridges to a port of its own: `W2_PLANNER_SOCK` and `W2_SCREEN_SOCK` (or `W2_PLANNER_URL=unix:/path` and
+  `W2_SCREEN_URL=unix:/path`). For the screen model on fatcat, open the tunnel and bridge its port to a socket only when
+  you are ready, and close both right after, for example
+  `ssh -N -L 8091:127.0.0.1:8000 fatcat &` then `socat UNIX-LISTEN:$HOME/w2-screen.sock,fork,mode=600 TCP:127.0.0.1:8091 &`.
+  The assistant's own model is bridged the same way from wherever it runs. The script never starts a model.
+- **The test builds** of casement, the shell, the screen helper and the assistant's services (`--print-build`), and the
+  offline drawing app. Zen is read from `~/.local/opt/zen/zen` (`W2_BROWSER` to change it). The jail already shows the
+  host read-only, so neither Zen nor the drawing app needs a bind of its own.
+- **bubblewrap** and `/dev/udmabuf`, as for any test-jail scenario.
+
+It is not part of the gate: the scenario carries an `# opt-in:` line, which the gate skips. The run folder defaults to
+`~/.cache/w2-runs/<date-time>`; the saved drawing is in `scenario/w2-excalidraw/out/` and the report is `report.md`.
+
+### What the W2 report checks
+
+- a `.excalidraw` file was saved in the run folder (the browser is set to save downloads there, with no question) and it
+  reads as a drawing file;
+- it holds at least four shapes (rectangles, ellipses, diamonds, lines or strokes; arrows and text do not count);
+- its text holds the lamp's three sizes, 285, 160 and 228 mm, with any reasonable spelling ("285 mm", "285mm",
+  "28.5 cm");
+- the base's width, the total height and the shade's width stand in the page's proportions to within 15%, whatever the
+  drawing's scale (the scale is taken from one known size);
+- every brief sheet was answered with its words unchanged;
+- the turn did not end in the guard's words.
+
+Recorded, not judged: the exported `.svg` picture, if one was saved (optional), every sheet answered and how, the stage
+times, the turns of the assistant and of each helper, the looks at the screen and the pictures. Left to you, by eye: that
+the drawing looks like the lamp, and that the assistant used only the screen.
+
+Limits: the window id the screen helper is allowed to use is `app.zen_browser.zen`, which the script asks Zen to use as
+its window name (unverified; the settings pattern needs a dot). The sheet answers go through the shell's debug keys:
+Return for Allow once and for "Use this brief" (a short brief counts as read at once). A sheet that asks for a hold is
+answered with Tab and a held Space.
