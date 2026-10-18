@@ -102,3 +102,67 @@ explains each field and which ids were checked on which distribution.
   for the app's window (the match is by window id and process number, so it is rare).
 - Exit codes of `run.sh`: 0 finished, 1 some measurement failed (lines marked FAILED), 2 usage, wrong
   session or a missing tool.
+
+## W1: from a product page to a Blender model
+
+`workflow/w1-blender.sh` runs one designer workflow on your real login, on demand (never in CI): you browse a product
+page, open the launcher, ask the assistant to get the specs of the thing on the page, and the assistant opens Blender,
+has several helpers model it, and saves a `.glb` file. The script builds the stage and measures; it does not drive
+Blender in any special way. The assistant looks at the screen and works the apps like a person would, and may find
+faster ways itself, asking you first.
+
+What it sets up, all in a scratch folder (`~/.cache/w1-runs/<date-time>`, or `--run-dir`), never touching your own
+files, settings or message bus:
+
+- a window of our desktop inside yours, with the shell (bar, dock, launcher);
+- the assistant's services on a private bus of their own, with its model log switched on;
+- the screen helper, with computer use turned on only for Blender and your browser, each set to ask first;
+- a made-up product page (a desk lamp, with sizes in millimetres, a parts list, colours and a drawing) served on this
+  computer only, from `workflow/fixtures/w1/`;
+- Zen (else Firefox) opened on that page, and the launcher shown.
+
+You choose the models yourself; there is no default. Set `W1_PLANNER_URL` (the assistant's own model) and
+`W1_SCREEN_URL` (the model that looks at the screen), each as an address on this computer such as
+`http://127.0.0.1:8090`. For the screen model on fatcat use the end of a tunnel. The script only checks that each
+answers; it never starts one. If the screen model does not answer it says "start the screen model on fatcat, then run
+again". Start it only when you are ready and stop it after the run.
+
+    W1_PLANNER_URL=http://127.0.0.1:8090 W1_SCREEN_URL=http://127.0.0.1:8091 workflow/w1-blender.sh
+    workflow/w1-blender.sh --print-build      # the builds it needs, for whoever builds
+    workflow/w1-selftest.sh                   # checks the script's own parts on canned input; needs no session
+
+The desktop window asks you the first time each program connects (the screen helper, the launcher, the apps); say
+Allow. With `--floor-dir DIR` (a root-owned folder you supply; a proposal is written to `<run dir>/floor`) it asks less.
+
+Then it prints one sentence to say to the assistant, for example "Get the specs of the lamp on this page, then build it
+in Blender with a few helpers and save it as a .glb file in <run dir>/out". Say it in the launcher, or run with
+`--drive` and it sends the same sentence for you after you press Enter. If the assistant needs you to answer a
+question, answer it in the window; the script keeps waiting until the file appears, the time is up (`--timeout`,
+3600 s by default) or you press Ctrl-C. On the way out it always writes the report and stops everything it started.
+
+### What the report checks
+
+`report.md` in the run folder. Checked by the script:
+
+- a `.glb` file was saved in the run folder;
+- Blender, run in the background on that file afterwards (the only Blender scripting here), opens it and finds at
+  least five separate shapes (the page lists five parts);
+- the overall size is within 10% of the page's 285 x 160 x 228 mm, in whatever order the axes are and whether one unit
+  is a millimetre, a centimetre or a metre;
+- the turn did not end in the guard's words ("Couldn't do that", "I keep getting the same answer", "stopped:", "That is
+  done").
+
+Recorded, not judged: the time of each stage (page shown, request given, first answer, first look at the screen,
+Blender shown, file saved), the turns of the assistant and of each conversation, the number of looks at the screen and
+when they began, pictures of the window at each stage change (with `grim`, if installed), and the files made during the
+run. Left to you, by eye: that every install or first run of a new tool was asked about first, that nothing was written
+outside the run folder, and that you could still use the computer without delay.
+
+Limits: the model log has no helper names, so turns are grouped by the opening words of each conversation's
+instructions; and the screen helper's steps are counted from the model server's own log of calls that carried a
+picture. The Blender window id the screen helper is allowed to use is `org.blender.Blender` (unverified window id; the
+settings pattern needs a dot, so a plain `blender` cannot be listed). The timing lines for the browser and Blender
+windows are read from the desktop window's log; if that build does not write them, those two stage marks are missing.
+
+Exit codes: 0 every checked criterion passed, 1 the run did not finish or a criterion failed, 2 bad usage, a missing
+program or model, or not a Wayland desktop.

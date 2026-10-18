@@ -1,0 +1,7 @@
+{
+  "name": "desk lamp",
+  "bbox_mm": [285, 160, 228],
+  "tolerance": 0.10,
+  "min_objects": 5,
+  "units": [1, 10, 1000]
+}
