@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "0f72c180d85f21c4e9aa54470c50b2d13042a77b"
+rev = "c18b8ccd8217b27dd92ce14a7a3eb18917cf5275"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -60,7 +60,7 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "125272e095943b6556a21994dc503171c795172b"
+rev = "8769181d206a579f283cd966ab9c53f5e7017a42"
 branch = "master"
 gate = "lane"
 
@@ -72,20 +72,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "723443b010a396b0266cf0b530a7f4249ac346cc"
+rev = "8f42b2f46dc785567c6e3f782f7e1ae4eade9fcc"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "4ec8abba952a846f40a970597fdeb9e7b86e4018"
+rev = "5a218b46a36c5457f0e374b01ecef1ed52cdddea"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "4ee1fe300d632f899b1d5bea657a3d639a4fe1e4"
+rev = "b67a06f32d98d007acb9e8a73d051775ce531d65"
 branch = "master"
 gate = "lane"
 
@@ -111,7 +111,7 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "c438dbe58eda217965ddfe2c21908cf4ab8d6181"
+rev = "fe2ae30df5066fefe71d47cbcc420292eb7082c8"
 branch = "master"
 gate = "none"
 
@@ -123,7 +123,7 @@ gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "0927e4a8fcb9ad92f54aeeeddd7c983a13ecc20a"
+rev = "fd6fc2cf387493cac97e160db453ed5bff3ff2dc"
 branch = "main"
 gate = "none"
 
@@ -160,6 +160,6 @@ gate = "lane"
 [repo.slipway]
 # The updater: installs and switches signed release bundles (release/ in this repo builds them).
 url = "https://github.com/PoHsuanLai/slipway.git"
-rev = "8eb3ccb3caec0a38957a349ea3010343fe9c59e2"
+rev = "92514f9ec3854c54c39c64a38f6008cc956d737a"
 branch = "master"
 gate = "none"
