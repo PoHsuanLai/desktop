@@ -73,7 +73,7 @@ harness/scenario-build.sh --w2
 # 3. the shell with its test features (the stand-in screen-brightness file)
 (cd $SCEN_SRC/sill && CARGO_TARGET_DIR=$SCEN_BUILD/sill-target nice cargo build -p sill --features debug)
 # 4. the screen helper with the fixture caller table (a plain build identifies nobody)
-(cd $SCEN_SIB/cua && CARGO_TARGET_DIR=$SCEN_BUILD/cua-target nice cargo build -p cuad --features docket-dbus/fixture-callers)
+(cd $SCEN_SIB/cua && CARGO_TARGET_DIR=$SCEN_BUILD/cua-target nice cargo build -p cuad --features fixture-callers)
 # 5. the assistant's services, the bring-up tool and the terminal command (docket-accept: test builds)
 (cd $SCEN_SIB/docket && CARGO_TARGET_DIR=$SCEN_BUILD/docket-target nice cargo build -p docket-accept --bins)
 # and, once, the offline drawing app (needs node and npm; changes nothing outside its folder):

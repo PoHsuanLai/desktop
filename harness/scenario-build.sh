@@ -17,7 +17,7 @@
 #
 #   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig)
 #   scenario-build.sh --w2         only what scenarios/w2-excalidraw.sh needs (casement, the checkouts, sill, and the two below):
-#   build/cua-target/debug/cuad                                          cuad (the screen helper) with docket-dbus/fixture-callers: a plain build identifies nobody
+#   build/cua-target/debug/cuad                                          cuad (the screen helper) with --features fixture-callers: a plain build identifies nobody
 #   build/docket-target/debug/{docket-bringup,accept-*}                  docket-accept's test builds (the assistant's services on a fake /proc, quire-do)
 #
 # The siblings are the checkouts beside this one (<this>/../sill, ...): the lane's symlinks, or ~ itself.
@@ -162,7 +162,7 @@ build_porter() {
 # cuad, the screen helper, from the sibling checkout. The fixture-callers feature makes it read caller identities from a fake
 # /proc (CUAD_TEST_PROC_ROOT): nothing in the jail runs in a systemd scope. A test build, never shipped.
 build_cuad() {
-  (cd "$SCEN_SIB/cua" && CARGO_TARGET_DIR="$SCEN_BUILD/cua-target" nice cargo build -p cuad --features docket-dbus/fixture-callers)
+  (cd "$SCEN_SIB/cua" && CARGO_TARGET_DIR="$SCEN_BUILD/cua-target" nice cargo build -p cuad --features fixture-callers)
 }
 
 # The assistant's services as docket-accept builds (fixture identities, scripted stand-ins), docket-bringup and quire-do's
@@ -186,7 +186,7 @@ stage "casement (bootstrap --build-only)" build_casement
 if [ "$only_w2" = 1 ]; then
   stage "checkouts of sill and shell-host" checkouts
   stage "sill (--features debug)" build_sill
-  stage "cuad (--features docket-dbus/fixture-callers)" build_cuad
+  stage "cuad (--features fixture-callers)" build_cuad
   stage "docket-accept (the assistant's services, test builds)" build_docket
   echo "scenario-build: done for W2 ($SCEN_BUILD)"
   exit 0
