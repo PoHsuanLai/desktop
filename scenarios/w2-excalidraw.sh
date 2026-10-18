@@ -248,7 +248,7 @@ prepare_models() {
     --screen-id "$SCREEN_MODEL" --screen-url "http://127.0.0.1:$SCREEN_PORT" >"$AGENTS/config/inferd/inferd.toml" || return 3
   mkdir -p "$CONFIG/cua"
   # The browser is allowed outright: nobody is here to answer, and the jail is the boundary.
-  "${PY1[@]}" cuad-settings --app "$BROWSER_APP=always" --steps "${W2_CUA_STEPS:-300}" --active-s "${W2_CUA_ACTIVE_S:-1800}" \
+  "${PY1[@]}" cuad-settings --app "$BROWSER_APP=ask" --steps "${W2_CUA_STEPS:-300}" --active-s "${W2_CUA_ACTIVE_S:-1800}" \
     >"$CONFIG/cua/settings.toml"
 }
 
