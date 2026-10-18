@@ -144,7 +144,7 @@ DRAW_DIR=${W2_DRAW_DIR:-$REAL_HOME/.cache/quire-workflow/excalidraw-0.18.0}
 
 require_models
 scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" \
-  "$SCEN_BUILD/sill-target/debug/sill" "$CUAD" "$BRINGUP" "$QUIREDO" "$DK/accept-intentd" "$DK/accept-companiond"
+  "$SCEN_BUILD/sill-target/debug/sill" "$CUAD" "$BRINGUP" "$QUIREDO" "$DK/accept-intentd" "$DK/accept-companiond" "$DK/accept-readerd"
 [ -x "$BROWSER" ] || die "the browser $BROWSER is not there (set W2_BROWSER to Zen's program)"
 [ -s "$DRAW_DIR/main.js" ] || die "the drawing app is not built at $DRAW_DIR: run $WF/fixtures/w2/build-excalidraw.sh outside the jail"
 for tool in socat curl python3 busctl gdbus; do command -v "$tool" >/dev/null || die "$tool is missing"; done
@@ -273,7 +273,7 @@ sheet_key() { sill debug key "$SHEET" "$@" >>"$RUN/keys.log" 2>&1; }
 # "Use this brief": the sheet sends the field's words back as its answer, which is what confirms it) once it is armed, and
 # written to sheets.tsv: time, id, kind, what it asked, the answer, the keys sent, the result.
 answer_sheets() {
-  local last="" id info kind gesture app action keys answer result tries
+  local last="" id info kind gesture app action keys answer result tries got
   while [ ! -e "$RUN/.stop" ]; do
     id=$(intents_field showing)
     if [ -z "$id" ] || [ "$id" = "$last" ]; then sleep 0.5; continue; fi
@@ -284,10 +284,12 @@ answer_sheets() {
     done
     [ -n "$info" ] || info=$(printf 'step\tpress\tunknown\tnot in the bus record')
     IFS=$'\t' read -r kind gesture app action <<<"$info"
-    sleep 1.2   # the sheet answers nothing until it has been still for a moment
-    tries=0 keys="" result="answered"
-    while [ "$(intents_field showing)" = "$id" ] && [ ! -e "$RUN/.stop" ]; do
-      if [ "$tries" -ge 6 ]; then result="still showing after $tries tries"; break; fi
+    sleep 2   # a sheet that has just appeared answers nothing until it has been still for a moment (sill's own script waits 1 s)
+    tries=0 keys="" got=""
+    # Answered only when the bus carries the sheet's reply; keys are sent again, 3 s apart, until it does.
+    while [ ! -e "$RUN/.stop" ]; do
+      got=$("${PY2[@]}" sheet-answer --bus "$RUN/bus.jsonl" --id "$id") && break
+      [ "$tries" -lt 6 ] || break
       case "$gesture" in
         hold_to_confirm)
           [ "$tries" -gt 0 ] || { sheet_key Tab; keys="Tab, "; }
@@ -295,9 +297,11 @@ answer_sheets() {
           keys="${keys%%Space*}Space held 1.7 s" ;;
         *) sheet_key Enter; keys="Enter" ;;
       esac
-      tries=$((tries + 1)); sleep 1
+      tries=$((tries + 1)); sleep 3
     done
-    case "$kind" in brief) answer="Use this brief (Allow once)" ;; *) answer="Allow once" ;; esac
+    if [ -n "$got" ]; then result="answered ($got, after $tries sending(s))"
+      case "$kind" in brief) answer="Use this brief (Allow once)" ;; *) answer="Allow once" ;; esac
+    else result="not answered (no reply on the bus after $tries tries)"; answer="none"; fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(date +%s)" "$id" "$kind" "$app: $action" "$answer" "$keys" "$result" >>"$RUN/sheets.tsv"
     last=$id
   done
@@ -349,6 +353,7 @@ step_stack() {
     --shell-pid "$SILL_PID" --catalog "$RUN/catalog" "${extra[@]}" >"$RUN/bringup.log" 2>&1 \
     || { tail -8 "$RUN/bringup.log" >&2; return 1; }
   restart_companion_with_log || return 1
+  start_reader || return 1
   start_screen_helper || return 1
   stamp stack_up
   note "The assistant's services and the screen helper are up."
@@ -381,6 +386,25 @@ restart_companion_with_log() {
     sleep 0.1; waited=$((waited + 1))
   done
   { grep -v '^companiond ' "$AGENTS/procs"; echo "companiond $new $(proc_token "$new")"; } >"$AGENTS/procs.new" && mv "$AGENTS/procs.new" "$AGENTS/procs"
+}
+
+# The reader (it reads pages for the assistant) is not one of the bring-up's daemons: started here as its own unit in the fake
+# /proc, with the companion's environment and its own two seam variables, and recorded in the procs file so `down` ends it.
+start_reader() {
+  local -a E
+  local new waited=0
+  mapfile -t E < <(grep -v '^COMPANIOND_' "$RUN/companiond.env")
+  setsid env -i "${E[@]}" READERD_PROC_ROOT="$AGENTS/proc" READERD_SYSTEM_CALLERS="$AGENTS/system/readerd-callers.toml" /bin/bash -c '
+    mkdir -p "$1/proc/$$" "$1/proc/units"
+    printf "0::/user.slice/user-1000.slice/user@1000.service/app.slice/%s.service\n" "$2" > "$1/proc/$$/cgroup"
+    echo $$ > "$1/proc/units/$2.service"
+    shift 2; exec "$@"' _ "$AGENTS" readerd "$DK/accept-readerd" >>"$AGENTS/logs/readerd.log" 2>&1 </dev/null &
+  new=$!
+  until bus_has_owner org.quire.Reader1; do
+    kill -0 "$new" 2>/dev/null && [ "$waited" -lt 300 ] || { tail -5 "$AGENTS/logs/readerd.log" >&2; echo "the reader did not start" >&2; return 1; }
+    sleep 0.1; waited=$((waited + 1))
+  done
+  echo "readerd $new $(proc_token "$new")" >>"$AGENTS/procs"
 }
 
 bus_has_owner() {
@@ -426,7 +450,7 @@ step_pages() {
     || { echo "the served pages do not answer" >&2; return 1; }
   local profile=$RUN/browser-profile before
   mkdir -p "$profile"
-  "${PY2[@]}" browser-prefs --download-dir "$OUT" >"$profile/user.js" || return 1
+  "${PY2[@]}" browser-prefs --download-dir "$OUT" --homepage "$LAMP_URL|$DRAW_URL" >"$profile/user.js" || return 1
   before=$("${TIMING[@]}" now)
   # Zen needs MOZ_LEGACY_PROFILES (its launcher sets it). The browser's own content sandbox cannot nest inside the jail's
   # and the jail is the boundary here, so it is off; no GPU, so pictures are drawn by software.

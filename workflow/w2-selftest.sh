@@ -80,6 +80,10 @@ has "prefs: downloads go to the run's folder" "$prefs" 'user_pref("browser.downl
 has "prefs: the folder, not the desktop" "$prefs" 'user_pref("browser.download.folderList", 2);'
 has "prefs: the folder is used" "$prefs" 'user_pref("browser.download.useDownloadDir", true);'
 has "prefs: nothing is asked" "$prefs" 'user_pref("browser.download.always_ask_before_handling_new_types", false);'
+prefs2=$("${PY[@]}" browser-prefs --download-dir /run/out --homepage "http://127.0.0.1:1/lamp/|http://127.0.0.1:1/draw/")
+has "prefs: Zen's welcome page is seen" "$prefs2" 'user_pref("zen.welcome-screen.seen", true);'
+has "prefs: starts on the home page" "$prefs2" 'user_pref("browser.startup.page", 1);'
+has "prefs: the home page is both tabs" "$prefs2" 'user_pref("browser.startup.homepage", "http://127.0.0.1:1/lamp/|http://127.0.0.1:1/draw/");'
 has "prefs: no first-run page" "$prefs" 'user_pref("browser.aboutwelcome.enabled", false);'
 [ "$("${PY[@]}" w2-unknown 2>&1 | head -c 0; echo done)" = done ] && ok "unknown commands are w1's to refuse" || bad "unknown commands are w1's to refuse"
 "${PY[@]}" loopback http://127.0.0.1:18090 >/dev/null; code "w1 commands still answer through w2.py" 0 $?
@@ -180,29 +184,42 @@ def request(i, brief_text=None, gesture="press"):
         r.update(app="org.quire.Companion", action="Check what the helpers will work from", effect="read",
                  brief={"title": "Lamp", "text": brief_text, "flags": [], "pieces": ["base", "arms", "shade"]})
     return r
-def call(r): return {"type": "method_call", "interface": "org.quire.Confirm1", "member": "Confirm", "payload": {"data": [json.dumps(r)]}}
-def reply(written=None):
+def call(r, cookie): return {"type": "method_call", "cookie": cookie, "interface": "org.quire.Confirm1", "member": "Confirm", "payload": {"data": [json.dumps(r)]}}
+def ret(cookie, reply_cookie, path): return {"type": "method_return", "cookie": cookie, "reply_cookie": reply_cookie, "payload": {"data": [path]}}
+def reply(path, written=None):
     v = {"scope": "once", "receipt": {"id": "x"}}
     if written is not None: v["written"] = written
-    return {"type": "signal", "interface": "org.quire.Intents1.Request", "member": "Response",
+    return {"type": "signal", "path": path, "interface": "org.quire.Intents1.Request", "member": "Response",
             "payload": {"data": [0, json.dumps({"kind": "allowed", "v": v})]}}
-lines = [call(request(1)), reply(), call(request(2, brief)), reply(brief), {"type": "signal", "interface": "x", "member": "y"}]
+# the router's own replies to its callers share the interface and member, with other paths: they must not be mixed in
+noise = {"type": "signal", "path": "/org/quire/Intents1/request/9", "interface": "org.quire.Intents1.Request", "member": "Response",
+         "payload": {"data": [0, json.dumps({"Err": {"kind": "denied"}})]}}
+lines = [noise, call(request(1), 10), ret(11, 10, "/org/quire/Confirm1/request/1"), call(request(2, brief), 12),
+         ret(13, 12, "/org/quire/Confirm1/request/2"), noise, reply("/org/quire/Confirm1/request/2", brief),
+         call(request(3), 14), ret(15, 14, "/org/quire/Confirm1/request/3"),   # a sheet nobody answered
+         {"type": "signal", "interface": "x", "member": "y"}]
 open(sys.argv[1], "w").write("\n".join(json.dumps(m) for m in lines) + "\nnot json\n")
 json.dump({"brief": brief}, open(sys.argv[1] + ".brief", "w"))
 P
 sheets=$("${PY[@]}" sheets --bus "$scratch/bus.jsonl"); code "sheets: read from the bus record" 0 $?
-[ "$(wc -l <<<"$sheets")" = 2 ] && ok "sheets: two confirmations seen" || bad "sheets: two confirmations seen" "$sheets"
+[ "$(wc -l <<<"$sheets")" = 3 ] && ok "sheets: three confirmations seen" || bad "sheets: three confirmations seen" "$sheets"
 has "sheets: a step sheet answered once" "$sheets" '"kind": "step"'
 has "sheets: the brief's words came back unchanged" "$sheets" '"written": "unchanged"'
 [ "$("${PY[@]}" sheet-info --bus "$scratch/bus.jsonl" --id c-2)" = "$(printf 'brief\tpress\torg.quire.Companion\tCheck what the helpers will work from')" ] \
   && ok "sheet-info: a brief sheet is known as one" || bad "sheet-info: a brief sheet is known as one"
 [ "$("${PY[@]}" sheet-info --bus "$scratch/bus.jsonl" --id c-1 | cut -f1)" = step ] && ok "sheet-info: a step sheet" || bad "sheet-info: a step sheet"
 "${PY[@]}" sheet-info --bus "$scratch/bus.jsonl" --id nope >/dev/null; code "sheet-info: an unknown sheet" 1 $?
+[ "$("${PY[@]}" sheet-answer --bus "$scratch/bus.jsonl" --id c-2)" = allowed ] && ok "sheet-answer: a reply on the sheet's own path counts" || bad "sheet-answer: a reply on the sheet's own path counts"
+"${PY[@]}" sheet-answer --bus "$scratch/bus.jsonl" --id c-1 >/dev/null; code "sheet-answer: the router's reply (another path) is not the sheet's" 1 $?
+"${PY[@]}" sheet-answer --bus "$scratch/bus.jsonl" --id c-3 >/dev/null; code "sheet-answer: an unanswered sheet has no reply" 1 $?
+has "sheets: the unanswered one reads none" "$sheets" '"answer": "none"'
 
 # ---- the report from a canned run
 run="$scratch/run"
 mkdir -p "$run/out" "$run/shots" "$run/agents/.local/state/quire/inferd"
 cp "$FIX/trace.jsonl" "$run/"
+# a row in the shape companiond writes (by, n, tier, class, shape, route, answer, took_ms, tokens, messages)
+echo '{"by":"companiond","n":10,"tier":"balanced","class":"prompt","shape":"text","route":["routed to local/x"],"messages":[{"role":"system","text":"You are the assistant of this desktop. Be brief."}],"answer":{"kind":"replied","v":{"text":"Starting.","calls":[{"name":"org_quire_Companion-companion_task_start","args":"{\"goal\": \"Get the specs of the lamp on this page\", \"kind\": \"research\"}"}],"stop":"tool_use"}},"took_ms":1208,"input_tokens":3122,"output_tokens":41}' >>"$run/trace.jsonl"
 cp "$FIX/audit.jsonl" "$run/agents/.local/state/quire/inferd/audit.jsonl"
 printf 'start\t1000000000000\t1000\ncasement_up\t1005000000000\t1005\nstack_up\t1010000000000\t1010\npage_open\t1015000000000\t1015\nasked\t1020000000000\t1020\nfirst_turn\t1025000000000\t1025\nfirst_screen_step\t1030000000000\t1030\ndrawing_saved\t1100000000000\t1100\nsvg_saved\t1110000000000\t1110\nfinished\t1120000000000\t1120\n' >"$run/stamps.tsv"
 cp "$scratch/drawings/good.excalidraw" "$run/out/lamp.excalidraw"
@@ -215,6 +232,9 @@ report=$("${PY[@]}" report --run "$run" --expected "$FIX/expected.json"); code "
 has "report: headline" "$report" "Workflow W2 (lamp page to a drawing): PASS"
 has "report: drawing check" "$report" "a drawing file (.excalidraw) was saved"
 has "report: brief check" "$report" "every brief sheet was answered with its words unchanged"
+has "report: turn by turn lists the call" "$report" "org_quire_Companion-companion_task_start({\"goal\": \"Get the specs of the lamp on this page\""
+has "report: turn by turn lists the words" "$report" "says: Starting."
+has "report: no service stopped" "$report" "no service stopped on its own"
 has "report: svg noted" "$report" "lamp.svg"
 has "report: sheets answered" "$report" "Use this brief (Allow once)"
 has "report: sheets on the bus" "$report" "As the bus carried them"
@@ -222,6 +242,11 @@ has "report: stage since start" "$(tr -s ' ' <<<"$report")" "| drawing file save
 has "report: screen looks counted" "$report" "3 looks at the screen by screen-model"
 has "report: picture listed" "$report" "shots/01-pages-open.png"
 [ -s "$run/report.md" ] && ok "report: report.md written" || bad "report: report.md written"
+mkdir -p "$run/agent-logs"; printf 'started\nthread x has overflowed its stack\nfatal runtime error: stack overflow, aborting\n' >"$run/agent-logs/companiond.log"
+report=$("${PY[@]}" report --run "$run" --expected "$FIX/expected.json"); code "report: a service that crashed fails the run" 1 $?
+has "report: Services that stopped heading" "$report" "## Services that stopped"
+has "report: names the crashed service" "$report" "- companiond.log: fatal runtime error: stack overflow, aborting"
+rm -rf "$run/agent-logs"
 rm -f "$run/out/lamp.svg"
 report=$("${PY[@]}" report --run "$run" --expected "$FIX/expected.json"); code "report: no svg does not fail the run" 0 $?
 has "report: says no svg" "$report" "no .svg picture was saved (optional)"
@@ -237,7 +262,7 @@ import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]) if l.startswith("{")]
 for m in rows:
     if m.get("member") == "Response":
-        v = json.loads(m["payload"]["data"][1]); v["v"].pop("written", None); m["payload"]["data"][1] = json.dumps(v)
+        v = json.loads(m["payload"]["data"][1]); (v.get("v") or {}).pop("written", None); m["payload"]["data"][1] = json.dumps(v)
 open(sys.argv[1], "w").write("\n".join(json.dumps(m) for m in rows) + "\n")
 P
 report=$("${PY[@]}" report --run "$run" --expected "$FIX/expected.json"); code "report: a brief answered without its words fails the run" 1 $?

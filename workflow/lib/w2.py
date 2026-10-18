@@ -11,6 +11,7 @@ Commands:
   browser-prefs --download-dir D   the browser profile's user.js: downloads go to D with no dialog, no first-run pages
   check --run DIR --expected F     the drawing checks, one line each: PASS|FAIL <TAB> check <TAB> detail
   sheet-info --bus F --id ID       what the sheet ID is: "brief|step <TAB> press|hold_to_confirm <TAB> app <TAB> action"
+  sheet-answer --bus F --id ID     exit 0 when the bus carried the sheet's reply (prints its kind), 1 when not (yet)
   sheets --bus F                   every confirmation the recorded bus carried and how it was answered, as JSON lines
   report --run DIR --expected F    write DIR/report.md; exit 0 when every checked criterion passes
 
@@ -61,8 +62,11 @@ def cmd_sentence(_args):
     return 0
 
 
-def browser_prefs(download_dir):
-    """user.js for the browser's profile: saved files go to download_dir without a question, and no first-run pages."""
+def browser_prefs(download_dir, homepage=None):
+    """user.js for the browser's profile: saved files go to download_dir without a question, and no first-run pages.
+
+    homepage ("URL|URL") is what a start with no address opens; the addresses on the command line still open as tabs.
+    """
     prefs = [
         ("browser.download.dir", str(download_dir)),
         ("browser.download.folderList", 2),
@@ -75,6 +79,12 @@ def browser_prefs(download_dir):
         ("browser.shell.checkDefaultBrowser", False),
         ("browser.startup.homepage_override.mstone", "ignore"),
         ("browser.aboutwelcome.enabled", False),
+        ("browser.preonboarding.enabled", False),
+        # Zen's own first-run page ("Welcome to a calmer internet") is shown until this is set.
+        ("zen.welcome-screen.seen", True),
+        ("browser.startup.page", 1),
+        ("browser.startup.firstrunSkipsHomepage", True),
+        ("browser.startup.couldRestoreSession.count", 0),
         ("trailhead.firstrun.didSeeAboutWelcome", True),
         ("browser.tabs.warnOnClose", False),
         ("browser.warnOnQuit", False),
@@ -91,13 +101,15 @@ def browser_prefs(download_dir):
         ("dom.ipc.processCount", 1),
         ("toolkit.telemetry.reportingpolicy.firstRun", False),
     ]
+    if homepage:
+        prefs.append(("browser.startup.homepage", homepage))
     lines = ["// Written by scenarios/w2-excalidraw.sh for this run only."]
     lines += [f"user_pref({json.dumps(k)}, {json.dumps(v)});" for k, v in prefs]
     return "\n".join(lines) + "\n"
 
 
 def cmd_browser_prefs(args):
-    print(browser_prefs(args.download_dir), end="")
+    print(browser_prefs(args.download_dir, args.homepage), end="")
     return 0
 
 
@@ -296,8 +308,13 @@ def data_of(m):
 
 
 def confirm_traffic(path):
-    """([request], [answer]) in bus order: org.quire.Confirm1.Confirm calls and the Response signals sent back."""
-    requests, answers = [], []
+    """[(request, answer or None)] in bus order for org.quire.Confirm1.Confirm calls.
+
+    A call is paired with its answer through the object path the call returns: the Response signal on that path is the
+    sheet's answer. (The router's own Response signals, to its callers, have other paths and are not mixed in.)
+    """
+    calls, paths, answers = {}, {}, {}
+    order = []
     for m in bus_messages(path):
         data = data_of(m)
         if not data:
@@ -305,12 +322,15 @@ def confirm_traffic(path):
         kind, interface, member = m.get("type"), str(m.get("interface", "")), m.get("member")
         try:
             if kind == "method_call" and interface == "org.quire.Confirm1" and member == "Confirm":
-                requests.append(json.loads(data[0]))
+                calls[m.get("cookie")] = json.loads(data[0])
+                order.append(m.get("cookie"))
+            elif kind == "method_return" and m.get("reply_cookie") in calls and isinstance(data[0], str):
+                paths[m["reply_cookie"]] = data[0]
             elif kind == "signal" and interface.startswith("org.quire.Intents1") and member == "Response":
-                answers.append(json.loads(data[-1]))
+                answers[m.get("path")] = json.loads(data[-1])
         except (ValueError, TypeError):
             continue
-    return requests, answers
+    return [(calls[c], answers.get(paths.get(c))) for c in order]
 
 
 def request_row(request, answer):
@@ -335,8 +355,7 @@ def request_row(request, answer):
 
 
 def sheet_rows(path):
-    requests, answers = confirm_traffic(path)
-    return [request_row(r, answers[i] if i < len(answers) else None) for i, r in enumerate(requests)]
+    return [request_row(r, a) for r, a in confirm_traffic(path)]
 
 
 def cmd_sheets(args):
@@ -346,11 +365,19 @@ def cmd_sheets(args):
 
 
 def cmd_sheet_info(args):
-    requests, _ = confirm_traffic(args.bus)
-    for request in requests:
+    for request, _ in confirm_traffic(args.bus):
         if str(request.get("id")) == args.id:
             row = request_row(request, None)
             print("\t".join([row["kind"], row["gesture"], row["app"], row["action"]]))
+            return 0
+    return 1
+
+
+def cmd_sheet_answer(args):
+    """Exit 0 and print the answer's kind when the bus carried a reply for sheet ID; 1 when it did not (yet)."""
+    for request, answer in confirm_traffic(args.bus):
+        if str(request.get("id")) == args.id and answer is not None:
+            print(answer.get("kind", "none"))
             return 0
     return 1
 
@@ -362,6 +389,40 @@ def read_tsv(path):
         return [line.split("\t") for line in Path(path).read_text().splitlines() if line.strip()]
     except OSError:
         return []
+
+
+def short(text, limit):
+    text = " ".join(str(text).split())
+    return text if len(text) <= limit else text[: limit - 1] + "..."
+
+
+def turn_lines(rows):
+    """One line per model turn: who, how long, the tool calls with short arguments, and any words."""
+    lines = []
+    for row in rows:
+        answer = (row.get("answer") or {}).get("v") or {}
+        calls = answer.get("calls", []) if isinstance(answer, dict) else []
+        said = answer.get("text", "") if isinstance(answer, dict) else ""
+        what = "; ".join(f"{c.get('name', '?')}({short(c.get('args', ''), 80)})" for c in calls) or "no tool call"
+        words = f" says: {short(said, 160)}" if said else ""
+        lines.append(f"- {row.get('n', '?')}. {w1.conversation_label(row)} ({int(row.get('took_ms') or 0)} ms): {what}{words}")
+    return lines
+
+
+STOP_WORDS = ("fatal runtime error", "panicked", "overflowed its stack")
+
+
+def services_stopped(run):
+    """[(log file, last line that says it stopped)] for the logs of services that ended badly."""
+    run = Path(run)
+    found = []
+    logs = sorted((run / "agent-logs").glob("*.log")) if (run / "agent-logs").is_dir() else []
+    logs += [run / n for n in ("cuad.log", "daemon.log", "casement-up.log") if (run / n).is_file()]
+    for log in logs:
+        hits = [l.strip() for l in log.read_text(errors="replace").splitlines() if any(w in l for w in STOP_WORDS)]
+        if hits:
+            found.append((log.name, short(hits[-1], 160)))
+    return found
 
 
 def build_report(run, expected):
@@ -379,6 +440,9 @@ def build_report(run, expected):
         unchanged = [r for r in briefs if r.get("written") == "unchanged"]
         checks.append(("every brief sheet was answered with its words unchanged", len(unchanged) == len(briefs),
                        f"{len(unchanged)} of {len(briefs)} brief sheet(s) came back with the written text"))
+    stopped = services_stopped(run)
+    checks.append(("no service stopped on its own", not stopped,
+                   "; ".join(f"{n}: {l}" for n, l in stopped) or "none seen"))
     texts = w1.last_words(trace)
     turn = run / "turn.txt"
     if turn.is_file():
@@ -439,6 +503,12 @@ def build_report(run, expected):
         lines += ["No model log was recorded."]
     lines += [""]
 
+    lines += ["## Turn by turn", ""] + (turn_lines(trace) or ["No model log was recorded."]) + [""]
+
+    lines += ["## Services that stopped", ""]
+    lines += [f"- {n}: {l}" for n, l in stopped] or ["None seen."]
+    lines += [""]
+
     lines += ["## Looks at the screen", ""]
     if steps:
         first, last = steps[0][0], steps[-1][0]
@@ -471,7 +541,7 @@ def cmd_report(args):
 
 # ---------------------------------------------------------------- the command line
 
-OWN = {"sentence", "browser-prefs", "check", "sheet-info", "sheets", "report"}
+OWN = {"sentence", "browser-prefs", "check", "sheet-info", "sheet-answer", "sheets", "report"}
 
 
 def build_parser():
@@ -485,9 +555,10 @@ def build_parser():
             p.add_argument(*flags, **kwargs)
 
     command("sentence", cmd_sentence)
-    command("browser-prefs", cmd_browser_prefs, (["--download-dir"], {"required": True}))
+    command("browser-prefs", cmd_browser_prefs, (["--download-dir"], {"required": True}), (["--homepage"], {"default": ""}))
     command("check", cmd_check, (["--run"], {"required": True}), (["--expected"], {"required": True}))
     command("sheet-info", cmd_sheet_info, (["--bus"], {"required": True}), (["--id"], {"required": True}))
+    command("sheet-answer", cmd_sheet_answer, (["--bus"], {"required": True}), (["--id"], {"required": True}))
     command("sheets", cmd_sheets, (["--bus"], {"required": True}))
     command("report", cmd_report, (["--run"], {"required": True}), (["--expected"], {"required": True}))
     return parser

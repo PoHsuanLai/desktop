@@ -225,4 +225,6 @@ the drawing looks like the lamp, and that the assistant used only the screen.
 Limits: the window id the screen helper is allowed to use is `app.zen_browser.zen`, which the script asks Zen to use as
 its window name (unverified; the settings pattern needs a dot). The sheet answers go through the shell's debug keys:
 Return for Allow once and for "Use this brief" (a short brief counts as read at once). A sheet that asks for a hold is
-answered with Tab and a held Space.
+answered with Tab and a held Space. A sheet counts as answered only when the bus carries its reply; the keys are sent again
+every 3 s up to six times, and the report says "not answered" otherwise. The report also lists each model turn, and fails
+the run if a service's log ends in a crash ("Services that stopped").

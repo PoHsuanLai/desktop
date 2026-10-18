@@ -170,7 +170,7 @@ def inferd_config_text(planner, screen):
         "[ai.floor]\nprompt = \"local_network\"\nmail = \"on_device\"\nscreen = \"local_network\"\n\n"
         "[ai.spend]\naccount_daily_cents = 0\napp_daily_cents = 0\n\n"
         + models
-        + "\n".join(engine(*e) for e in dict.fromkeys((planner, screen))) + "\n"
+        + "\n".join(engine(m, u) for m, u in dict((p[0], p[1]) for p in (screen, planner)).items()) + "\n"
         "[probe]\nollama = []\nllama_cpp = []\nlm_studio = []\n"
     )
 
