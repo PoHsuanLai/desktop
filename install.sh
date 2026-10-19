@@ -60,6 +60,8 @@
 #     three go under /usr/local instead and the plan says so; install/system.sh refuses such a prefix on its own (re-audit NEW-ROOT-1)
 #   - stoker: the catalogue goes under the prefix; its installer asks for sudo, doas or pkexec itself for a system
 #     prefix, so outside a --destdir it is left to you, run as yourself
+#   - mailo: the binary under the prefix and its unit in /etc/systemd/user; its installer refuses to run as root
+#     and asks for sudo itself, so outside a --destdir it is left to you, run as yourself (never under sudo)
 #   - almanac, docket, cua: their caller tables go to /etc/quire (always replaced) and docket's default settings to
 #     /etc/xdg/quire. Their installers refuse to run as root and ask for sudo, doas or pkexec themselves for
 #     just those steps, so outside a --destdir they are left to you, run as yourself (never under sudo)
@@ -227,7 +229,8 @@ describe() {
     mailo)
       script=dist/install.sh
       envs=("MAILO_PREFIX=$destdir$prefix" "MAILO_UNIT_DIR=$destdir/etc/systemd/user")
-      writes=("$destdir$prefix" "$destdir/etc/systemd/user") ;;
+      writes=("$destdir$prefix" "$destdir/etc/systemd/user")
+      [ -n "$destdir" ] || yourself="its installer builds as you, refuses to run as root and asks for sudo itself; run it as yourself" ;;
     palmrest)
       # The touchpad service, installed by install/system.sh and not by palmrest's own installer (see the header).
       dir="$HERE"
