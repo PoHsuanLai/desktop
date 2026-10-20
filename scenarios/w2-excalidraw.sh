@@ -475,6 +475,12 @@ step_pages() {
     note "(The browser's window was not seen in the timing lines; carrying on.)"
   fi
   sleep 5
+  # A person reading the page has clicked into it, which makes the browser the active app (casement keys a newly
+  # mapped window only when its app is already active). The click lands in the page's right margin, clear of the
+  # centred text, the browser's left sidebar and the notification column.
+  casementctl debug inject "move $(( ${SIZE%x*} * 3 / 4 )) $(( ${SIZE#*x} / 2 ))" "sleep 60" "press left" "sleep 40" \
+    "release left" >>"$RUN/input.log" 2>&1 || note "(The click into the page was refused; see input.log.)"
+  sleep 1
   snap pages-open
 }
 
