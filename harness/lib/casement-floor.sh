@@ -53,8 +53,8 @@ floor_powers() {
 }
 
 # floor_role TOOL: the role TOOL plays in the desktop's caller list (the roles casement checks: shell, settings,
-# portal; and the services sill, detent and transom check by role: accounts, inference, sync, portal_frontend,
-# compositor); nothing
+# portal, agent_tier; and the services sill, detent and transom check by role: accounts, inference, sync,
+# portal_frontend, compositor); nothing
 # for a program that is none. The shell-host demos stand in for the shell: they map the shell's
 # surfaces (an exclusive keyboard, an overlay), which casement gives only to the shell's connection. The ones that
 # need it start through casement-shell-exec (shell-host's comp_as_shell), which asks Compositor1.Connect("shell")
@@ -70,6 +70,7 @@ floor_role() {
     syncd) echo sync ;;
     xdg-desktop-portal) echo portal_frontend ;;
     casement) echo compositor ;;
+    cuad) echo agent_tier ;; # the screen helper: casement leases it a window (Compositor1.LeaseWindow)
     fake-shell) echo shell ;; # transom's dev/lib fake shell (python3), which owns org.quire.Shell in portal-quire
     *) return 1 ;;
   esac
@@ -86,6 +87,7 @@ floor_app() {
     sync) echo org.quire.Sync ;;
     portal_frontend) echo org.freedesktop.portal.Desktop ;;
     compositor) echo org.quire.Compositor ;;
+    agent_tier) echo org.quire.Agent ;;
   esac
 }
 
@@ -127,7 +129,7 @@ floor_rows() {
 # plays a role.
 floor_callers() {
   local role tool path exes
-  for role in shell settings portal portal_frontend compositor accounts inference sync; do
+  for role in shell settings portal portal_frontend compositor agent_tier accounts inference sync; do
     exes=
     for tool in "$@"; do
       [ "$(floor_role "$tool" 2>/dev/null)" = "$role" ] || continue
