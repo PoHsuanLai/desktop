@@ -546,13 +546,15 @@ step_ask_and_wait() {
     if [ "$ask_state" = none ] && ! kill -0 "$ASK_PID" 2>/dev/null; then
       wait "$ASK_PID" 2>/dev/null; rc=$?
       ask_state=ended
+      # Code 8 is quire-do handing the turn to the sheet: it exits at the first confirmation and
+      # the turn goes on behind it, so the full time still applies. Any other end leaves a minute.
       case "$rc" in
         0) note "The assistant has finished its turn." ;;
-        8) note "The assistant is waiting for an answer that nobody here can give (code 8)." ;;
+        8) note "The request is waiting on a sheet (code 8); the turn goes on." ;;
         *) note "The request ended (code $rc): $(tail -1 "$RUN/turn.err" 2>/dev/null)" ;;
       esac
       [ "$drawing_seen" = yes ] && break
-      deadline=$((SECONDS + 60))
+      [ "$rc" = 8 ] || deadline=$((SECONDS + 60))
     fi
     # The turn is still going but the drawing has been saved for a while: stop waiting.
     if [ -n "$saved_at" ] && [ $((SECONDS - saved_at)) -ge "$AFTER_SAVE_S" ]; then note "The drawing has been saved for ${AFTER_SAVE_S} s; stopping."; break; fi
