@@ -194,8 +194,10 @@ acc_providers_only() {
 acc_ca_env() { [ ! -f "$RIG_DIR/servers/ca.pem" ] || echo "SSL_CERT_FILE=$RIG_DIR/servers/ca.pem"; }
 
 # acc_ship_providers: the provider files of $PROV (the pin's, with the rig's brand and fake-host files) into the jail's
-# /usr/share overlay, the Shipped layer. inferd and syncd have no --providers: they read /usr/share/porter/providers and
-# $XDG_DATA_HOME/porter/providers only, and a person's layer may not point a shipped provider at another server.
+# /usr/share overlay, the Shipped layer. inferd and syncd have no --providers: they read the first XDG_DATA_DIRS entry
+# that has porter/providers (the jail pins XDG_DATA_DIRS to /usr/share, so a host install under /usr/local/share
+# cannot shadow it) and $XDG_DATA_HOME/porter/providers, and a person's layer may not point a shipped provider at
+# another server.
 acc_ship_providers() {
   mkdir -p /usr/share/porter/providers
   cp "$PROV"/*.toml /usr/share/porter/providers/

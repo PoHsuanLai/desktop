@@ -162,6 +162,9 @@ args+=(
   --setenv HOME "$scratch/home" --setenv XDG_RUNTIME_DIR "/run/user/$uid"
   --setenv XDG_CONFIG_HOME "$scratch/config" --setenv XDG_STATE_HOME "$scratch/state"
   --setenv XDG_CACHE_HOME "$scratch/cache"
+  # The system data dirs are the overlaid /usr/share alone: the default also reads /usr/local/share, where a host
+  # install (porter's providers, 2026-10-19) shadowed what a scenario ships and sent its daemons to real servers.
+  --setenv XDG_DATA_DIRS /usr/share
   --setenv __EGL_VENDOR_LIBRARY_FILENAMES /usr/share/glvnd/egl_vendor.d/50_mesa.json
   --setenv VK_ICD_FILENAMES "$vulkan_icd"
   --setenv MESA_SHADER_CACHE_DISABLE true --setenv LP_NUM_THREADS 4
