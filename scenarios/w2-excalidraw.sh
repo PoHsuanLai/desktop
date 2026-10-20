@@ -49,6 +49,8 @@ LAMP_DIR="$WF/fixtures/w1"
 TIMEOUT=3600 SHOTS=yes PRINT_BUILD=no
 SHOT_EVERY=${W2_SHOT_EVERY:-120}
 AFTER_SAVE_S=${W2_AFTER_SAVE_S:-300}
+# A question (never a sheet) that nobody answers, with nothing moving on the bus for this long, ends the run.
+STALL_S=${W2_STALL_S:-120}
 PLANNER_MODEL=${W2_PLANNER_MODEL:-qwen3-4b-instruct-2507-fp8}
 SCREEN_MODEL=${W2_SCREEN_MODEL:-holo4-35b-a3b-fp8}
 BROWSER_APP=${W2_BROWSER_APP:-app.zen_browser.zen}
@@ -520,7 +522,7 @@ step_ask_and_wait() {
   stamp asked
   post_turn
   local audit=$AGENTS/.local/state/quire/inferd/audit.jsonl
-  local deadline=$((SECONDS + TIMEOUT)) next_shot=$((SECONDS + SHOT_EVERY)) saved_at="" rc
+  local deadline=$((SECONDS + TIMEOUT)) next_shot=$((SECONDS + SHOT_EVERY)) next_stall=$SECONDS saved_at="" rc
   local turn_seen=no screen_seen=no svg_seen=no drawing_seen=no ask_state=none last_sheets=0 f s size prev=-1 stable=0
   while [ "$SECONDS" -lt "$deadline" ]; do
     f=$(ls -t "$OUT"/*.excalidraw 2>/dev/null | head -1)
@@ -555,6 +557,15 @@ step_ask_and_wait() {
       esac
       [ "$drawing_seen" = yes ] && break
       [ "$rc" = 8 ] || deadline=$((SECONDS + 60))
+    fi
+    # Every open task waits on a question (not a sheet) and nothing has moved for STALL_S: nobody here answers it.
+    if [ "$SECONDS" -ge "$next_stall" ]; then
+      next_stall=$((SECONDS + 10))
+      if "${PY2[@]}" stalled --bus "$RUN/bus.jsonl" --quiet "$STALL_S" >"$RUN/stalled.txt"; then
+        note "Stopped: the assistant waits on a question nobody here answers, with nothing moving for ${STALL_S} s: $(head -1 "$RUN/stalled.txt")"
+        break
+      fi
+      rm -f "$RUN/stalled.txt"
     fi
     # The turn is still going but the drawing has been saved for a while: stop waiting.
     if [ -n "$saved_at" ] && [ $((SECONDS - saved_at)) -ge "$AFTER_SAVE_S" ]; then note "The drawing has been saved for ${AFTER_SAVE_S} s; stopping."; break; fi

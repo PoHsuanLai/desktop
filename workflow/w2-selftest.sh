@@ -174,6 +174,31 @@ mkrun r-bad notjson; res=$(rows r-bad); code "drawing: a file that is not JSON f
 mkdir -p "$scratch/r-none/out"; res=$(rows r-none); code "drawing: no file fails" 1 $?
 has "drawing: says none found" "$res" "none found"
 
+# ---- a stall: every open task waits on a question nobody here answers, and the bus is quiet
+stall_bus() { # FILE AGE_S PHASE_JSON...: one Updated signal per phase, AGE_S seconds old
+  python3 -I - "$@" <<'P'
+import json, sys, time
+path, age, phases = sys.argv[1], float(sys.argv[2]), sys.argv[3:]
+with open(path, "w") as out:
+    for n, phase in enumerate(phases):
+        answer = {"task": f"t-{n}", "phase": json.loads(phase)}
+        out.write(json.dumps({"type": "signal", "interface": "org.quire.Companion1.Answer", "member": "Updated",
+                              "timestamp-realtime": int((time.time() - age) * 1e6),
+                              "payload": {"type": "s", "data": [json.dumps(answer)]}}) + "\n")
+P
+}
+question='{"kind":"needs_you","v":{"kind":"question","v":{"text":"How would you like me to go on?","choices":[]}}}'
+confirm='{"kind":"needs_you","v":{"kind":"confirm","v":"c-9"}}'
+stall_bus "$scratch/stall.jsonl" 300 "$question" '{"kind":"done"}'
+out=$("${PY[@]}" stalled --bus "$scratch/stall.jsonl" --quiet 120); code "stalled: a question and a finished task, quiet" 0 $?
+has "stalled: prints the question" "$out" "t-0: How would you like me to go on?"
+stall_bus "$scratch/stall.jsonl" 30 "$question"
+"${PY[@]}" stalled --bus "$scratch/stall.jsonl" --quiet 120 >/dev/null; code "stalled: not while the bus moved lately" 1 $?
+stall_bus "$scratch/stall.jsonl" 300 "$question" "$confirm"
+"${PY[@]}" stalled --bus "$scratch/stall.jsonl" --quiet 120 >/dev/null; code "stalled: never while a sheet waits" 1 $?
+stall_bus "$scratch/stall.jsonl" 300 "$question" '{"kind":"streaming"}'
+"${PY[@]}" stalled --bus "$scratch/stall.jsonl" --quiet 120 >/dev/null; code "stalled: not while a task still works" 1 $?
+
 # ---- the sheets, read from a canned bus record
 python3 -I - "$scratch/bus.jsonl" <<'P'
 import json, sys

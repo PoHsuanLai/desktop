@@ -22,6 +22,7 @@ import importlib.util
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -385,6 +386,57 @@ def cmd_sheet_answer(args):
     return 1
 
 
+# A task's answer phase that is over: nothing more comes from it.
+CLOSED_PHASES = {"done", "cancelled", "failed"}
+
+
+def task_phases(path):
+    """({task: its latest answer phase}, the bus time in seconds of the last assistant or sheet message, or None)."""
+    phases, last = {}, None
+    for m in bus_messages(path):
+        interface = str(m.get("interface", ""))
+        if not (interface.startswith("org.quire.Companion1") or interface.startswith("org.quire.Confirm1")):
+            continue
+        last = m.get("timestamp-realtime", 0) / 1e6
+        data = data_of(m)
+        if m.get("member") != "Updated" or not data or not isinstance(data[0], str):
+            continue
+        try:
+            answer = json.loads(data[0])
+        except ValueError:
+            continue
+        if isinstance(answer, dict) and answer.get("task") and isinstance(answer.get("phase"), dict):
+            phases[answer["task"]] = answer["phase"]
+    return phases, last
+
+
+def open_question(phase):
+    """The words of a question or form the task waits on (the person's, never a sheet), else None."""
+    if phase.get("kind") != "needs_you" or not isinstance(phase.get("v"), dict):
+        return None
+    needs = phase["v"]
+    if needs.get("kind") == "confirm":
+        return None
+    v = needs.get("v")
+    text = v.get("text") if isinstance(v, dict) else None
+    return str(text or needs.get("kind"))
+
+
+def cmd_stalled(args):
+    """Exit 0 and print "task: question" lines when every task still open waits on a question (not a sheet) and nothing
+    has moved on the bus for --quiet seconds; 1 otherwise. A sheet (a confirmation) is never a stall: it is answered."""
+    phases, last = task_phases(args.bus)
+    if last is None or time.time() - last < args.quiet:
+        return 1
+    open_tasks = {t: p for t, p in phases.items() if p.get("kind") not in CLOSED_PHASES}
+    questions = {t: open_question(p) for t, p in open_tasks.items()}
+    if not questions or any(q is None for q in questions.values()):
+        return 1
+    for task, question in sorted(questions.items()):
+        print(f"{task}: {short(question, 200)}")
+    return 0
+
+
 # ---------------------------------------------------------------- the report
 
 def read_tsv(path):
@@ -452,6 +504,10 @@ def build_report(run, expected):
         texts.append(turn.read_text(errors="replace"))
     hits = w1.guard_hits(texts)
     checks.append(("the turn did not end in the guard's words", not hits, ", ".join(f'"{h}"' for h in hits) or "none seen"))
+    stall = run / "stalled.txt"
+    stalled = stall.read_text(errors="replace").strip() if stall.is_file() else ""
+    checks.append(("the run did not stop on a question nobody here answers", not stalled,
+                   short(stalled.replace("\n", "; "), 300) or "none seen"))
     ok_all = all(ok for _, ok, _ in checks)
 
     lines = [f"# Workflow W2 (lamp page to a drawing): {'PASS' if ok_all else 'FAIL'}", "", f"Run folder: {run}", ""]
@@ -544,7 +600,7 @@ def cmd_report(args):
 
 # ---------------------------------------------------------------- the command line
 
-OWN = {"sentence", "browser-prefs", "check", "sheet-info", "sheet-answer", "sheets", "report"}
+OWN = {"sentence", "browser-prefs", "check", "sheet-info", "sheet-answer", "sheets", "stalled", "report"}
 
 
 def build_parser():
@@ -563,6 +619,7 @@ def build_parser():
     command("sheet-info", cmd_sheet_info, (["--bus"], {"required": True}), (["--id"], {"required": True}))
     command("sheet-answer", cmd_sheet_answer, (["--bus"], {"required": True}), (["--id"], {"required": True}))
     command("sheets", cmd_sheets, (["--bus"], {"required": True}))
+    command("stalled", cmd_stalled, (["--bus"], {"required": True}), (["--quiet"], {"type": float, "default": 120.0}))
     command("report", cmd_report, (["--run"], {"required": True}), (["--expected"], {"required": True}))
     return parser
 
