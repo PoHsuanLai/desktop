@@ -26,7 +26,8 @@
 # (the window id, default app.zen_browser.zen), W2_DRAW_DIR (the offline build, default
 # $JAIL_REAL_HOME/.cache/quire-workflow/excalidraw-0.18.0), W2_STOKER_CATALOG, W2_PROVIDERS, W2_SHOT_EVERY (seconds,
 # default 120), W2_CUA_STEPS (default 300), W2_CUA_ACTIVE_S (default 1800), W2_AFTER_SAVE_S (how long to keep waiting for
-# the turn to end after the drawing is saved, default 300).
+# the turn to end after the drawing is saved, default 300), W2_CLICK_PAGE (1, the default: the person clicks into the
+# lamp page, so the browser is the active app; 0: no click, so the screen helper has to ask the compositor for focus).
 #
 #   scenarios/w2-excalidraw.sh [--timeout SECONDS] [--no-shots] [--print-build]
 #
@@ -51,6 +52,8 @@ AFTER_SAVE_S=${W2_AFTER_SAVE_S:-300}
 PLANNER_MODEL=${W2_PLANNER_MODEL:-qwen3-4b-instruct-2507-fp8}
 SCREEN_MODEL=${W2_SCREEN_MODEL:-holo4-35b-a3b-fp8}
 BROWSER_APP=${W2_BROWSER_APP:-app.zen_browser.zen}
+CLICK_PAGE=${W2_CLICK_PAGE:-1}
+case "$CLICK_PAGE" in 0 | 1) ;; *) echo "w2-excalidraw: W2_CLICK_PAGE is 0 or 1, not '$CLICK_PAGE'" >&2; exit 64 ;; esac
 PLANNER_PORT=18090 SCREEN_PORT=18091   # inside the jail's own network: nothing else listens there
 
 usage() { sed -n '2,/^set -uo/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'; }
@@ -478,8 +481,13 @@ step_pages() {
   # A person reading the page has clicked into it, which makes the browser the active app (casement keys a newly
   # mapped window only when its app is already active). The click lands in the page's right margin, clear of the
   # centred text, the browser's left sidebar and the notification column.
-  casementctl debug inject "move $(( ${SIZE%x*} * 3 / 4 )) $(( ${SIZE#*x} / 2 ))" "sleep 60" "press left" "sleep 40" \
-    "release left" >>"$RUN/input.log" 2>&1 || note "(The click into the page was refused; see input.log.)"
+  # W2_CLICK_PAGE=0 leaves it out, to test the screen helper asking the compositor for focus instead.
+  if [ "$CLICK_PAGE" = 1 ]; then
+    casementctl debug inject "move $(( ${SIZE%x*} * 3 / 4 )) $(( ${SIZE#*x} / 2 ))" "sleep 60" "press left" "sleep 40" \
+      "release left" >>"$RUN/input.log" 2>&1 || note "(The click into the page was refused; see input.log.)"
+  else
+    note "(No click into the page: W2_CLICK_PAGE=0, so the screen helper has to ask for focus.)"
+  fi
   sleep 1
   snap pages-open
 }
