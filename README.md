@@ -6,6 +6,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | Path | What |
 |---|---|
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
+| `justfile`, `install/plain.sh` | `just`: builds every part as you and installs it with one sudo, a line per part (see Installing) |
 | `install.sh` | installs the desktop: runs each component repo's own installer in order (callers, porter, stoker, almanac, docket, cua, detent, casement, sill, transom, turnstile, keycap, anyview, mailo, palmrest, session; callers, turnstile, keycap and palmrest are this repo's `install/system.sh`) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
 | `docs/distros.md` | Ubuntu 24.04+, Fedora and Arch: what is checked, the install lines, picking the session at login, the Ubuntu AppArmor note |
 | `docs/release-notes.md` | the notes for the release being prepared, in plain words (what a person sees change); the text for the release's notes |
@@ -32,6 +33,22 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | `harness/lib/regress.sh`, `pixels.py`, `sheet-bus.py` | what the `accounts-regress-*` scenarios share: checks that fail a step (`must`), the sheet's traffic read from the recorded bus (what accountd shows it, what the keys sent back), and measurements of a capture (the card's box, equal pixels, dark text, contrast). sill's surfaces write no debug probe (shell-host does not run ds-blitz's), so the sheet is read this way; detent's controls are read by role and name |
 
 ## Installing
+
+With every part checked out beside this repo (`~/sill`, `~/detent`, ...):
+
+```
+just              # build everything as you, then install it (sudo asks once)
+just only sill detent
+just build        # build only
+just check        # what this machine lacks
+```
+
+One line per part; the whole output is in `~/.local/state/desktop-install.log`, and a failure prints
+its last lines. `install/plain.sh` holds how each part is built (as you, never as root) and installed (its
+own installer, with `--no-build` where it installs as root). `PREFIX` (default `/usr/local`) and `SIBLINGS`
+can be set in the environment.
+
+`install.sh`, below, is the packaging path (`--destdir`, `--sysconfdir`, a staged tree) and `--check`.
 
 `./install.sh [--dry-run] [--prefix DIR] [--destdir DIR] [--sysconfdir DIR] [--siblings DIR] [--only NAME,...]`
 runs each component's own installer, siblings checked out side by side, in this order: callers
