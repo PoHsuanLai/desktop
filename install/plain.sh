@@ -53,7 +53,9 @@ install_part() {
     transom) sudo "$s/transom/scripts/install.sh" --prefix "$p" --no-build ;;
     turnstile | keycap | palmrest) sudo "$d/install/system.sh" "$1" --prefix "$p" --siblings "$s" ;;
     anyview) sudo "$s/anyview/dist/install.sh" --prefix "$p" --no-build ;;
-    mailo) MAILO_PREFIX=$p MAILO_UNIT_DIR=/etc/systemd/user "$s/mailo/dist/install.sh" ;;
+    # Only the prefix: with MAILO_UNIT_DIR set too, mailo takes both for a place you own and never asks
+    # for sudo. Its unit goes to its default, /etc/systemd/user.
+    mailo) MAILO_PREFIX=$p "$s/mailo/dist/install.sh" ;;
     session) sudo "$d/install/install.sh" --prefix "$p" --sysconfdir /etc --siblings "$s" ;;
   esac
 }
