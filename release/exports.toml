@@ -46,6 +46,10 @@ link = "/usr/local/bin/mailo"
 target = "bin/mailo"
 
 [[export]]
+link = "/usr/local/bin/files"
+target = "bin/files"
+
+[[export]]
 link = "/usr/local/bin/slipway"
 target = "bin/slipway"
 

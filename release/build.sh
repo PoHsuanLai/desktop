@@ -7,12 +7,12 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo slipway satellite); the
+#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo files slipway satellite); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
 # /opt/quire/current under the destdir OUT/stage, through the component's own installer where it can stage
-# (porter, stoker, almanac, docket, cua, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, turnstile,
+# (porter, stoker, almanac, docket, cua, detent, anyview, mailo, files, and the session in install/). The others (casement, sill, transom, turnstile,
 # keycap, palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
@@ -238,6 +238,13 @@ build_mailo() {
   # INTERIM: the installer writes the destdir-prefixed path into the D-Bus service file; it must name the
   # installed one (FINDINGS.md).
   sed -i "s|$root|$P|g" "$root/share/dbus-1/services/org.quire.Mail.service"
+}
+
+build_files() {
+  local d; d=$(repo_dir files)
+  cargo_in "$d" files -p files --bin files
+  # FILES_PREFIX is the installed path (the service files name it), FILES_DESTDIR the stage.
+  (cd "$d" && FILES_BIN="$(tdir files)/files" FILES_PREFIX="$P" FILES_DESTDIR="$stage" ./dist/install.sh --no-build)
 }
 
 build_transom() {

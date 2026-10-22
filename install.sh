@@ -13,14 +13,14 @@
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
 #   --only NAMES   just these components (comma separated: callers, porter, stoker, almanac, docket, cua, detent, casement, sill,
-#                  transom, turnstile, keycap, anyview, mailo, palmrest, session, fonts)
+#                  transom, turnstile, keycap, anyview, mailo, files, palmrest, session, fonts)
 #
 # Order: callers (the list of the desktop's own programs, /etc/quire/desktop-callers.toml, this repo's dist/), porter (the account daemons and the caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
 # docket (the action router, the companion, the reader and the tool server, with their caller tables; they read
 # porter's accounts), cua (the computer-use daemon cuad, for apps that are not ours, and its caller table), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
 # scripts/install.sh builds it), turnstile (the input service that makes virtual keyboards and pads, from install/system.sh), keycap (the
-# keyboard map, also from install/system.sh), anyview, mailo, palmrest (the touchpad service, also from install/system.sh), and last the session itself (this repo's
+# keyboard map, also from install/system.sh), anyview, mailo, files (the file manager), palmrest (the touchpad service, also from install/system.sh), and last the session itself (this repo's
 # install/install.sh: the desktop-session script, the user target and the login entry "sill (casement)"). Each
 # component's installer is its
 # own: this script passes the prefix and the staging root through and nothing else, and stops at the first
@@ -62,6 +62,9 @@
 #     prefix, so outside a --destdir it is left to you, run as yourself
 #   - mailo: the binary under the prefix and its unit in /etc/systemd/user; its installer refuses to run as root
 #     and asks for sudo itself, so outside a --destdir it is left to you, run as yourself (never under sudo)
+#   - files: the binary, the desktop entry, the two bus services (its own and the desktop's file-manager name) and the intents
+#     under the prefix; its installer refuses to run as root and asks for sudo itself for a place you do not own, so outside a
+#     --destdir it is left to you, run as yourself (never under sudo)
 #   - almanac, docket, cua: their caller tables go to /etc/quire (always replaced) and docket's default settings to
 #     /etc/xdg/quire. Their installers refuse to run as root and ask for sudo, doas or pkexec themselves for
 #     just those steps, so outside a --destdir they are left to you, run as yourself (never under sudo)
@@ -81,7 +84,7 @@ source "$HERE/install/rootheld.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo palmrest session)
+ORDER=(callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -230,6 +233,11 @@ describe() {
       script=dist/install.sh
       envs=("MAILO_PREFIX=$destdir$prefix" "MAILO_UNIT_DIR=$destdir/etc/systemd/user")
       writes=("$destdir$prefix" "$destdir/etc/systemd/user")
+      [ -n "$destdir" ] || yourself="its installer builds as you, refuses to run as root and asks for sudo itself; run it as yourself" ;;
+    files)
+      script=dist/install.sh
+      envs=("FILES_PREFIX=$prefix" "FILES_DESTDIR=$destdir")
+      writes=("$destdir$prefix")
       [ -n "$destdir" ] || yourself="its installer builds as you, refuses to run as root and asks for sudo itself; run it as yourself" ;;
     palmrest)
       # The touchpad service, installed by install/system.sh and not by palmrest's own installer (see the header).

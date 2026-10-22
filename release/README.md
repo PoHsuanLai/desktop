@@ -101,7 +101,7 @@ and palmrest are system files in `/usr/lib/systemd/system` and were never links.
 
    - `RELEASE_READ_TOKEN`: resource owner PoHsuanLai, repositories: every private repo in `manifest.toml`
      plus slipway (quire, sill, shell-host, blitz-kit, keycap, palmrest, porter, stoker, almanac, docket,
-     cua, latchkey, bulkhead, bayonet, mailo, detent, transom, anyview, mpv-wgpu, casement-protocols, casement,
+     cua, latchkey, bulkhead, bayonet, mailo, files, detent, transom, anyview, mpv-wgpu, casement-protocols, casement,
      slipway); permission Contents: Read-only, and nothing else.
    - `RELEASES_TOKEN`: repository PoHsuanLai/desktop-releases only; permission Contents: Read and write.
 
@@ -152,7 +152,7 @@ gh workflow run release.yml --repo PoHsuanLai/desktop -f version=0.2.0 -f notes=
 
 or tag: `git tag -a v0.2.0 -m "What changed" && git push origin v0.2.0` (the tag's message is the notes).
 The notes for the next release are kept in `docs/release-notes.md` while it is prepared; use them as the text.
-The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, porter, almanac with docket, stoker and cua, turnstile, keycap and palmrest (the programs the system manager starts, a job each), and the small ones together, with xwayland-satellite, which is built from its public repository at the commit in `build.sh`, `SATELLITE_REV`, the one `SATELLITE_TAG` names) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
+The workflow builds the components in parallel jobs (casement, sill, anyview, mailo, files, porter, almanac with docket, stoker and cua, turnstile, keycap and palmrest (the programs the system manager starts, a job each), and the small ones together, with xwayland-satellite, which is built from its public repository at the commit in `build.sh`, `SATELLITE_REV`, the one `SATELLITE_TAG` names) in an `ubuntu:24.04` container (the oldest supported base, so the programs load on Fedora and
 Arch as well), checks their glibc and library needs, packs and signs, verifies, installs the signed release with
 slipway's helper in clean Ubuntu 24.04, Fedora 44 and Arch containers, and only then creates the release
 `v0.2.0` in desktop-releases. Watch it with

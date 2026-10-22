@@ -89,6 +89,7 @@ jobs:
           - { name: sill, only: sill }
           - { name: anyview, only: anyview }
           - { name: mailo, only: mailo }
+          - { name: files, only: files }
           - { name: porter, only: porter }
           - { name: agents, only: "almanac,docket,stoker,cua" }
           # Each program the system manager starts has a job of its own: release/stage-owners.list lets only that job supply it and

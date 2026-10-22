@@ -17,10 +17,10 @@ log=${XDG_STATE_HOME:-$HOME/.local/state}/desktop-install.log
 # shellcheck source=install/cargo.sh
 . "$here/cargo.sh"
 
-all=(callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo palmrest session)
+all=(callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
 
 # build_part PART: build what PART's installer installs, as you. Parts whose installer builds as you and
-# asks for sudo itself (stoker, almanac, docket, cua, sill, mailo) build in their install step instead.
+# asks for sudo itself (stoker, almanac, docket, cua, sill, mailo, files) build in their install step instead.
 build_part() {
   local s=$siblings
   case $1 in
@@ -56,6 +56,8 @@ install_part() {
     # Only the prefix: with MAILO_UNIT_DIR set too, mailo takes both for a place you own and never asks
     # for sudo. Its unit goes to its default, /etc/systemd/user.
     mailo) MAILO_PREFIX=$p "$s/mailo/dist/install.sh" ;;
+    # Its installer builds as you and asks for sudo itself only when the prefix is not yours.
+    files) FILES_PREFIX=$p "$s/files/dist/install.sh" ;;
     session) sudo "$d/install/install.sh" --prefix "$p" --sysconfdir /etc --siblings "$s" ;;
   esac
 }

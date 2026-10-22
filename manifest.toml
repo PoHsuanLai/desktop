@@ -115,6 +115,12 @@ rev = "5548954a5b1e40e8809de88d2ef5da68f941ec29"
 branch = "master"
 gate = "none"
 
+[repo.files]
+url = "https://github.com/PoHsuanLai/files.git"
+rev = "049fc5e422f5970ae5b87bf894253b13ce0be4d3"
+branch = "master"
+gate = "none"
+
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
 rev = "730fdb6743b66fc65b51f1aa6a389ce95cf69dc7"
