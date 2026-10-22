@@ -20,7 +20,7 @@ stub() { # REPO-RELATIVE-SCRIPT FAIL-NAME
   mkdir -p "$(dirname "$f")"
   cat >"$f" <<STUB
 #!/usr/bin/env bash
-echo "$1 \$* PREFIX=\${PREFIX:-} DESTDIR=\${DESTDIR:-} MAILO_PREFIX=\${MAILO_PREFIX:-} FLAGS=\${RUSTFLAGS-unset}" >>"$log"
+echo "$1 \$* PREFIX=\${PREFIX:-} DESTDIR=\${DESTDIR:-} MAILO_PREFIX=\${MAILO_PREFIX:-} FILES_PREFIX=\${FILES_PREFIX:-} FILES_DESTDIR=\${FILES_DESTDIR:-} FLAGS=\${RUSTFLAGS-unset}" >>"$log"
 [ "\${STUB_FAIL:-}" != "$2" ] || exit 7
 STUB
   chmod +x "$f"
@@ -37,6 +37,7 @@ stub transom/scripts/install.sh transom
 stub keycap/install.sh keycap
 stub anyview/dist/install.sh anyview
 stub mailo/dist/install.sh mailo
+stub files/dist/install.sh files
 stub palmrest/install.sh palmrest
 # The two units the session installer puts in /etc/systemd/user, as the casement and sill checkouts ship them.
 mkdir -p "$sib/casement/dist" "$sib/sill/dist"
@@ -72,7 +73,7 @@ inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot "$INSTA
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo palmrest session " ] || fail "plan order is: $order"
+[ "$order" = "callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'callers .*runs .*install/system.sh callers --destdir' || fail "the callers table is not placed first, into the staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'turnstile .*runs .*install/system.sh turnstile --prefix /usr/local --destdir' || fail "the input service does not run into a staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'keycap .*runs .*install/system.sh keycap --prefix /usr/local --destdir' || fail "the keyboard map is not placed by the desktop's own script: $plan"
@@ -177,6 +178,7 @@ grep -q "^cua/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail
 grep -q "^detent/scripts/install.sh  PREFIX=/opt/d DESTDIR=$dest" "$log" || fail "detent did not get PREFIX and DESTDIR"
 grep -q "^transom/scripts/install.sh --prefix /opt/d --destdir $dest" "$log" || fail "transom did not get the prefix and destdir"
 grep -q "MAILO_PREFIX=$dest/opt/d" "$log" || fail "mailo did not get its prefix"
+grep -q "FILES_PREFIX=/opt/d FILES_DESTDIR=$dest" "$log" || fail "files did not get its prefix and destdir"
 ! grep -q "^keycap/install.sh" "$log" || fail "keycap's own installer ran: it gives the input group /dev/uinput and the service a drop-in to open it"
 ! grep -q "^palmrest/install.sh" "$log" || fail "palmrest's own installer ran: the desktop places the touchpad service with install/system.sh"
 grep -q "^transom/scripts/install.sh" "$log" || fail "no component ran"
