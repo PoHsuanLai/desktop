@@ -422,9 +422,33 @@ def open_question(phase):
     return str(text or needs.get("kind"))
 
 
+def screen_waits(path):
+    """([the question of each screen run whose latest state is waiting_for_user], the bus time in seconds of the last
+    screen-run message, or None). A screen run's question goes to the person, not through the assistant's answer."""
+    state, asked, last = {}, {}, None
+    for m in bus_messages(path):
+        if not str(m.get("interface", "")).startswith("org.quire.Cua1.Run"):
+            continue
+        last = m.get("timestamp-realtime", 0) / 1e6
+        run, data = m.get("path"), data_of(m)
+        if m.get("member") == "StateChanged" and data:
+            state[run] = str(data[0])
+        elif m.get("member") == "AskUser" and len(data) > 1:
+            try:
+                asked[run] = json.loads(data[1])["body"]["question"]["value"]
+            except (ValueError, KeyError, TypeError):
+                asked[run] = "a question"
+    return [asked.get(r, "a question") for r, st in state.items() if st == "waiting_for_user"], last
+
+
 def cmd_stalled(args):
     """Exit 0 and print "task: question" lines when every task still open waits on a question (not a sheet) and nothing
     has moved on the bus for --quiet seconds; 1 otherwise. A sheet (a confirmation) is never a stall: it is answered."""
+    waits, screen_last = screen_waits(args.bus)
+    if waits and screen_last is not None and time.time() - screen_last >= args.quiet:
+        for question in waits:
+            print(f"screen run: {short(question, 200)}")
+        return 0
     phases, last = task_phases(args.bus)
     if last is None or time.time() - last < args.quiet:
         return 1
