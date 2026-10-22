@@ -83,6 +83,8 @@ has "catalog: a given parser wins" "$(cat "$scratch/given.toml")" 'tool_parser =
 sed -i 's/, "--tool-call-parser", "qwen3_coder"//' "$scratch/entry.toml"
 "${PY[@]}" catalog --src "$scratch/entry.toml" --out "$scratch/none.toml" --served demo 2>/dev/null \
   && bad "catalog: an entry naming no parser is refused" || ok "catalog: an entry naming no parser is refused"
+"${PY[@]}" catalog --src "$scratch/out.toml" --out "$scratch/again.toml" --served other
+has "catalog: an attached entry keeps the parsers it says" "$(cat "$scratch/again.toml")" 'served_name = "other", tool_parser = "qwen3_coder", reasoning_parser = "qwen3" } }'
 lacks "catalog: the engine rows are gone" "$entry" "[[engine]]"
 lacks "catalog: the old serving line is gone" "$entry" "launched"
 has "catalog: the rest is kept" "$entry" '[text_out]'

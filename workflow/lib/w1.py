@@ -117,20 +117,27 @@ def cmd_served(_args):
 
 
 def engine_parsers(text):
-    """(tool parser, reasoning parser or "") from the entry's vllm `[[engine]]` args.
+    """(tool parser, reasoning parser or "") the entry itself names: its attached `serving`'s, else
+    its vllm `[[engine]]` args'.
 
     The engine on the other computer is started with the entry's own line, so the parsers it named
-    there are the ones the attached entry must say; a model is added as catalogue data alone.
+    there are the ones the attached entry must say; an entry already attached says them in `serving`.
+    Either way a model is added as catalogue data alone.
     """
     def flag(args, name):
         return next((args[i + 1] for i, arg in enumerate(args[:-1]) if arg == name), "")
 
-    for engine in tomllib.loads(text).get("engine", []):
+    entry = tomllib.loads(text)
+    serving = entry.get("serving", {})
+    attached = serving.get("v", {}) if serving.get("kind") == "attached" else {}
+    if attached.get("tool_parser"):
+        return attached["tool_parser"], attached.get("reasoning_parser", "")
+    for engine in entry.get("engine", []):
         args = engine.get("args", []) if engine.get("kind") == "vllm" else []
         tool = flag(args, "--tool-call-parser")
         if tool:
             return tool, flag(args, "--reasoning-parser")
-    raise ValueError("the catalogue entry has no vllm engine line naming a --tool-call-parser")
+    raise ValueError("the catalogue entry names no tool parser (an attached serving, or a vllm engine line)")
 
 
 def attached_catalog(text, served, tool_parser="", reasoning_parser=""):
