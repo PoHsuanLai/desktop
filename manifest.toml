@@ -117,7 +117,7 @@ gate = "none"
 
 [repo.files]
 url = "https://github.com/PoHsuanLai/files.git"
-rev = "049fc5e422f5970ae5b87bf894253b13ce0be4d3"
+rev = "8bde8f5b6b962fcacd9a5d6fcaee944c5131813a"
 branch = "master"
 gate = "none"
 
