@@ -95,7 +95,8 @@
 #
 # casement.service and sill.service come from their repos (dist/); install/install.sh renders them for the prefix and
 # puts them in the system user-unit folder. This script writes no unit file and no drop-in.
-# X11 apps: casement starts xwayland-satellite itself when it is installed (its default), so nothing is passed.
+# X11 apps: casement starts xwayland-satellite itself when it is installed (its default), so nothing is passed; the
+# display it names (its ready status or its log) becomes DISPLAY for the shell and every program it starts.
 set -euo pipefail
 
 log() { printf 'desktop-session: %s\n' "$*" >&2; }
@@ -233,6 +234,9 @@ trap on_term TERM INT HUP
 
 # The socket name casement logs ("casement: listening on wayland-1"); empty if it has not yet.
 socket_of() { sed -n 's/^casement: listening on //p' "$1" | head -n 1; }
+
+# The X11 display casement logs ("casement: X11 display :0", before the socket's line); empty when X11 is not served.
+display_of() { sed -n 's/^casement: X11 display //p' "$1" | head -n 1; }
 
 # The environment D-Bus activation and systemd user units see (portals, autostart, Flatpak).
 publish_environment() {
@@ -402,9 +406,11 @@ first_run() {
     "$(bin detent)" --first-run || log "detent --first-run exited with $?"
 }
 
-# Start the components against the casement whose socket is $1 (a name in XDG_RUNTIME_DIR).
+# Start the components against the casement whose socket is $1 (a name in XDG_RUNTIME_DIR) and whose X11 display is
+# $2 (empty when X11 apps are not served: then no DISPLAY is handed on, so X11 apps fail instead of finding another X).
 start_components() {
     export WAYLAND_DISPLAY="$1"
+    if [ -n "${2:-}" ]; then export DISPLAY="$2"; else unset DISPLAY; fi
     publish_environment
     [ -z "$nested" ] || [ -n "$stubs" ] || return 0
     wallet & component_pids+=("$!")
@@ -474,17 +480,18 @@ set_session_mode() {
     [ -n "$nested" ] || systemctl --user set-environment "$session_mode_var=$1" || log "could not tell the shell the session mode"
 }
 
-# The socket casement announced in the unit's STATUS= text ("listening on wayland-1"); empty if it has not yet.
-unit_socket() {
-    systemctl --user show "$unit" -p StatusText --value 2>/dev/null | sed -n 's/^listening on \([^ ]*\).*/\1/p' | head -n 1
-}
+# The unit's STATUS= text ("listening on wayland-1", or "listening on wayland-1 X11 display :0"); empty if not yet.
+unit_status() { systemctl --user show "$unit" -p StatusText --value 2>/dev/null; }
+# The socket and the X11 display in that text (the display empty when X11 apps are not served).
+status_socket() { sed -n 's/^listening on \([^ ]*\).*/\1/p' <<<"$1" | head -n 1; }
+status_display() { sed -n 's/^listening on [^ ]* X11 display \([^ ]*\).*/\1/p' <<<"$1" | head -n 1; }
 
 # Run the casement unit (extra args "$@") to its end; sets run_status. The unit's Result and
 # ExecMainStatus say how it ended; a signal or a start that failed is a nonzero status. The unit restarts itself
 # after a failure, so the moment it is no longer active it is stopped (which cancels that restart) and the
 # guard decides what runs next.
 run_unit_to_end() {
-    local socket="" key value active="" result="" mainstatus=0 tries=0
+    local socket="" status="" key value active="" result="" mainstatus=0 tries=0
     set_session_args "$@" || { run_status=1; return; }
     systemctl --user reset-failed "$unit" 2>/dev/null || true
     # Blocks until casement has said READY=1 (Type=notify), or fails if it never does.
@@ -494,10 +501,11 @@ run_unit_to_end() {
         return
     fi
     while [ -z "$socket" ] && [ "$tries" -lt 50 ]; do
-        socket=$(unit_socket)
+        status=$(unit_status)
+        socket=$(status_socket "$status")
         [ -n "$socket" ] || { sleep 0.1; tries=$((tries + 1)); }
     done
-    [ -z "$socket" ] || start_components "$socket"
+    [ -z "$socket" ] || start_components "$socket" "$(status_display "$status")"
     while :; do
         active="" result="" mainstatus=0
         while IFS== read -r key value; do
@@ -526,7 +534,7 @@ run_child_to_end() {
         socket=$(socket_of "$log_file")
         [ -n "$socket" ] || { sleep 0.1; tries=$((tries + 1)); }
     done
-    [ -z "$socket" ] || start_components "$socket"
+    [ -z "$socket" ] || start_components "$socket" "$(display_of "$log_file")"
     run_status=0
     wait "$casement_pid" || run_status=$?
     casement_pid=

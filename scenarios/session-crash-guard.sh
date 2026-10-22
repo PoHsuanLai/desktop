@@ -17,6 +17,7 @@
 #               the unit sill.service (`systemctl --user start sill.service`, and again after it exits), the power-key inhibitor,
 #               the wallet (pam_kwallet_init, then ksecretd when nothing owns the Secret Service) and
 #               detent --first-run; all are gone when the session ends
+#   x11         the X11 display casement logs ("casement: X11 display :N") is the shell's DISPLAY
 # This is the direct-child path (DESKTOP_SESSION_NESTED=1); the real session runs casement as casement.service
 # (needs a systemd user manager, first-login check) with the same guard decisions.
 # Nothing outside the jail's scratch is read or written; the session is ended by its PID.
@@ -26,6 +27,13 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SELF="$HERE/$(basename "${BASH_SOURCE[0]}")"
+
+# A stand-in casement that serves X11: it names a display, then its socket, and stays up.
+if [ "${1:-}" = --x11-casement ]; then
+  echo "casement: X11 display :7" >&2
+  echo "casement: listening on wayland-x11" >&2
+  exec sleep 300
+fi
 
 # The stand-in casement the session runs. Inside the jail's scenario environment (bus, tools).
 if [ "${1:-}" = --fake-casement ]; then
@@ -176,13 +184,13 @@ guard_log_outlives_the_runtime_folder() {
 # first time (the session must start it again); the rest stay up.
 stub_components() {
   local d="$OUT_DIR/stubs" n
-  rm -rf "$d" "$OUT_DIR/stubs.log" "$OUT_DIR/sill-ran" "$OUT_DIR/unit.pid"; mkdir -p "$d"
+  rm -rf "$d" "$OUT_DIR/stubs.log" "$OUT_DIR/sill-ran" "$OUT_DIR/unit.pid" "$OUT_DIR/sill-display"; mkdir -p "$d"
   for n in ksecretd pam_kwallet_init detent; do
     printf '#!/bin/sh\necho "%s $*" >>"%s"\n[ "%s" = pam_kwallet_init ] || [ "%s" = detent ] || exec sleep 300\n' \
       "$n" "$OUT_DIR/stubs.log" "$n" "$n" >"$d/$n"
   done
-  printf '#!/bin/sh\necho "sill $* mode=${QUIRE_SESSION_MODE:-unset}" >>"%s"\nif [ ! -e "%s/sill-ran" ]; then : >"%s/sill-ran"; exit 1; fi\nexec sleep 300\n' \
-    "$OUT_DIR/stubs.log" "$OUT_DIR" "$OUT_DIR" >"$d/sill"
+  printf '#!/bin/sh\necho "sill $* mode=${QUIRE_SESSION_MODE:-unset}" >>"%s"\necho "${DISPLAY:-unset}" >>"%s/sill-display"\nif [ ! -e "%s/sill-ran" ]; then : >"%s/sill-ran"; exit 1; fi\nexec sleep 300\n' \
+    "$OUT_DIR/stubs.log" "$OUT_DIR" "$OUT_DIR" "$OUT_DIR" >"$d/sill"
   printf '#!/bin/sh\necho "systemd-inhibit $*" >>"%s"\nexec sleep 300\n' "$OUT_DIR/stubs.log" >"$d/systemd-inhibit"
   # systemctl stands in for the user manager's sill.service: `start` runs the sill stand-in detached and remembers
   # its pid as the unit's, ActiveState follows the pid, stop ends it. Every call is logged.
@@ -222,8 +230,18 @@ components_start_and_end_with_the_session() {
   ! pgrep -f "$d/" >/dev/null || { echo "components outlived the session:" >&2; pgrep -af "$d/" >&2; return 1; }
 }
 
+# X11 apps (Warp, Electron builds without Wayland) need DISPLAY: the shell launches them with its own environment.
+the_x11_display_reaches_the_shell() {
+  local d="$OUT_DIR/stubs"
+  stub_components
+  start_session x11 DESKTOP_SESSION_STUBS="$d" DESKTOP_SESSION_FIRST_RUN_DELAY=1 DESKTOP_SESSION_CASEMENT_CMD="$SELF --x11-casement"
+  wait_for 300 test -s "$OUT_DIR/sill-display" || { echo "sill never started:" >&2; cat "$OUT_DIR/stubs.log" >&2; return 1; }
+  stop_session
+  [ "$(head -n 1 "$OUT_DIR/sill-display")" = :7 ] || { echo "sill's DISPLAY was: $(head -n 1 "$OUT_DIR/sill-display")" >&2; return 1; }
+}
+
 for name in step_bus guard_reaches_safe safe_stays_up_on_one_output safe_failing_ends_the_session \
-  guard_log_outlives_the_runtime_folder components_start_and_end_with_the_session; do
+  guard_log_outlives_the_runtime_folder components_start_and_end_with_the_session the_x11_display_reaches_the_shell; do
   STEP_BUDGET=60 step "$name" "$name" || true
 done
 if [ "$STEP_WORST" != 0 ]; then
