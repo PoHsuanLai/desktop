@@ -359,9 +359,9 @@ prepare_models() {
   cp "$src"/*.toml "$catalog/"
   [ -f "$catalog/$PLANNER_MODEL.toml" ] || die "the catalogue has no entry for $PLANNER_MODEL"
   [ -f "$catalog/$SCREEN_MODEL.toml" ] || die "the catalogue has no entry for $SCREEN_MODEL"
-  "${PY[@]}" catalog --src "$src/$PLANNER_MODEL.toml" --out "$catalog/$PLANNER_MODEL.toml" --served "$PLANNER_SERVED" --tool-parser hermes || die "cannot prepare $PLANNER_MODEL"
-  "${PY[@]}" catalog --src "$src/$SCREEN_MODEL.toml" --out "$catalog/$SCREEN_MODEL.toml" --served "$SCREEN_SERVED" \
-    --tool-parser qwen3_coder --reasoning-parser qwen3 || die "cannot prepare $SCREEN_MODEL"
+  # Each entry's parsers come from its own engine line: a model is added as catalogue data alone.
+  "${PY[@]}" catalog --src "$src/$PLANNER_MODEL.toml" --out "$catalog/$PLANNER_MODEL.toml" --served "$PLANNER_SERVED" || die "cannot prepare $PLANNER_MODEL"
+  "${PY[@]}" catalog --src "$src/$SCREEN_MODEL.toml" --out "$catalog/$SCREEN_MODEL.toml" --served "$SCREEN_SERVED" || die "cannot prepare $SCREEN_MODEL"
   "${PY[@]}" inferd-config --planner-id "$PLANNER_MODEL" --planner-url "${W1_PLANNER_URL%/}" \
     --screen-id "$SCREEN_MODEL" --screen-url "${W1_SCREEN_URL%/}" >"$AGENTS/config/inferd/inferd.toml"
   mkdir -p "$HOME_S/.config/cua"

@@ -246,9 +246,9 @@ prepare_models() {
   cp "$src"/*.toml "$catalog/"
   [ -f "$catalog/$PLANNER_MODEL.toml" ] || { note "The catalogue has no entry for $PLANNER_MODEL."; return 3; }
   [ -f "$catalog/$SCREEN_MODEL.toml" ] || { note "The catalogue has no entry for $SCREEN_MODEL."; return 3; }
-  "${PY1[@]}" catalog --src "$src/$PLANNER_MODEL.toml" --out "$catalog/$PLANNER_MODEL.toml" --served "$PLANNER_SERVED" --tool-parser hermes || return 3
-  "${PY1[@]}" catalog --src "$src/$SCREEN_MODEL.toml" --out "$catalog/$SCREEN_MODEL.toml" --served "$SCREEN_SERVED" \
-    --tool-parser qwen3_coder --reasoning-parser qwen3 || return 3
+  # Each entry's parsers come from its own engine line: a model is added as catalogue data alone.
+  "${PY1[@]}" catalog --src "$src/$PLANNER_MODEL.toml" --out "$catalog/$PLANNER_MODEL.toml" --served "$PLANNER_SERVED" || return 3
+  "${PY1[@]}" catalog --src "$src/$SCREEN_MODEL.toml" --out "$catalog/$SCREEN_MODEL.toml" --served "$SCREEN_SERVED" || return 3
   "${PY1[@]}" inferd-config --planner-id "$PLANNER_MODEL" --planner-url "http://127.0.0.1:$PLANNER_PORT" \
     --screen-id "$SCREEN_MODEL" --screen-url "http://127.0.0.1:$SCREEN_PORT" >"$AGENTS/config/inferd/inferd.toml" || return 3
   mkdir -p "$CONFIG/cua"

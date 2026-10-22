@@ -30,6 +30,7 @@ import json
 import os
 import re
 import sys
+import tomllib
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -115,12 +116,32 @@ def cmd_served(_args):
     return 0 if names else 1
 
 
-def attached_catalog(text, served, tool_parser, reasoning_parser):
+def engine_parsers(text):
+    """(tool parser, reasoning parser or "") from the entry's vllm `[[engine]]` args.
+
+    The engine on the other computer is started with the entry's own line, so the parsers it named
+    there are the ones the attached entry must say; a model is added as catalogue data alone.
+    """
+    def flag(args, name):
+        return next((args[i + 1] for i, arg in enumerate(args[:-1]) if arg == name), "")
+
+    for engine in tomllib.loads(text).get("engine", []):
+        args = engine.get("args", []) if engine.get("kind") == "vllm" else []
+        tool = flag(args, "--tool-call-parser")
+        if tool:
+            return tool, flag(args, "--reasoning-parser")
+    raise ValueError("the catalogue entry has no vllm engine line naming a --tool-call-parser")
+
+
+def attached_catalog(text, served, tool_parser="", reasoning_parser=""):
     """A catalogue entry that is served somewhere else: its engine rows go, `serving` comes in.
 
     The shipped entries describe an engine the desktop would start itself; an engine on another
     computer needs the entry to say it is attached (porter: a launched entry cannot be attached).
+    The parsers are the entry's own engine line's (`engine_parsers`) unless a tool parser is given.
     """
+    if not tool_parser:
+        tool_parser, reasoning_parser = engine_parsers(text)
     lines = text.splitlines()
     out, skipping = [], False
     for line in lines:
@@ -585,11 +606,12 @@ def build_parser():
     command("loopback", cmd_loopback, (["url"], {}))
     command("served", cmd_served)
     command("catalog", cmd_catalog, (["--src"], {"required": True}), (["--out"], {"required": True}),
-            (["--served"], {"required": True}), (["--tool-parser"], {"required": True}),
+            (["--served"], {"required": True}),
+            (["--tool-parser"], {"default": "", "help": "default: the entry's own engine line"}),
             (["--reasoning-parser"], {"default": ""}))
     command("inferd-config", cmd_inferd_config, (["--planner-id"], {"required": True}), (["--planner-url"], {"required": True}),
             (["--screen-id"], {"required": True}), (["--screen-url"], {"required": True}))
-    command("cuad-settings", cmd_cuad_settings, (["--app"], {"action": "append", "default": [], "help": "APP=ask|session|always"}),
+    command("cuad-settings", cmd_cuad_settings, (["--app"], {"action": "append", "default": [], "help": "APP=ask|always"}),
             (["--steps"], {"type": int, "default": 400}), (["--active-s"], {"type": int, "default": 3600}))
     command("sentence", cmd_sentence, (["--outdir"], {"required": True}))
     command("serve", cmd_serve, (["--dir"], {"default": ""}), (["--mount"], {"action": "append", "default": [], "help": "/PREFIX/=FOLDER"}),

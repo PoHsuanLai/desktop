@@ -72,12 +72,17 @@ tools = "server_parsed"
 
 [[engine]]
 kind = "vllm"
-args = ["--max-model-len", "16384"]
+args = ["--max-model-len", "16384", "--tool-call-parser", "qwen3_coder", "--reasoning-parser", "qwen3"]
 weights = { kind = "hf_snapshot" }
 T
-"${PY[@]}" catalog --src "$scratch/entry.toml" --out "$scratch/out.toml" --served demo --tool-parser hermes
+"${PY[@]}" catalog --src "$scratch/entry.toml" --out "$scratch/out.toml" --served demo
 entry=$(cat "$scratch/out.toml")
-has "catalog: now attached" "$entry" 'serving = { kind = "attached", v = { engine = "vllm", served_name = "demo", tool_parser = "hermes" } }'
+has "catalog: now attached, with the engine line's parsers" "$entry" 'serving = { kind = "attached", v = { engine = "vllm", served_name = "demo", tool_parser = "qwen3_coder", reasoning_parser = "qwen3" } }'
+"${PY[@]}" catalog --src "$scratch/entry.toml" --out "$scratch/given.toml" --served demo --tool-parser hermes
+has "catalog: a given parser wins" "$(cat "$scratch/given.toml")" 'tool_parser = "hermes" } }'
+sed -i 's/, "--tool-call-parser", "qwen3_coder"//' "$scratch/entry.toml"
+"${PY[@]}" catalog --src "$scratch/entry.toml" --out "$scratch/none.toml" --served demo 2>/dev/null \
+  && bad "catalog: an entry naming no parser is refused" || ok "catalog: an entry naming no parser is refused"
 lacks "catalog: the engine rows are gone" "$entry" "[[engine]]"
 lacks "catalog: the old serving line is gone" "$entry" "launched"
 has "catalog: the rest is kept" "$entry" '[text_out]'
