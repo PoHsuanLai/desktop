@@ -114,6 +114,11 @@ build_casement() {
   put 755 "$(tdir casement)/casement" bin/casement
   put 755 "$(tdir casement)/casementctl" bin/casementctl
   put 644 "$d/dist/casement.service" lib/systemd/user/casement.service
+  # Its settings schema, so Settings draws its rows (Spaces: switch to an app's Space).
+  local schema; schema=$(mktemp -d)
+  "$(tdir casement)/casement" --write-schema "$schema" >/dev/null
+  put 644 "$schema/casement.settings.toml" share/quire/settings/casement.settings.toml
+  rm -rf "$schema"
   retarget "$root/lib/systemd/user/casement.service" /usr/bin/casement
 }
 

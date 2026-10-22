@@ -20,6 +20,7 @@
 casement components.d/casement.txt
 casement bin/casement
 casement bin/casementctl
+casement share/quire/settings/casement.settings.toml
 casement system/usr/lib/systemd/user/casement.service
 
 sill components.d/sill.txt
