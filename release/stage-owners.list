@@ -62,7 +62,7 @@ files components.d/files.txt
 files bin/files
 files share/applications/org.quire.Files.desktop
 files share/dbus-1/services/org.quire.Files.service
-files share/dbus-1/services/org.freedesktop.FileManager1.service
+files share/dbus-1/services/org.quire.Files.FileManager1.service
 files share/quire/intents/org.quire.Files.toml
 
 porter components.d/porter.txt
