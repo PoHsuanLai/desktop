@@ -118,7 +118,8 @@ def cmd_served(_args):
 
 def engine_parsers(text):
     """(tool parser, reasoning parser or "") the entry itself names: its attached `serving`'s, else
-    its vllm `[[engine]]` args'.
+    its vllm `[[engine]]` args'. An entry whose calls are read from the raw text
+    (`[text_out] tools = "client_parsed"`) names none, and ("", "") is its answer.
 
     The engine on the other computer is started with the entry's own line, so the parsers it named
     there are the ones the attached entry must say; an entry already attached says them in `serving`.
@@ -128,6 +129,8 @@ def engine_parsers(text):
         return next((args[i + 1] for i, arg in enumerate(args[:-1]) if arg == name), "")
 
     entry = tomllib.loads(text)
+    if entry.get("text_out", {}).get("tools") == "client_parsed":
+        return "", ""
     serving = entry.get("serving", {})
     attached = serving.get("v", {}) if serving.get("kind") == "attached" else {}
     if attached.get("tool_parser"):
@@ -160,10 +163,12 @@ def attached_catalog(text, served, tool_parser="", reasoning_parser=""):
         if skipping or re.match(r"\s*serving\s*=", line):
             continue
         out.append(line)
-    parsers = f'tool_parser = "{tool_parser}"'
-    if reasoning_parser:
-        parsers += f', reasoning_parser = "{reasoning_parser}"'
-    serving = f'serving = {{ kind = "attached", v = {{ engine = "vllm", served_name = "{served}", {parsers} }} }}'
+    parsers = "".join(
+        f', {key} = "{value}"'
+        for key, value in (("tool_parser", tool_parser), ("reasoning_parser", reasoning_parser))
+        if value
+    )
+    serving = f'serving = {{ kind = "attached", v = {{ engine = "vllm", served_name = "{served}"{parsers} }} }}'
     for i, line in enumerate(out):
         if re.match(r"\s*id\s*=", line):
             out.insert(i + 1, serving)
