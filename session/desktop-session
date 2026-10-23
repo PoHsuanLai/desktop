@@ -50,7 +50,9 @@
 # seconds each, then given up). ksecretd, ibus and the inhibitor are children of this script,
 # ended by PID when casement ends; sill is watched as its unit (the unit restarts it on a failure, and it is started
 # again here when it ends cleanly) and ended with `systemctl --user stop sill.service`. All start again with the next
-# casement. Nothing is looked up or killed by name.
+# casement. Nothing is looked up or killed by name. When the session ends, graphical-session.target is stopped with
+# desktop-session.target, which ends every unit PartOf= it (transom, the portal frontend); one an earlier login left
+# up is ended before the first casement starts.
 #
 # The crash-loop guard. A casement run that lasts less than QUICK seconds (default 20) is a quick
 # exit; a longer run clears the count. Three quick exits in a row switch the session to
@@ -225,7 +227,6 @@ on_term() {
     [ -z "$casement_pid" ] || kill "$casement_pid" 2>/dev/null || true
     stop_components
     if [ -z "$nested" ]; then
-        systemctl --user stop desktop-session.target 2>/dev/null || true
         stop_unit
     fi
     exit 0
@@ -432,8 +433,26 @@ unset_session_args() {
     systemctl --user unset-environment "$session_args_var" "$session_mode_var" 2>/dev/null || true
 }
 
-# Stop the unit and drop the arguments (also run at logout; harmless when nothing runs).
+# End the graphical session in the user manager. Stopping desktop-session.target alone leaves
+# graphical-session.target up: the portal frontend, sill and other units name it Requisite=, and systemd counts
+# that as a need, so its StopWhenUnneeded= never fires. It then outlives the login, and so do the units that are
+# PartOf= it (transom, xdg-desktop-portal), still holding the old Wayland socket. Stopping it stops them too.
+stop_session_targets() {
+    systemctl --user stop desktop-session.target graphical-session.target 2>/dev/null || true
+}
+
+# A graphical session left by a login that ended without stop_session_targets (a killed session, an older version
+# of this script): ended once before the first casement starts, so no unit of it serves this login.
+end_stale_session() {
+    [ -z "$nested" ] || return 0
+    systemctl --user is-active --quiet graphical-session.target 2>/dev/null || return 0
+    log "a graphical session from an earlier login is still up; ending it"
+    stop_session_targets
+}
+
+# Stop the session's targets and the unit, and drop the arguments (also run at logout; harmless when nothing runs).
 stop_unit() {
+    stop_session_targets
     systemctl --user stop "$unit" 2>/dev/null || true
     unset_session_args
 }
@@ -587,6 +606,7 @@ manual_way_back() {
 
 recover_update
 remove_old_dropin
+end_stale_session
 # Whatever way the session ends, this run's arguments do not stay in the user manager.
 [ -n "$nested" ] || trap unset_session_args EXIT
 quick=0
