@@ -49,9 +49,17 @@ fail() { echo "scenario-build: $1 (see $log)" >&2; exit 3; }
 # stage NAME CMD...: runs CMD with its output in the log.
 stage() { local name=$1; shift; echo "scenario-build: $name"; "$@" >>"$log" 2>&1 || fail "$name failed"; }
 
+# built_at TARGET DIR...: notes in build/TARGET/BUILT_AT the HEAD each checkout DIR was built from ("<repo> <sha>" a
+# line), so a scenario can refuse a build older than the siblings it is meant to test (stale_builds in scenarios/lib).
+built_at() {
+  local target=$SCEN_BUILD/$1 dir; shift
+  mkdir -p "$target"
+  for dir in "$@"; do printf '%s %s\n' "$(basename "$dir")" "$(git -C "$dir" rev-parse HEAD)"; done >"$target/BUILT_AT"
+}
+
 build_casement() {
   (cd "$SCEN_SIB/casement" && CARGO_TARGET_DIR="$SCEN_BUILD/casement-target" CASEMENT_TOOLS="$SCEN_BUILD/tools" \
-    dev/bootstrap.sh --build-only)
+    dev/bootstrap.sh --build-only) && built_at casement-target "$SCEN_SIB/casement"
 }
 
 fetch_foot() {
@@ -118,7 +126,8 @@ build_detent() {
 }
 
 build_sill() {
-  (cd "$SCEN_SRC/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" cargo build -p sill --features debug)
+  (cd "$SCEN_SRC/sill" && CARGO_TARGET_DIR="$SCEN_BUILD/sill-target" cargo build -p sill --features debug) &&
+    built_at sill-target "$SCEN_SRC/sill"
 }
 
 # transom from the sibling checkout, --locked (the sibling's Cargo.lock is never changed).
@@ -162,13 +171,15 @@ build_porter() {
 # cuad, the screen helper, from the sibling checkout. The fixture-callers feature makes it read caller identities from a fake
 # /proc (CUAD_TEST_PROC_ROOT): nothing in the jail runs in a systemd scope. A test build, never shipped.
 build_cuad() {
-  (cd "$SCEN_SIB/cua" && CARGO_TARGET_DIR="$SCEN_BUILD/cua-target" nice cargo build -p cuad --features fixture-callers)
+  (cd "$SCEN_SIB/cua" && CARGO_TARGET_DIR="$SCEN_BUILD/cua-target" nice cargo build -p cuad --features fixture-callers) &&
+    built_at cua-target "$SCEN_SIB/cua"
 }
 
 # The assistant's services as docket-accept builds (fixture identities, scripted stand-ins), docket-bringup and quire-do's
 # test twin, from the sibling checkout.
 build_docket() {
-  (cd "$SCEN_SIB/docket" && CARGO_TARGET_DIR="$SCEN_BUILD/docket-target" nice cargo build -p docket-accept --bins)
+  (cd "$SCEN_SIB/docket" && CARGO_TARGET_DIR="$SCEN_BUILD/docket-target" nice cargo build -p docket-accept --bins) &&
+    built_at docket-target "$SCEN_SIB/docket"
 }
 
 # sill at its pin: the accounts-* scenarios need the accounts sheet, which the sibling's HEAD may lack.

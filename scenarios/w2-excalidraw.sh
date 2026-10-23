@@ -150,6 +150,7 @@ DRAW_DIR=${W2_DRAW_DIR:-$REAL_HOME/.cache/quire-workflow/excalidraw-0.18.0}
 require_models
 scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" \
   "$SCEN_BUILD/sill-target/debug/sill" "$CUAD" "$BRINGUP" "$QUIREDO" "$DK/accept-intentd" "$DK/accept-companiond" "$DK/accept-readerd"
+scenario_fresh "harness/scenario-build.sh --w2 (outside the jail)" casement-target sill-target cua-target docket-target
 [ -x "$BROWSER" ] || die "the browser $BROWSER is not there (set W2_BROWSER to Zen's program)"
 [ -s "$DRAW_DIR/main.js" ] || die "the drawing app is not built at $DRAW_DIR: run $WF/fixtures/w2/build-excalidraw.sh outside the jail"
 for tool in socat curl python3 busctl gdbus; do command -v "$tool" >/dev/null || die "$tool is missing"; done
