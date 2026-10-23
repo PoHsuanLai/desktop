@@ -7,7 +7,8 @@ separated; the box is the border box in the window's logical pixels from its top
 "CX CY" (the box's centre, rounded) of the first control with exactly this role and name (the Nth with --nth,
 counted from 1; negative counts from the end, -1 the last), or with --state its state words. Exit 1 when there is none, so a poll can wait for one.
 A NAME ending in " …" names a lead: it matches the words before it alone or followed by a space and more
-("Manage …" matches "Manage" and "Manage Home cloud"), for controls whose name carries the thing they act on.
+("Manage …" matches "Manage" and "Manage Home cloud"; "ada@example.com …" matches the list row "ada@example.com,
+Microsoft"), for controls whose name carries the thing they act on or reads on after a comma.
 """
 import argparse
 import sys
@@ -35,7 +36,7 @@ def names(name):
     if not args.name.endswith(LEAD):
         return name == args.name
     stem = args.name[: -len(LEAD)]
-    return name == stem or name.startswith(stem + " ")
+    return name == stem or name.startswith(stem + " ") or name.startswith(stem + ", ")
 
 
 found = []

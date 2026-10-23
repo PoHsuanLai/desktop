@@ -7,8 +7,9 @@
 #   boot      a password account (Fake Mail) and a browser account (Microsoft) added through accountd's sheet, an OpenAI key
 #             added through inferd's, a permit for an app on the key (since porter's accounts split the permits and their
 #             Revoke are the AI keys', inferd's); the Accounts pane reads accountd, inferd and (if it runs) syncd
-#   D1        every row button names what it acts on: "Manage <account>", "Revoke <app> ...", "Sign in again <account>",
-#             "Remove account <account>", never the bare word [probe listing]
+#   D1        the list's rows are named by their account, read apart ("<account>, <provider>"), and every detail button
+#             names what it acts on: "Revoke <app> ...", "Sign in again <account>", "Remove account <account>", never the
+#             bare word [probe listing]
 #   D2        the sidebar search "acc" keeps Accounts and drops Dock [probe listing]
 #   D3        Sign in again's line follows the account's `sign_in` row: the browser account's line is longer than the
 #             password account's (the plain line was one for both before) [accountd's sign_in key, and the width of the help card
@@ -86,18 +87,16 @@ step_d1_names() {
   local names
   detent_press option Accounts; sleep 1.5
   names=$(buttons)
-  must "D1 the list's row buttons name the account (Manage ada@rig.test)" lists "$names" "Manage ada@rig.test"
-  must "D1 no bare Manage" not lists "$names" Manage
-  detent_press button "Manage …" 1; sleep 1.5
+  must "D1 the list's rows name the account (ada@rig.test, ...)" starts_with "$(options)" "ada@rig.test, "
+  detent_press option "ada@rig.test …" 1; sleep 1.5
   acc_shot d1-account
   names=$(buttons)
   must "D1 Sign in again names the account" lists "$names" "Sign in again ada@rig.test"
   must "D1 Remove account names the account" lists "$names" "Remove account ada@rig.test"
   must "D1 no bare Sign in again" not lists "$names" "Sign in again"
   must "D1 no bare Remove account on the page" not lists "$names" "Remove account"
-  # The AI key is the third account of the list (Internet accounts first, then Intelligence): its permit's Revoke names the app.
-  detent_press button "Accounts"; sleep 1.5
-  detent_press button "Manage …" 3; sleep 1.5
+  # The AI key is in the list's Intelligence group: its permit's Revoke names the app.
+  detent_press option "$(ai_get "accounts.$AI_ACCOUNT.label") …"; sleep 1.5
   acc_shot d1-ai-account
   names=$(buttons)
   must "D1 Revoke names the app" starts_with "$names" "Revoke org.quire.Companion"
@@ -108,10 +107,9 @@ step_d1_names() {
 # The line under Sign in again is behind an info button now (quire's help on request: "About Sign in again" opens a popover
 # card with the label and the help). The card's width follows its text, so the card is measured: the output with the card
 # open against the output with it closed, in the detent window, and the width of what differs (the popover and its shadow).
-help_width() { # NTH: the width of the help card on the NTHth account's page
+help_width() { # NTH: the width of the help card on the NTHth ada@rig.test account's detail
   local fx fy fw fh
-  if detent_centre button Accounts >/dev/null; then detent_press button Accounts; sleep 1.5; fi
-  detent_press button "Manage …" "$1"; sleep 1.5
+  detent_press option "ada@rig.test …" "$1"; sleep 1.5
   acc_shot "d3-closed-$1"
   detent_press button "About Sign in again"; sleep 1.2
   acc_shot "d3-account-$1"

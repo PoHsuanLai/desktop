@@ -51,6 +51,7 @@ local_is() { [ "$(cat "$(folder)/$1" 2>/dev/null)" = "$2" ]; }
 remote_is() { [ "$(rigctl GET "/graph/file?path=$1")" = "$2" ]; }
 detent_mapped() { [ -n "$(detent_frame 2>/dev/null)" ]; }
 sync_files() { sync_get "accounts.$SYNC_ACCOUNT.sync.files"; }
+sync_label() { sync_get "accounts.$SYNC_ACCOUNT.label"; }
 sync_account() { # the id of syncd's first account, or nothing
   sync_describe 2>/dev/null | python3 -I -c '
 import json, sys
@@ -104,8 +105,9 @@ step_grant() {
   sheet_enter_until 30 sheet_hidden || { echo "the sheet did not go after syncd signed in" >&2; return 1; }
   acc_wait 30 sync_on || { acc_shot 5-sync-not-on; echo "continuing as the identity did not switch the files on: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
   acc_shot 6-sync-on
-  # The account's own switch, in the real window: it is the last account of the list (the Sync group comes last).
-  sleep 2; detent_press button "Manage …" -1; sleep 1; acc_shot 7-sync-account
+  # The account's own switch, in the real window: it is the last row of the list (the Sync group comes last), named by
+  # the identity it continues as.
+  sleep 2; detent_press option "$(sync_label) …" -1; sleep 1; acc_shot 7-sync-account
   detent_press switch "$SYNC_FILES_LABEL"; sleep 1
   acc_wait 15 sync_off || { echo "the switch did not take the permit back: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
   detent_press switch "$SYNC_FILES_LABEL"; sleep 1

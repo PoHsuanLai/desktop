@@ -11,7 +11,7 @@
 #             `settings`, with the programs' schema fixtures; every daemon the pane reads runs first: detent never starts
 #             one); a fake mail identity added through accountd's sheet, an app (org.quire.Mail) says it uses it, an OpenAI
 #             key added through inferd's, an app (org.quire.Companion) granted the key
-#   open      Accounts in the sidebar, Manage on the AI key (capture of the list and of the account)
+#   open      Accounts in the sidebar, the AI key chosen in the list (capture of the list and of the account)
 #   service   the Language model switch is turned off: inferd's `service.llm` row says so and the app that held the permit
 #             is refused the key (ai-keys request: refused); turned on again, the key is back
 #   keep      Remove account, then Keep: the key is still there (capture of the question)
@@ -49,11 +49,11 @@ no_ai() { ! ai_has_account "$AI"; }
 has_ai() { ai_has_account "$AI"; }
 no_ident() { ! has_ident; }
 has_ident() { has_row_of settings_describe "$IDENT"; }
-# The controls, by role and accessible name (detent's labels; detent_press, harness/lib/accounts.sh). A row's
-# buttons name the account or app they act on ("Manage Home cloud"), so they are pressed by their lead ("Manage ...").
+# The controls, by role and accessible name (detent's labels; detent_press, harness/lib/accounts.sh). The detail's
+# buttons name the account or app they act on ("Remove account Home cloud"), so they are pressed by their lead
+# ("Remove account ..."); a row of the list is named by the account and reads on after a comma ("Home cloud, OpenAI").
 press_accounts() { detent_press option Accounts; }
-press_back() { ! detent_centre button Accounts >/dev/null 2>&1 || detent_press button Accounts; }
-press_manage_of() { detent_press button "Manage $1"; }
+choose_account() { detent_press option "$1 …"; }
 # The service switch is named by the kind the module's row ends in (humanized: `llm` reads "Llm"), its row's label otherwise.
 press_llm_switch() { if detent_centre switch Llm >/dev/null 2>&1; then detent_press switch Llm; else detent_press switch "Language model"; fi; }
 press_revoke() { detent_press button "Revoke …"; }
@@ -91,7 +91,7 @@ step_boot() {
 
 step_open() {
   press_accounts; sleep 1; acc_shot 1-accounts-list
-  press_manage_of "$AI_LABEL"; sleep 1; acc_shot 2-account
+  choose_account "$AI_LABEL"; sleep 1; acc_shot 2-account
 }
 
 step_service() {
@@ -130,7 +130,7 @@ step_remove() {
   grep -q "$AI" "$STATE/quire/inferd/keys/registry.json" 2>/dev/null && { echo "inferd's registry still holds the key" >&2; return 1; }
   grep -q '"kind":"removed"' "$STATE/quire/inferd/keys-audit.jsonl" || { echo "no removed event in inferd's audit file" >&2; return 1; }
   # And the identity, from its own page.
-  press_back; sleep 1; press_manage_of "$MAIL_LABEL"; sleep 1
+  choose_account "$MAIL_LABEL"; sleep 1
   press_remove; sleep 1
   press_question_remove
   acc_wait 15 no_ident || { echo "the identity is still in the settings module after Remove" >&2; return 1; }
@@ -166,15 +166,15 @@ step_added_shows() {
     return 1
   }
   # The page changing is not enough: an unavailable pane also differs from 'No accounts'. The added
-  # identity's row must be there, with its Manage button.
-  detent_centre button "Manage …" >/dev/null || {
+  # identity's row must be there in the list.
+  detent_centre option "$MAIL_LABEL …" >/dev/null || {
     echo "detent's Accounts pane changed after the add but shows no account row (it shows:)" >&2; detent_listing >&2
     return 1
   }
 }
 
 step_sign_in() {
-  press_accounts; sleep 1; press_manage_of "$MAIL_LABEL"; sleep 1; acc_shot 8-account-again
+  press_accounts; sleep 1; choose_account "$MAIL_LABEL"; sleep 1; acc_shot 8-account-again
   press_sign_in_again; sleep 2; acc_shot 9-after-sign-in-again
   if sheet_shown; then sheet_shot 10-sign-in-again; sheet_key Escape; return 0; fi
   echo "Sign in again opened no sheet: $(grep reauthenticate "$OUT_DIR/accountd.log" | tail -n 1)" >&2
