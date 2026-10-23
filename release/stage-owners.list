@@ -28,6 +28,7 @@ sill bin/sill
 sill system/usr/lib/systemd/user/sill.service
 sill share/quire/intents/org.quire.Shell.toml
 sill share/quire/settings/sill.settings.toml
+sill share/quire/selectors/sill.toml
 sill share/quire/skills/focused-app-menus/**
 sill share/quire/skills/screenshots/**
 sill share/quire/skills/windows-spaces/**
@@ -58,6 +59,14 @@ mailo share/icons/**
 mailo share/dbus-1/services/org.quire.Mail.service
 mailo share/quire/intents/org.quire.Mail.toml
 mailo share/quire/skills/mail/**
+
+files components.d/files.txt
+files bin/files
+files share/applications/org.quire.Files.desktop
+files share/dbus-1/services/org.quire.Files.service
+files share/dbus-1/services/org.quire.Files.FileManager1.service
+files share/quire/intents/org.quire.Files.toml
+files share/quire/settings/files.settings.toml
 
 porter components.d/porter.txt
 porter libexec/quire/accountd

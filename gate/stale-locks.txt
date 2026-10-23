@@ -1,3 +1,3 @@
 # repo  lock  rev  why: a lock the repo's own gate never resolves, stale at a release the manifest pins.
 # Each line names one rev and lapses when the manifest moves the repo on; fix the lock upstream first.
-quire examples/consumer/Cargo.lock 9234da1dc89bfe98516d77f7dc5c6bd05d18fd07 quire v0.3.31 example lock names blitz-kit 0ba642e7; fixed on quire master (39f393b1) for the next release
+quire examples/consumer/Cargo.lock 7fa27afc834e8365b356e7a0db94b269e62aaaf6 quire v0.3.45 example lock names blitz-kit 878dc799; Whopper relocks it to 07f0272b in the next quire release

@@ -7,12 +7,12 @@
 #   --out DIR       default build/release under this repo. Gets stage/ (the destdir), target/<repo>/ (cargo's
 #                   output, cacheable) and components.d/<name>.txt ("repo rev" lines for pack.sh)
 #   --siblings DIR  where the component repos are checked out side by side (default: the parent of this repo)
-#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo slipway satellite); the
+#   --only NAMES    just these (casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo files slipway satellite); the
 #                   CI builds the heavy ones in separate jobs and merges the stage/ trees
 #
 # Everything is built with `cargo build --release --locked` and installed with the prefix
 # /opt/quire/current under the destdir OUT/stage, through the component's own installer where it can stage
-# (porter, stoker, almanac, docket, cua, detent, anyview, mailo, and the session in install/). The others (casement, sill, transom, turnstile,
+# (porter, stoker, almanac, docket, cua, detent, anyview, mailo, files, and the session in install/). The others (casement, sill, transom, turnstile,
 # keycap, palmrest, slipway) have an installer that cannot stage without sudo or writes $HOME; their staging below is marked
 # INTERIM and listed in FINDINGS.md with what each installer must learn. Each sibling must be checked out at
 # its manifest rev (RELEASE_ALLOW_DIRTY_REVS=1 skips that check, for a trial on a working tree).
@@ -27,7 +27,7 @@ ROOT="$(cd "$HERE/.." && pwd)"
 P=/opt/quire/current
 # shellcheck source=../install/cargo.sh
 source "$ROOT/install/cargo.sh"
-ALL=(casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo slipway satellite)
+ALL=(casement sill session porter stoker almanac docket cua detent transom turnstile keycap palmrest anyview mailo files slipway satellite)
 # xwayland-satellite (MPL-2.0; a separate program casement starts for X11 apps), built from its own public repository at
 # one commit, locked. Ubuntu 24.04 does not package it. Bump both lines together: SATELLITE_REV is the commit the tag
 # names (`git ls-remote $SATELLITE_URL 'refs/tags/v0.8.3^{}'`), because a tag can be moved and a commit cannot.
@@ -137,6 +137,12 @@ build_sill() {
   "$(tdir sill)/sill" --write-schema "$schema" >/dev/null
   put 644 "$schema/sill.settings.toml" share/quire/settings/sill.settings.toml
   rm -rf "$schema"
+  # Its published style names, so Settings can tell a person's style using one from an internal name (needs
+  # sill >= 38036130, the manifest rev).
+  local parts; parts=$(mktemp -d)
+  "$(tdir sill)/sill" --write-selectors "$parts" >/dev/null
+  put 644 "$parts/sill.toml" share/quire/selectors/sill.toml
+  rm -rf "$parts"
   put_system 644 "$d/dist/pam.d/sill" /etc/pam.d/sill
   # External-monitor brightness (distro audit D7): the uaccess rule for the i2c buses and the list that loads
   # i2c-dev. Both folders are on slipway's list of system folders. Fedora's ddcutil package ships a rule with the
@@ -243,6 +249,13 @@ build_mailo() {
   # INTERIM: the installer writes the destdir-prefixed path into the D-Bus service file; it must name the
   # installed one (FINDINGS.md).
   sed -i "s|$root|$P|g" "$root/share/dbus-1/services/org.quire.Mail.service"
+}
+
+build_files() {
+  local d; d=$(repo_dir files)
+  cargo_in "$d" files -p files --bin files
+  # FILES_PREFIX is the installed path (the service files name it), FILES_DESTDIR the stage.
+  (cd "$d" && FILES_BIN="$(tdir files)/files" FILES_PREFIX="$P" FILES_DESTDIR="$stage" ./dist/install.sh --no-build)
 }
 
 build_transom() {
