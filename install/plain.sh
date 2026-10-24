@@ -101,5 +101,23 @@ keepalive=$!
 trap 'kill "$keepalive" 2>/dev/null || true' EXIT
 verb=installing
 for part in "${parts[@]}"; do quietly "$part" install_part "$part"; done
+
+# Your user manager outlives a logout, so it would keep the units it read before this install and the
+# background services' old programs. Reload it, restart the services that are running (the session's
+# own casement, sill and transom wait for the next login; Settings and the apps for their next start)
+# and start the sockets the install linked in sockets.target.wants.
+daemons=(accountd inferd syncd memoryd intentd companiond readerd cuad actions-mcp docket-agent)
+reload_user() {
+  systemctl --user daemon-reload &&
+    systemctl --user try-restart "${daemons[@]/%/.service}" &&
+    for wants in "$prefix/lib/systemd/user/sockets.target.wants"/*.socket; do
+      [ -e "$wants" ] || continue
+      systemctl --user start "$(basename "$wants")" || return
+    done
+}
+if systemctl --user show-environment >/dev/null 2>&1; then
+  verb=reloading
+  quietly services reload_user
+fi
 echo
 echo "  installed to $prefix. Log out and back in to \"sill (casement)\" to use it."
