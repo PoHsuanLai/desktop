@@ -42,6 +42,7 @@ runtime portal-gtk        file:/usr/libexec/xdg-desktop-portal-gtk /usr/lib/xdg-
 runtime xwayland          cmd:Xwayland
 runtime secrets           cmd:gnome-keyring-daemon cmd:ksecretd file:/usr/share/dbus-1/services/org.freedesktop.secrets.service
 runtime bwrap             cmd:bwrap
+runtime fuse3             cmd:fusermount3
 runtime curl              cmd:curl
 runtime xdg-open          cmd:xdg-open
 runtime vulkan-loader     lib:libvulkan.so.1
@@ -114,6 +115,7 @@ packages_fedora() {
     xwayland) echo xorg-x11-server-Xwayland ;;
     secrets) echo gnome-keyring ;;
     bwrap) echo bubblewrap ;;
+    fuse3) echo fuse3 ;;
     curl) echo curl ;;
     xdg-open) echo xdg-utils ;;
     vulkan-loader) echo vulkan-loader ;;
@@ -179,6 +181,7 @@ packages_debian() {
     xwayland) echo xwayland ;;
     secrets) echo gnome-keyring ;;
     bwrap) echo bubblewrap ;;
+    fuse3) echo fuse3 ;;
     curl) echo curl ;;
     xdg-open) echo xdg-utils ;;
     vulkan-loader) echo libvulkan1 ;;
@@ -244,6 +247,7 @@ packages_arch() {
     xwayland) echo xorg-xwayland ;;
     secrets) echo gnome-keyring ;;
     bwrap) echo bubblewrap ;;
+    fuse3) echo fuse3 ;;
     curl) echo curl ;;
     xdg-open) echo xdg-utils ;;
     vulkan-loader) echo vulkan-icd-loader ;;

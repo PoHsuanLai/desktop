@@ -153,7 +153,7 @@ run_machine 'ID=fedora'
 contains no-rustup "$machine_out" "https://sh.rustup.rs"
 
 # Now give the machine everything the runtime list wants.
-for tool in pkexec bwrap curl xdg-open Xwayland gnome-keyring-daemon; do printf '#!/bin/sh\n' >"$bin/$tool"; chmod +x "$bin/$tool"; done
+for tool in pkexec bwrap fusermount3 curl xdg-open Xwayland gnome-keyring-daemon; do printf '#!/bin/sh\n' >"$bin/$tool"; chmod +x "$bin/$tool"; done
 printf '#!/bin/sh\nexit 0\n' >"$bin/dpkg"; chmod +x "$bin/dpkg"
 printf '#!/bin/sh\nprintf "\\tlibvulkan.so.1 (libc6,x86-64) => /usr/lib/libvulkan.so.1\\n"\n' >"$tmp/ldconfig"; chmod +x "$tmp/ldconfig"
 mkdir -p "$root/usr/libexec" "$root/usr/share/vulkan/icd.d"

@@ -21,7 +21,7 @@ It looks for:
 - **To run the session**: a way to ask for administrator rights (polkit), the desktop portals (file chooser,
   screenshots, screen sharing; the backend that answers screenshots and screen sharing is transom, which the
   installer builds and puts in place), Xwayland, a place to keep saved passwords (gnome-keyring or KWallet), bubblewrap
-  (the sandbox for agents), curl, xdg-utils, the Vulkan loader and a Vulkan driver. On Ubuntu also
+  (the sandbox for agents), fuse3 (cloud drives in Files open their files when you open them), curl, xdg-utils, the Vulkan loader and a Vulkan driver. On Ubuntu also
   `dbus-user-session`, which minimal installs lack.
 - **To build from source**: rustup (the repos pin Rust 1.98.1; a distro's own rust package is the wrong version,
   and Ubuntu's is far too old), a C toolchain, cmake, pkg-config, libclang, perl and the development packages of
@@ -50,19 +50,19 @@ installer picks the one you have, or set `SUDO`).
 **Fedora**
 
 ```
-dnf install polkit xdg-desktop-portal xdg-desktop-portal-gtk xorg-x11-server-Xwayland gnome-keyring bubblewrap curl xdg-utils vulkan-loader mesa-vulkan-drivers
+dnf install polkit xdg-desktop-portal xdg-desktop-portal-gtk xorg-x11-server-Xwayland gnome-keyring bubblewrap fuse3 curl xdg-utils vulkan-loader mesa-vulkan-drivers
 ```
 
 **Ubuntu / Debian**
 
 ```
-apt install dbus-user-session polkitd pkexec xdg-desktop-portal xdg-desktop-portal-gtk xwayland gnome-keyring bubblewrap curl xdg-utils libvulkan1 mesa-vulkan-drivers
+apt install dbus-user-session polkitd pkexec xdg-desktop-portal xdg-desktop-portal-gtk xwayland gnome-keyring bubblewrap fuse3 curl xdg-utils libvulkan1 mesa-vulkan-drivers
 ```
 
 **Arch**
 
 ```
-pacman -S polkit xdg-desktop-portal xdg-desktop-portal-gtk xorg-xwayland gnome-keyring bubblewrap curl xdg-utils vulkan-icd-loader
+pacman -S polkit xdg-desktop-portal xdg-desktop-portal-gtk xorg-xwayland gnome-keyring bubblewrap fuse3 curl xdg-utils vulkan-icd-loader
 ```
 
 Arch also needs a Vulkan driver for your graphics card: `vulkan-radeon`, `vulkan-intel` or `nvidia-utils`.
