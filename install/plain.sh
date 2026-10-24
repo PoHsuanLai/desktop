@@ -24,7 +24,7 @@ all=(callers porter stoker almanac docket cua detent casement sill transom turns
 build_part() {
   local s=$siblings
   case $1 in
-    porter) build_outside "$s/porter" -p accountd -p syncd -p inferd -p porter-engines-install ;;
+    porter) build_outside "$s/porter" -p accountd -p syncd -p inferd -p porter-mountd -p porter-engines-install ;;
     detent) build_outside "$s/detent" -p detent ;;
     casement) build_outside "$s/casement" -p casement -p casementctl ;;
     transom) build_outside "$s/transom" -p transom ;;
