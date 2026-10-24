@@ -1,3 +1,3 @@
 # repo  lock  rev  why: a lock the repo's own gate never resolves, stale at a release the manifest pins.
 # Each line names one rev and lapses when the manifest moves the repo on; fix the lock upstream first.
-anyview Cargo.lock d0a5c0ba2bedd4b9eac9a656324904574dd8ad54 anyview locks docket ff9d1b73, porter e91eb7a4 and almanac ff542b0c; mailo ed23196f and files lock anyview d0a5c0ba, so this round keeps it; anyview #219 (373afbbc) moves them and lands in the next round
+anyview Cargo.lock d0a5c0ba2bedd4b9eac9a656324904574dd8ad54 anyview locks docket ff9d1b73, porter e91eb7a4 and almanac ff542b0c; mailo 8f10ffdd and files 383a962 lock anyview d0a5c0ba, so this round keeps it; anyview 373afbbc and later move them once mailo and files relock onto it
