@@ -2,7 +2,7 @@
 # Scenario `appearance-reaches-apps` (plan §4.14): an appearance change through ds-settings reaches
 # every running app, live, on a headless casement in the jail.
 #
-# The apps are the sill daemon's surfaces (bar, dock, OSD): each is a quire ds root that follows
+# The apps are the sill daemon's surfaces (bar and Dock): each is a quire ds root that follows
 # `quire/appearance.toml` through ds-settings' watch. The change is made the way a settings app
 # makes it, by writing the file in the scratch XDG_CONFIG_HOME (never a real one); the proof is each
 # surface's own capture (`sill debug capture`), compared by pixels. Quire apps outside sill need
@@ -51,17 +51,14 @@ step_baseline() {
   scratch_new
   build || return 1
   write_theme light
-  # The OSD is held up for the whole run so it is a surface to capture.
-  mkdir -p "$CONFIG/sill"
-  printf '[osd]\nhold_ms = 60000\n' >"$CONFIG/sill/settings.toml"
+  # The OSD is not among the surfaces: it hides after a fixed 1.5 s (the Settings prune made its hold a constant), so it
+  # cannot stay up across the three captures. The bar and the Dock are drawn all the time.
   floor_sill_callers
   launch_daemon || return 1
   DAEMON_PID=$DAEMON
   name=$(output_name) || return 1
-  SURFACES=("sill-bar-$name" "sill-dock-$name" "sill-osd-$name")
-  sill debug osd volume 60 >"$OUT_DIR/osd.log" 2>&1 || return 1
-  wait_surface "sill-osd-$name" 100 || { echo "the OSD never mapped" >&2; return 1; }
-  # Settled: the OSD and the bar finish their first animations before the baseline is taken.
+  SURFACES=("sill-bar-$name" "sill-dock-$name")
+  # Settled: the bar and the Dock finish their first animations before the baseline is taken.
   for surface in "${SURFACES[@]}"; do await_frames_settled "$surface" 20 || { echo "$surface never settled" >&2; return 1; }; done
   for surface in "${SURFACES[@]}"; do capture "$surface" "$OUT_DIR/base-$surface.png" || return 1; done
 }
