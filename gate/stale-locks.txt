@@ -1,3 +1,15 @@
 # repo  lock  rev  why: a lock the repo's own gate never resolves, stale at a release the manifest pins.
 # Each line names one rev and lapses when the manifest moves the repo on; fix the lock upstream first.
-anyview Cargo.lock d0a5c0ba2bedd4b9eac9a656324904574dd8ad54 anyview locks docket ff9d1b73, porter e91eb7a4 and almanac ff542b0c; mailo 8f10ffdd and files 383a962 lock anyview d0a5c0ba, so this round keeps it; anyview 373afbbc and later move them once mailo and files relock onto it
+# Round of 2026-10-29 (quire v0.3.58, before the reinstall): the path consumers (sill, detent, casement) build at the
+# manifest revs; the lines below are git pins inside separate programs whose owners relock onto this round next.
+quire examples/consumer/Cargo.lock e19728b7ee9e369d360c646bf5e7ed559bc3d6f9 the consumer example locks blitz-kit 7da72633; it is outside quire's own gate
+shell-host Cargo.lock f6571df30c00792b550a962ef77ccef6eccb138e locks casement-protocols fa664f1f through keycap's git pin; nothing it uses changed in 3a8b3715
+keycap Cargo.lock 4f5ceb2a3b39eee8564a37c9a9e90f3baf169070 locks casement-protocols fa664f1f; sill takes keycap by path at this rev
+porter Cargo.lock ad54ea46a9d6ef23039371f5f12c1ed8fccb4cb7 locks quire d17e19da; porter's daemons are separate programs (mailo session relocks)
+docket Cargo.lock 2df55f2a724db9ce0a4b6cd6a74a6e7ca2d5301e locks quire d17e19da; separate programs (agent session relocks)
+cua Cargo.lock 589c03f112434533735d31a6463308a43f8ce394 locks casement-protocols fa664f1f, docket 7bb397e5 and keycap bc3d4175; separate program (agent session relocks)
+mailo Cargo.lock 749246684ee852b9925c1679f32602080b6ec3ee locks anyview 30d90f52, porter 8e0355e0 and quire 8760244b (v0.3.57); separate app (mailo session relocks)
+detent Cargo.lock c1e785c28d901ca1fd24f5f81b6f1a370537b042 locks keycap bc3d4175 (its keycap-client pin follows casement's) and through it casement-protocols fa664f1f
+anyview Cargo.lock 3d5c3a453a866791fe691ed8fdc72a57fa62383d locks almanac 05c5b8c0, docket 77be9598, porter 31799cfa and prov 628083b3; separate app (anyview session relocks)
+casement Cargo.lock 11c9705d9940052e5c9145618420b8508f13c60f locks keycap bc3d4175 by git; the compositor talks to keycap over its socket
+casement wlcs-casement/Cargo.lock 11c9705d9940052e5c9145618420b8508f13c60f the conformance shim locks casement-protocols fa664f1f and keycap bc3d4175; outside casement's gate

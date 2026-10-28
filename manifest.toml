@@ -14,39 +14,39 @@ palmrest = 1
 
 [repo.quire]
 url = "https://github.com/PoHsuanLai/quire.git"
-rev = "d17e19da64c8845d8eb413784b2d84f177a86767"
+rev = "e19728b7ee9e369d360c646bf5e7ed559bc3d6f9"
 branch = "master"
 gate = "lane"
 gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "69967b98afdaae6a608810c74efdf059e90a0bdc"
+rev = "a9d6a7a5fdb08895f11bf98c3f975656ed517292"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
 
 [repo.shell-host]
 url = "https://github.com/PoHsuanLai/shell-host.git"
-rev = "c6fdf10409563dc05bd6f88f0c5958016d9d6300"
+rev = "f6571df30c00792b550a962ef77ccef6eccb138e"
 branch = "master"
 gate = "lane"
 
 [repo.blitz-kit]
 url = "https://github.com/PoHsuanLai/blitz-kit.git"
-rev = "80938e37915db0ca9ba6ac19216a4efa6bd76f73"
+rev = "fd08b468b8b5f7256c132240e96de35d2fea1433"
 branch = "master"
 gate = "none"
 
 [repo.keycap]
 url = "https://github.com/PoHsuanLai/keycap.git"
-rev = "bc3d41754fa716f4183c901915f95b70a5c4d0b8"
+rev = "4f5ceb2a3b39eee8564a37c9a9e90f3baf169070"
 branch = "main"
 gate = "lane"
 
 [repo.palmrest]
 url = "https://github.com/PoHsuanLai/palmrest.git"
-rev = "0895f6d4768583fb10d812027f40f6dd739bf591"
+rev = "74616cf2414bc23b6b80a1a1ce046edbbe33faac"
 branch = "master"
 gate = "lane"
 
@@ -60,13 +60,13 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "dcc16ada850559c7c8ae213cd7a9b153672e5031"
+rev = "ad54ea46a9d6ef23039371f5f12c1ed8fccb4cb7"
 branch = "master"
 gate = "lane"
 
 [repo.stoker]
 url = "https://github.com/PoHsuanLai/stoker.git"
-rev = "f30d2808a9f05901a952c1fac6db2c6479a1bfe2"
+rev = "c8fed624534867659448ac417992bac4f0f47e28"
 branch = "master"
 gate = "lane"
 
@@ -78,20 +78,20 @@ gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "0e1bc07512e730f328a2d7b334fa455af63005af"
+rev = "f98261aa54adf78bf8f8cb7252a73ed638e58f49"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "ec949633f4141c100abbafcd903a19c66c857707"
+rev = "2df55f2a724db9ce0a4b6cd6a74a6e7ca2d5301e"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "834fa8af268ece817ce7ca520a6df27244d3d364"
+rev = "589c03f112434533735d31a6463308a43f8ce394"
 branch = "master"
 gate = "lane"
 
@@ -117,25 +117,25 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "8f10ffddd7f9709c6d4fe84647ee28873117752c"
+rev = "749246684ee852b9925c1679f32602080b6ec3ee"
 branch = "master"
 gate = "none"
 
 [repo.files]
 url = "https://github.com/PoHsuanLai/files.git"
-rev = "383a962279cbb0ac48242127155bb3b3a8c1a2ac"
+rev = "0787c3abb02c14a9c2b5e6b85e4e189813c0e17a"
 branch = "master"
 gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "d6ac8c8cd61a67f3589402bad18fe8fc4e90cbb2"
+rev = "c1e785c28d901ca1fd24f5f81b6f1a370537b042"
 branch = "master"
 gate = "none"
 
 [repo.anyview]
 url = "https://github.com/PoHsuanLai/anyview.git"
-rev = "d0a5c0ba2bedd4b9eac9a656324904574dd8ad54"
+rev = "3d5c3a453a866791fe691ed8fdc72a57fa62383d"
 branch = "main"
 gate = "none"
 
@@ -157,7 +157,7 @@ gate = "none"
 
 [repo.casement-protocols]
 url = "https://github.com/PoHsuanLai/casement-protocols.git"
-rev = "fa664f1fcb312abd7e7a0e38ccae216406e88139"
+rev = "3a8b37153f3569cb604ba5b2daf8480444e543f3"
 branch = "master"
 gate = "none"
 
@@ -165,7 +165,7 @@ gate = "none"
 # The compositor (clean room: smithay fork PoHsuanLai/smithay@casement and anvil only). Not the daily
 # session until P1; its own gate is the jailed lane gate with --fabricate-gpus 1.
 url = "https://github.com/PoHsuanLai/casement.git"
-rev = "4e769bf97ffd3f0c2e041c022d550be939574c62"
+rev = "11c9705d9940052e5c9145618420b8508f13c60f"
 branch = "master"
 gate = "lane"
 
