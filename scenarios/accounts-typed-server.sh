@@ -41,7 +41,7 @@ cleanup() { acc_stop_all; stop_daemon; stop_compositor; scratch_drop; }
 trap cleanup EXIT
 
 # The porter in the build has the form.
-grep -q 'Protocol,' "$SCEN_BUILD/pin/porter/crates/porter-core/src/sheet/fields.rs" || {
+grep -q 'Protocol,' "$SCEN_BUILD/pin/porter/crates/porter-sheet/src/fields.rs" || {
   echo "SKIP accounts-typed-server: porter has no typed mail server form (FieldKind::Protocol)" >&2; exit 2; }
 
 # Where the form's controls are (sheet coordinates): pop-ups, their items below them, text fields, Continue.
