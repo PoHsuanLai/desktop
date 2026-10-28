@@ -8,7 +8,7 @@ keycap Cargo.lock 4f5ceb2a3b39eee8564a37c9a9e90f3baf169070 locks casement-protoc
 porter Cargo.lock ad54ea46a9d6ef23039371f5f12c1ed8fccb4cb7 locks quire d17e19da; porter's daemons are separate programs (mailo session relocks)
 docket Cargo.lock 2df55f2a724db9ce0a4b6cd6a74a6e7ca2d5301e locks quire d17e19da; separate programs (agent session relocks)
 cua Cargo.lock 589c03f112434533735d31a6463308a43f8ce394 locks casement-protocols fa664f1f, docket 7bb397e5 and keycap bc3d4175; separate program (agent session relocks)
-mailo Cargo.lock 065a55a3dd4e34f762d51cd49d78acd06e5ad951 locks porter 8e0355e0; mailo has no hits on porter 5c and re-pins to porter in its next porter round
+mailo Cargo.lock 1781d26a74f75ff0894e69c27c9fd7a3024ffe4a locks porter 8e0355e0; mailo has no hits on porter 5c and re-pins to porter in its next porter round
 detent Cargo.lock c1e785c28d901ca1fd24f5f81b6f1a370537b042 locks keycap bc3d4175 (its keycap-client pin follows casement's) and through it casement-protocols fa664f1f
 anyview Cargo.lock 3d5c3a453a866791fe691ed8fdc72a57fa62383d locks almanac 05c5b8c0, docket 77be9598, porter 31799cfa and prov 628083b3; separate app (anyview session relocks)
 casement Cargo.lock 11c9705d9940052e5c9145618420b8508f13c60f locks keycap bc3d4175 by git; the compositor talks to keycap over its socket
