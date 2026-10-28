@@ -70,6 +70,12 @@ rev = "f30d2808a9f05901a952c1fac6db2c6479a1bfe2"
 branch = "master"
 gate = "lane"
 
+[repo.prov]
+url = "https://github.com/PoHsuanLai/prov.git"
+rev = "f6cc175c4c6d815b6faa3d58b7875ca00def836d"
+branch = "master"
+gate = "lane"
+
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
 rev = "0e1bc07512e730f328a2d7b334fa455af63005af"
