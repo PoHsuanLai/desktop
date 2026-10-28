@@ -72,6 +72,11 @@ files() {
   echo "644 $(unit_source casement) $sysconfdir/systemd/user/casement.service"
   echo "644 $(unit_source sill) $sysconfdir/systemd/user/sill.service"
   echo "644 $SRC/sill-casement.desktop $sessions_dir/sill-casement.desktop"
+  # quire's look Extensions (Editorial), picked under Settings > Look; every quire app finds them in <data dir>/quire/extensions.
+  local f
+  for f in "$siblings"/quire/extensions/*/*; do
+    [ -f "$f" ] && echo "644 $f $prefix/share/quire/extensions/${f#"$siblings"/quire/extensions/}"
+  done
 }
 
 # content SOURCE: what is installed from SOURCE (the entry gets its Exec path, a unit its program's installed path;

@@ -171,6 +171,13 @@ build_session() {
   # (ds-blitz emoji_file.rs: <data dir>/fonts/quire/Noto-COLRv1.ttf for each XDG data dir, /usr/share included) finds it.
   put 644 "$ROOT/fonts/Noto-COLRv1.ttf" share/fonts/quire/Noto-COLRv1.ttf
   put 644 "$ROOT/fonts/OFL.txt" share/fonts/quire/OFL-Noto-COLRv1.txt
+  # quire's look Extensions (Editorial), from the quire checkout at the manifest rev (install.sh above has no siblings).
+  local q="$sib/quire" f want
+  want=$(manifest_rev quire)
+  [ "$(git -C "$q" rev-parse HEAD)" = "$want" ] || [ -n "${RELEASE_ALLOW_DIRTY_REVS:-}" ] || die "quire is not at the manifest rev $want" 2
+  (cd "$q/extensions" && find . -type f | sort) | while IFS= read -r f; do
+    put 644 "$q/extensions/$f" "share/quire/extensions/${f#./}"
+  done
 }
 
 build_porter() {

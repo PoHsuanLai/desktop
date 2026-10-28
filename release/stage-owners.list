@@ -155,6 +155,7 @@ small share/wayland-sessions/*.desktop
 small share/xdg-desktop-portal/quire-portals.conf
 small share/xdg-desktop-portal/portals/quire.portal
 small share/fonts/quire/*
+small share/quire/extensions/**
 small share/applications/org.quire.Settings.desktop
 small share/quire/intents/org.quire.Settings.toml
 small share/dbus-1/services/org.quire.Settings.service
