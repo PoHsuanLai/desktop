@@ -4,9 +4,9 @@
 # sill drawing the sheets, the rig's fake mail and Graph; no probe of sill's surfaces exists (see harness/lib/regress.sh),
 # so a check reads the bus record (what accountd shows the sheet, what the keys made it send) or compares captures.
 #
-#   boot      casement, recorded bus, rig, accountd with 14 filler providers (24 rows: since porter's accounts split the
-#             add list is the Internet providers only, 10 with the alias and Fake Mail) and an alias of Fake Mail, inferd, sill
-#   S4        24 provider rows: the card stays inside the surface, and a click at Cancel's place (relative to the card)
+#   boot      casement, recorded bus, rig, accountd with 14 filler providers (at least 24 rows: the shipped providers
+#             that can sign in, Fake Mail and its alias, the fillers) and an alias of Fake Mail, inferd, sill
+#   S4        20 or more provider rows: the card stays inside the surface, and a click at Cancel's place (relative to the card)
 #             sends Dismiss and closes the sheet [pixels + bus]
 #   S2        "Google" + Return picks `google`, not `google-ai` [bus: Input pick]
 #   S1        "Other..." picks `generic-imap` and shows its form, not the calendar and contacts one [bus: Input, Update]
@@ -14,7 +14,7 @@
 #             the same title, one with another label draws another [capture of the card's title band]
 #   S6        Microsoft with no client id (the client goes between the list and the pick: porter 1c9a8e8 leaves a clientless provider off the list): the failure is `needs_client_id`; Return (Done, the default) dismisses; Tab
 #             twice then Return still dismisses, so there is no Try Again between Back and Done [bus: Input]
-#   add       one OpenAI key added through inferd's sheet, for the consent window (the consent question is inferd's)
+#   add       one OpenAI key added through the same sheet, for the consent window (the consent question is accountd's)
 #   S5        an agent's app id is shown as written: `org.example.Agent.Zq-Bx` and its lowercase twin draw different
 #             headings [captures of the consent window]
 #   S3        a long app id: two ids that agree on their first 28 characters draw the same window (cut with an
@@ -48,8 +48,8 @@ step_boot() {
   local n
   regress_boot || return 1
   provider_copy alias-mail "Fake Mail" fake-mail
-  # The add list is accountd's Internet providers: the shipped ones that can sign in (7 without a client), Tailscale, Fake
-  # Mail and its alias make 10; 14 fillers make 24. Lettered, so "Filler A" matches one provider only.
+  # The add list is accountd's: the shipped providers that can sign in, Fake Mail and its alias, and 14 fillers (S4 needs
+  # 20 rows or more). Lettered, so "Filler A" matches one provider only.
   for n in a b c d e f g h i j k l m n; do provider_copy "filler-$n" "Filler ${n^^}" fake-mail; done
   accountd_start || return 1
   inferd_write_config </dev/null

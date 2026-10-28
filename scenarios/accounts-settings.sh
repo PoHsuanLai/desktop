@@ -2,22 +2,23 @@
 # Scenario `accounts-settings` (design 31 §7.1, PLAN §2.5): detent's Accounts pane against the live daemons. Each control
 # is clicked in the real window on casement (the window is placed by the compositor; clicks are relative to its frame,
 # `casementctl debug windows`), and the daemon's own state is what is checked afterwards, never detent's.
-# Since porter's accounts split (Phase B) the pane reads three modules: accountd's (the identities: sign in again, remove,
-# the apps using one), inferd's (the AI keys: the Language model switch, the apps' permits with their Revoke, remove) and
-# syncd's (not run here). The switch and the Revoke this scenario clicked on a mail account are the AI key's now.
+# Since porter's step 5c the pane reads accountd's module for every account (the identities: sign in again, remove, the
+# apps using one; the AI keys: the Language model switch, the apps' permits with their Revoke, remove), inferd's for the
+# spend rows beside them, and syncd's (not run here). The switch and the Revoke this scenario clicked on a mail account are
+# the AI key's now.
 # Real accountd, inferd, sill (the compositor's shell, and the sheet host), detent at its pin, the rig's fake servers.
 #
 #   boot      casement, recorded bus, fakes, Secret Service, accountd, inferd, sill, detent (named org.quire.Settings, role
 #             `settings`, with the programs' schema fixtures; every daemon the pane reads runs first: detent never starts
 #             one); a fake mail identity added through accountd's sheet, an app (org.quire.Mail) says it uses it, an OpenAI
-#             key added through inferd's, an app (org.quire.Companion) granted the key
+#             key added through the same sheet, an app (org.quire.Companion) granted the key
 #   open      Accounts in the sidebar, the AI key chosen in the list (capture of the list and of the account)
-#   service   the Language model switch is turned off: inferd's `service.llm` row says so and the app that held the permit
+#   service   the Language model switch is turned off: accountd's `service.llm` row says so and the app that held the permit
 #             is refused the key (ai-keys request: refused); turned on again, the key is back
 #   keep      Remove account, then Keep: the key is still there (capture of the question)
 #   revoke    Revoke on the app's row: the app's permit is gone
-#   remove    Remove account, then Remove account in the question: the key is gone from inferd's module and registry, and
-#             its audit file says removed; the same for the identity (accountd's module, registry and audit)
+#   remove    Remove account, then Remove account in the question: the key is gone from accountd's module and registry, and
+#             its audit file says removed; the same for the identity (a second removed in the audit)
 #   added     an identity added through the sheet while detent is open shows in its pane (accountd sends Changed on an add)
 #   sign-in   Sign in again on that identity: accountd opens the sign-in sheet (Settings reauthenticates any account)
 #   scan      the secret scan
@@ -34,7 +35,7 @@ acc_env
 # shellcheck source=/dev/null
 source "$SCEN_BUILD/pin/sill/dev/lib/all.sh"
 OUT_DIR=$(scenario_out accounts-settings)
-IDENT=fake-mail-ada-rig.test   # the identity (accountd); AI is the OpenAI key's account (inferd), set at boot
+IDENT=fake-mail-ada-rig.test   # the identity (accountd); AI is the OpenAI key's account (accountd's too), set at boot
 AI=
 AI_LABEL=
 MAIL_LABEL=
@@ -57,6 +58,8 @@ choose_account() { detent_press option "$1 …"; }
 # The service switch is named by the kind the module's row ends in (humanized: `llm` reads "Llm"), its row's label otherwise.
 press_llm_switch() { if detent_centre switch Llm >/dev/null 2>&1; then detent_press switch Llm; else detent_press switch "Language model"; fi; }
 press_revoke() { detent_press button "Revoke …"; }
+# removed_events: how many `removed` events accountd's audit file holds (the key's removal, then the identity's).
+removed_events() { grep -c '"kind":"removed"' "$STATE/quire/accountd/audit.jsonl" 2>/dev/null; }
 press_remove() { detent_press button "Remove account …"; }
 press_sign_in_again() { detent_press button "Sign in again …"; }
 # The question's buttons come after the page's own Remove account button in the document.
@@ -99,7 +102,7 @@ step_service() {
   before=$(service_llm)
   press_llm_switch; sleep 1; acc_shot 3-llm-off
   after=$(service_llm)
-  [ "$before" != "$after" ] || { echo "the Language model switch changed nothing in inferd (service.llm is still $before)" >&2; return 1; }
+  [ "$before" != "$after" ] || { echo "the Language model switch changed nothing in accountd (service.llm is still $before)" >&2; return 1; }
   ai_request_start org.quire.Companion off; acc_wait 20 grep -q '"result"' "$OUT_DIR/off.log"
   grep -q '"result":"refused"' "$OUT_DIR/off.log" || { echo "with the switch off the app is still offered the key: $(cat "$OUT_DIR/off.log")" >&2; return 1; }
   press_llm_switch; sleep 1
@@ -111,6 +114,7 @@ step_service() {
 }
 
 step_revoke() {
+  [ -n "$(ai_grant_path org.quire.Companion)" ] || { echo "the app holds no permit to revoke (accountd lists none titled $(app_title org.quire.Companion))" >&2; return 1; }
   press_revoke; sleep 1; acc_shot 4-revoked
   acc_wait 10 app_has_no_permit \
     || { echo "the app still has its permit: $(ai_grant_path org.quire.Companion)" >&2; return 1; }
@@ -125,10 +129,10 @@ step_keep() {
 step_remove() {
   press_remove; sleep 1
   press_question_remove
-  acc_wait 15 no_ai || { echo "the key is still in inferd's settings module after Remove" >&2; return 1; }
+  acc_wait 15 no_ai || { echo "the key is still in accountd's settings module after Remove" >&2; return 1; }
   sleep 1; acc_shot 6-removed
-  grep -q "$AI" "$STATE/quire/inferd/keys/registry.json" 2>/dev/null && { echo "inferd's registry still holds the key" >&2; return 1; }
-  grep -q '"kind":"removed"' "$STATE/quire/inferd/keys-audit.jsonl" || { echo "no removed event in inferd's audit file" >&2; return 1; }
+  grep -q "$AI" "$STATE/porter/registry.json" 2>/dev/null && { echo "the registry still holds the key" >&2; return 1; }
+  [ "$(removed_events)" = 1 ] || { echo "the audit file has $(removed_events) removed events after the key was removed, not 1" >&2; return 1; }
   # And the identity, from its own page.
   choose_account "$MAIL_LABEL"; sleep 1
   press_remove; sleep 1
@@ -136,7 +140,7 @@ step_remove() {
   acc_wait 15 no_ident || { echo "the identity is still in the settings module after Remove" >&2; return 1; }
   sleep 1; acc_shot 6-removed-identity
   grep -q "$IDENT" "$STATE/porter/registry.json" && { echo "the registry still holds the identity" >&2; return 1; }
-  grep -q '"kind":"removed"' "$STATE/quire/accountd/audit.jsonl" || { echo "no removed event in the audit file" >&2; return 1; }
+  [ "$(removed_events)" = 2 ] || { echo "the audit file has $(removed_events) removed events after the identity was removed too, not 2" >&2; return 1; }
   return 0
 }
 

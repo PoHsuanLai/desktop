@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Scenario `accounts-consent` (design 31 §7.1 item on consent): an app asks to use the person's AI key, sill draws the
 # consent sheet (captured), and each answer gives the right permit, or none; a second request after Always asks nothing.
-# Since porter's accounts split (Phase B) the question is inferd's (org.quire.Inference1.Keys.RequestKey, the rig's
-# `ai-keys request`), not accountd's: the grants and the relays left accountd with the mail and file kinds. Real accountd,
-# inferd, sill on casement, the rig's LLM API fake and Secret Service. Each case is its own app id
-# (porter-rig-client --app-id), so one answer cannot stand in for another. The permits are read from inferd's settings
+# Since porter's step 5c the question is accountd's (org.quire.Accounts1.Keys.RequestKey, the rig's `ai-keys request`):
+# accountd keeps the AI keys and their permits, and inferd asks it for the key behind a permit. Real accountd, inferd,
+# sill on casement, the rig's LLM API fake and Secret Service. Each case is its own app id
+# (porter-rig-client --app-id), so one answer cannot stand in for another. The permits are read from accountd's settings
 # module (`accounts.<id>.grant.<grant>` and its `.scope` row), as Settings reads them.
 #
 #   boot      casement, recorded bus, the rig, accountd, inferd (cloud models allowed for the class asked), sill; an OpenAI
-#             key added through the sheet (sheet_add_openai)
+#             key added through the add sheet (sheet_add_openai)
 #   always    Always Allow: granted, the permit is `always`; the same app asks again: granted at once, no sheet drawn
 #   once      Allow Once: granted, the permit is `once`; the app uses it (opens a session on the key with one prompt); a used
 #             once-permit is spent ("for one use"), so the permit is gone afterwards and the next request must ask again
@@ -78,7 +78,7 @@ step_always() {
   sheet_gone || return 1
   [ "$(grant_field $app scope)" = always ] || { echo "the permit is $(grant_field $app scope), not always" >&2; return 1; }
   ask $app always2
-  asked_nothing always2 "the second request after Always Allow drew the consent sheet again: inferd's RequestKey (porter-service choose.rs: ask_for builds a sheet from the fitting accounts and never reads the grants) asks every time" || return 1
+  asked_nothing always2 "the second request after Always Allow drew the consent sheet again: accountd's RequestKey (porter-service choose.rs: ask_for builds a sheet from the fitting accounts and never reads the grants) asks every time" || return 1
   out=$(answered always2) || return 1
   case "$out" in *'"result":"granted"'*) ;; *) echo "the second request was not answered from the permit: $out" >&2; return 1 ;; esac
   sheet_hidden || { echo "a sheet was drawn for the second request" >&2; return 1; }

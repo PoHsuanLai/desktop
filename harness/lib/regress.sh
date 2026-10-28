@@ -46,7 +46,7 @@ card_top() { local x0 y0 x1; read -r x0 y0 x1 _ < <(sheet_card "$1") || return 1
 # same_shot A B [BOX]: two captures draw the same pixels (in the box).
 same_shot() { px same "$OUT_DIR/$1.png" "$OUT_DIR/$2.png" ${3:+--box "$3"} >/dev/null; }
 
-# ask APP LOG: an app asks for a permit to use the person's AI keys (ai-keys request: inferd's consent sheet) in the
+# ask APP LOG: an app asks for a permit to use the person's AI keys (ai-keys request: accountd's consent sheet) in the
 # background; the answer lands in LOG.
 ask() { ai_request_start "$1" "$2"; }
 
@@ -68,7 +68,7 @@ regress_boot() {
   acc_config; acc_fake_mail_provider; acc_provider_openai_on_rig
 }
 
-# accounts_now: the account ids in accountd's settings module, space separated.
+# accounts_now: every account id in accountd's settings module (identities and AI keys), space separated.
 accounts_now() {
   settings_describe | python3 -I -c '
 import json, sys

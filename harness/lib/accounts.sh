@@ -184,9 +184,12 @@ acc_providers_only() {
 }
 
 # --- the daemons ---------------------------------------------------------------------------------------------
-# Phase B (porter bfd909a): accountd holds identities only; the AI keys and their permits are inferd's
-# (org.quire.Inference1), syncd keeps its own accounts (org.quire.Sync1). A page that reads a daemon never starts it
-# (detent's live/io.rs answers NotRunning), so a scenario starts every daemon its page reads before opening the page.
+# Since porter's step 5c accountd holds every account: the identities, the AI keys with their permits and switches (its
+# Keys interface), and the local runtimes inferd's probe reports to it (Broker.ReportLocal, a call only the `ai_broker`
+# role may make: inferd.service in dist/callers.toml). inferd (org.quire.Inference1) holds no key; it serves the models
+# and the spend rows (`accounts.<id>.spend.*`) of the accounts accountd lists. syncd keeps its own accounts
+# (org.quire.Sync1). A page that reads a daemon never starts it (detent's live/io.rs answers NotRunning), so a scenario
+# starts every daemon its page reads before opening the page.
 # Each daemon reads its caller table at startup only: acc_config installs callers.toml before accountd and syncd start,
 # inferd_write_config writes inferd's own system table ($INFERD_SYSTEM_CALLERS) before inferd starts.
 
@@ -225,18 +228,19 @@ syncd_start() {
 }
 syncd_stop() { [ -z "$SYNCD_PID" ] || acc_kill "$SYNCD_PID"; SYNCD_PID=; }
 
-# inferd_write_config: $CONFIG/quire/inferd.toml is what is on stdin (tables of the scenario: [probe], [ai] ...), and
+# inferd_write_config: $CONFIG/inferd/inferd.toml is what is on stdin (tables of the scenario: [probe], [ai] ...), and
 # $INFERD_SYSTEM_CALLERS is inferd's caller table, in the shape of porter's dist/inferd-callers.toml: inferd serves its
-# settings module to the unit org.quire.Settings.service and draws its sheets through the shell (sill.service); an app
-# in a Flatpak or app scope needs no row. Call it before inferd_start.
+# settings module (the spend rows) to the unit org.quire.Settings.service and its places to the shell (sill.service); an
+# app in a Flatpak or app scope needs no row. The file is inferd's own folder's, where Settings looks for it. Call it
+# before inferd_start.
 inferd_write_config() {
-  mkdir -p "$CONFIG/quire"
-  cat >"$CONFIG/quire/inferd.toml"
+  mkdir -p "$CONFIG/inferd"
+  cat >"$CONFIG/inferd/inferd.toml"
   printf 'settings = ["%s"]\nshell = ["sill.service"]\n' "$SETTINGS_UNIT" >"$INFERD_SYSTEM_CALLERS"
 }
 
 INFERD_PID=
-inferd_start() { # needs $CONFIG/quire/inferd.toml and $INFERD_SYSTEM_CALLERS (inferd_write_config)
+inferd_start() { # needs $CONFIG/inferd/inferd.toml and $INFERD_SYSTEM_CALLERS (inferd_write_config)
   # The model catalog at the manifest's stoker pin, where inferd reads it ($XDG_DATA_HOME/stoker/catalog): without
   # it no hosted model is known, so a turn on an AI key is refused before the key is ever read.
   mkdir -p "$DATA/stoker/catalog"
@@ -359,8 +363,9 @@ as_app() {
 }
 
 # settings_describe_at BUS PATH / settings_get_at BUS PATH KEY: a daemon's settings module (org.quire.SettingsModule1), read
-# as the Settings app. Three daemons serve one: accountd (identities, /org/quire/Accounts1/settings), inferd (AI keys and
-# permits, /org/quire/Inference1/settings) and syncd (sync accounts, /org/quire/Sync1/settings).
+# as the Settings app. Three daemons serve one: accountd (every account: identities, AI keys with their permits and
+# switches, local runtimes; /org/quire/Accounts1/settings), inferd (only the spend rows, `accounts.<id>.spend.*`, of the
+# accounts accountd lists; /org/quire/Inference1/settings) and syncd (sync accounts, /org/quire/Sync1/settings).
 settings_describe_at() {
   as_app org.quire.Settings busctl --address="$BUS" --json=short call "$1" "$2" \
     org.quire.SettingsModule1 Describe | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["data"][0])'
@@ -379,12 +384,12 @@ settings_press_at() {
     org.quire.SettingsModule1 Set sv "$3" b false >/dev/null
 }
 ACC_SET=/org/quire/Accounts1/settings
-AI_SET=/org/quire/Inference1/settings
 SYNC_SET=/org/quire/Sync1/settings
 settings_describe() { settings_describe_at org.quire.Accounts1 $ACC_SET; }
 settings_get() { settings_get_at org.quire.Accounts1 $ACC_SET "$1"; }
-ai_describe() { settings_describe_at org.quire.Inference1 $AI_SET; }
-ai_get() { settings_get_at org.quire.Inference1 $AI_SET "$1"; }
+# The AI accounts (keys, permits, switches, local runtimes) are rows of accountd's module beside the identities'.
+ai_describe() { settings_describe; }
+ai_get() { settings_get "$1"; }
 sync_describe() { settings_describe_at org.quire.Sync1 $SYNC_SET; }
 sync_get() { settings_get_at org.quire.Sync1 $SYNC_SET "$1"; }
 sync_press() { settings_press_at org.quire.Sync1 $SYNC_SET "$1"; }
@@ -395,15 +400,25 @@ has_row_of() { # DESCRIBE-FN ID
 }
 ai_has_account() { has_row_of ai_describe "$1"; }
 sync_has_account() { has_row_of sync_describe "$1"; }
+# app_title APP: what the person reads for the app: the `name` of its row in the system caller table ("Assistant" for
+# org.quire.Companion), else its id.
+app_title() {
+  python3 -I -c '
+import sys, tomllib
+with open(sys.argv[1], "rb") as f:
+    rows = tomllib.load(f).get("caller", [])
+print(next((r["name"] for r in rows if r.get("app") == sys.argv[2] and r.get("name")), sys.argv[2]))' "$ACC_SYSTEM_CALLERS" "$1"
+}
 # ai_grant_path APP: the path of APP's permit row on the AI keys (`accounts.<id>.grant.<grant>`), or nothing. The row's label
-# starts with the app's name ("org.quire.Always can use Language model").
+# starts with the app's title ("Assistant can use Language model", "org.quire.Always can use Language model").
 ai_grant_path() {
+  local title; title=$(app_title "$1")
   ai_describe 2>/dev/null | python3 -I -c '
 import json, re, sys
 for k in json.load(sys.stdin)["key"]:
     p = k["path"]
-    if ".grant." in p and not re.search(r"\.(since|scope)$", p) and str(k.get("label", "")).startswith(sys.argv[1] + " "):
-        print(p); break' "$1"
+    if ".grant." in p and not re.search(r"\.(since|scope|app|service)$", p) and str(k.get("label", "")).startswith(sys.argv[1] + " "):
+        print(p); break' "$title"
 }
 # ai_grant_field APP scope|decision: the permit's `scope` (once, always, session), or its decision (allow, deny); `none` when APP has none.
 ai_grant_field() {
@@ -525,27 +540,20 @@ sheet_add_microsoft() {
   sheet_gone
 }
 
-# ai_add_start APP [PROVIDER]: inferd's add-a-key sheet as that app (porter-rig-client ai-keys add), in the background; the
-# answer lands in $OUT_DIR/add.log as acc_add_start's does.
-ai_add_start() {
-  : >"$OUT_DIR/add.log"
-  rigc_bg "$OUT_DIR/add.log" "$1" ai-keys add ${2:+"$2"}
-  ADD_PID=$ACC_LAST
-}
-
-# sheet_add_openai: the whole add flow of an OpenAI key through the sheet (inferd draws it for ai-keys add; the key goes
-# sheet -> inferd -> Secret Service and the rig's LLM API fake checks it with its models list). Needs the rig started with
-# --llm-api, acc_provider_openai_on_rig, inferd and sill. Sets ACCOUNT to the new account.
+# sheet_add_openai: the whole add flow of an OpenAI key through the sheet (an AI key is added like any account: accountd
+# draws the add sheet for Manager.AddAccount, the key goes sheet -> accountd -> Secret Service and the rig's LLM API fake
+# checks it with its models list). Needs the rig started with --llm-api, acc_provider_openai_on_rig, accountd and sill.
+# Sets ACCOUNT to the new account.
 sheet_add_openai() {
-  ai_add_start org.quire.Companion
+  acc_add_start org.quire.Companion
   sheet_await || return 1; sheet_settled; sleep 1
   sheet_type OpenAI; sleep 0.5; sheet_key Enter; sleep 1
   sheet_type "$(rigj llm_api.api_key)"; sleep 0.5
   sheet_key Enter; sleep 3
   sheet_key Enter
   local response
-  response=$(acc_add_response 30) || { echo "ai-keys add never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
-  acc_added "$response" || { echo "ai-keys add answered $response" >&2; return 1; }
+  response=$(acc_add_response 30) || { echo "AddAccount never answered: $(cat "$OUT_DIR/add.log")" >&2; return 1; }
+  acc_added "$response" || { echo "AddAccount answered $response" >&2; return 1; }
   sheet_gone
 }
 
@@ -575,7 +583,7 @@ sync_continue_keys() {
 # sheet_stray_escape: a sheet nobody expected is closed (so one failed check does not leave its sheet to take the next step's keys).
 sheet_stray_escape() { sheet_shown && { sheet_key Escape; sheet_gone 8; }; }
 
-# ai_request_start APP LOG: the app asks inferd for a permit to use the person's AI keys (porter-rig-client ai-keys request),
+# ai_request_start APP LOG: the app asks accountd for a permit to use the person's AI keys (porter-rig-client ai-keys request),
 # in the background; its one result line lands in LOG: {"result":"granted","permit":..} or {"result":"refused","refusal":..}.
 ai_request_start() { rigc_bg "$OUT_DIR/$2.log" "$1" ai-keys request --class "${3:-files}"; }
 
@@ -606,7 +614,7 @@ print(want)' "$1"
 
 # detent_start: detent (the Settings app, built at its pin) on casement, on the private bus, named org.quire.Settings
 # (the role `settings` of the caller table). Its window is captured with `casementctl shot --output` (acc_shot).
-DETENT_PID=
+DETENT_PID= PROBE_DIR=
 detent_start() {
   local data="$SCRATCH/detent-data"
   # The programs' schemas, as detent's own tests seed them (its pages are made of schemas: without them the sidebar
@@ -661,20 +669,22 @@ detent_click() {
 # presses "button Manage", never a place. The roles are the ones the markup has: button, switch, option (a sidebar row),
 # checkbox, textbox ...; the name is the aria-label, else the visible text.
 
-# detent_centre ROLE NAME [NTH]: "X Y", the control's centre in detent's window; exit 1 when there is none. NTH counts from
-# 1 in document order; -1 is the last (an alert's button, after the page's of the same name).
-detent_centre() { python3 -I "$ACC_LIB/probe-find.py" "$PROBE_DIR" "$DETENT_PID" "$1" "$2" ${3:+--nth "$3"}; }
+# detent_centre ROLE NAME [NTH]: "X Y", the control's centre in detent's window; exit 1 when there is none (detent not
+# started yet: none). NTH counts from 1 in document order; -1 is the last (an alert's button, after the page's of the same
+# name).
+detent_centre() { [ -n "$DETENT_PID" ] || return 1; python3 -I "$ACC_LIB/probe-find.py" "$PROBE_DIR" "$DETENT_PID" "$1" "$2" ${3:+--nth "$3"}; }
 
 # detent_state ROLE NAME [NTH]: the control's state words (checked, pressed, selected, expanded, disabled, or -).
-detent_state() { python3 -I "$ACC_LIB/probe-find.py" "$PROBE_DIR" "$DETENT_PID" "$1" "$2" ${3:+--nth "$3"} --state; }
+detent_state() { [ -n "$DETENT_PID" ] || return 1; python3 -I "$ACC_LIB/probe-find.py" "$PROBE_DIR" "$DETENT_PID" "$1" "$2" ${3:+--nth "$3"} --state; }
 
 # detent_listing: what detent shows now, one control per line (role x y w h state name).
-detent_listing() { cat "$PROBE_DIR/$DETENT_PID-0.tsv" 2>/dev/null; }
+detent_listing() { [ -z "$DETENT_PID" ] || cat "$PROBE_DIR/$DETENT_PID-0.tsv" 2>/dev/null; }
 
 # detent_press ROLE NAME [NTH]: waits for the control, waits until it stands still (two reads 0.3 s apart agree: a page
-# change slides), then clicks its centre as detent_click would.
+# change slides), scrolls it into the window when the probe lists it below the window's bottom edge (the sidebar is
+# taller than the window, so its last pages are listed but out of reach), then clicks its centre as detent_click would.
 detent_press() {
-  local role=$1 name=$2 nth=${3:-} c1 c2 x y w h i
+  local role=$1 name=$2 nth=${3:-} c1 c2 x y w h i cx cy
   for i in $(seq 100); do
     c1=$(detent_centre "$role" "$name" $nth) && { sleep 0.3; c2=$(detent_centre "$role" "$name" $nth) && [ "$c1" = "$c2" ] && break; }
     sleep 0.1
@@ -684,6 +694,16 @@ detent_press() {
   }
   read -r x y w h < <(detent_frame) || return 1
   read -r cx cy <<<"$c1"
+  # The wheel over the control's own column, a notch at a time, until its centre is inside the window; the page slides
+  # while it scrolls, so the position is read again.
+  for i in $(seq 20); do
+    [ "$cy" -lt $((h - 16)) ] && break
+    casementctl debug inject "move $((x + cx)) $((y + h / 2))" "axis vertical 15" >/dev/null || return 1
+    sleep 0.5
+    c1=$(detent_centre "$role" "$name" $nth) || { echo "detent lost $role \"$name\" while scrolling to it" >&2; return 1; }
+    read -r cx cy <<<"$c1"
+  done
+  [ "$cy" -lt $((h - 16)) ] || { echo "detent_press: $role \"$name\" stays below the window (y $cy of $h) after scrolling" >&2; return 1; }
   casement_tap $((x + cx)) $((y + cy))
 }
 

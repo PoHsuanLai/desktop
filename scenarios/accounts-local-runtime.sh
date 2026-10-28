@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Scenario `accounts-local-runtime` (design 31 §3.3, PLAN acceptance 6): a runtime on this computer is an account.
 # The rig's fake Ollama listens on 127.0.0.1; inferd (real, `[probe] ollama` set to the fake's port, a look a second)
-# finds it and records it as its own account (since porter's accounts split, Phase B, the AI accounts are inferd's, no
-# longer accountd's); the account `ollama` appears in inferd's settings module, its place is this computer, detent's
-# Intelligence page lists it; when the fake stops, inferd reports it offline: the account is `offline` and the page
-# greys it. Real accountd, inferd and detent on casement; no sill (no sheet is needed).
+# finds it and reports it to accountd (Broker.ReportLocal, which accountd lets inferd.service make as the `ai_broker` of
+# dist/callers.toml; since porter's step 5c the registry of the AI accounts, the local runtimes among them, is accountd's);
+# the account `ollama` appears in accountd's settings module, its place is this computer, detent's Intelligence page lists
+# it; when the fake stops, inferd reports it offline: the account is `offline` and the page greys it. Real accountd, inferd and detent on casement; no sill (no sheet is needed).
 #
 #   boot       casement, recorded bus, the fake Ollama, Secret Service, accountd, inferd, detent (org.quire.Settings);
 #              detent never starts a daemon, so every daemon its Accounts and Intelligence pages read runs first
-#   appears    the account `ollama` is in inferd's settings module and `ok`
+#   appears    the account `ollama` is in accountd's settings module and `ok`
 #   place      `accounts.ollama.place` is this_computer
 #   listed     detent's Intelligence page, under Models on this computer, lists it as Running (capture)
-#   offline    the fake is stopped (rig lever /ollama/stop); inferd's next look reports it offline and the account is
+#   offline    the fake is stopped (rig lever /ollama/stop); inferd's next look reports it offline to accountd and the account is
 #              `offline`
 #   greyed     detent's page changes at the runtime's row: it reads Offline and is greyed (capture)
 #   scan       the secret scan
@@ -66,8 +66,8 @@ scroll_to_runtimes() {
   RUNTIME_Y=$((y + cy)); acc_shot .scroll
 }
 
-# reports: what inferd said of its looks, from its log (the probe's report is in process now, not on the bus).
-reports() { tail -n 10 "$OUT_DIR/inferd.log"; }
+# reports: what inferd and accountd said of the looks, from their logs (the probe's report goes inferd -> accountd).
+reports() { tail -n 10 "$OUT_DIR/inferd.log" "$OUT_DIR/accountd.log"; }
 
 step_boot() {
   start_compositor || return 1
@@ -90,7 +90,7 @@ EOF
 
 step_appears() {
   acc_wait 30 has_ollama || {
-    echo "no ollama account in inferd 30 s after it should have found the fake; inferd said:" >&2
+    echo "no ollama account in accountd 30 s after inferd should have found the fake and reported it; the logs say:" >&2
     reports >&2
     return 1
   }
@@ -114,7 +114,7 @@ step_listed() {
 
 step_offline() {
   rigctl POST /ollama/stop >/dev/null
-  acc_wait 20 ollama_offline || { echo "the fake Ollama stopped, inferd looks every second, but the account is $(ai_get accounts.ollama.state), not offline; inferd said:" >&2; reports >&2; return 1; }
+  acc_wait 20 ollama_offline || { echo "the fake Ollama stopped, inferd looks every second, but the account is $(ai_get accounts.ollama.state), not offline; the logs say:" >&2; reports >&2; return 1; }
 }
 
 # detent redraws the row when its next look at the accounts lands, which can be a few seconds after the

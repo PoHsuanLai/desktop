@@ -5,8 +5,8 @@
 # its pin, the rig's fake mail and Graph.
 #
 #   boot      a password account (Fake Mail) and a browser account (Microsoft) added through accountd's sheet, an OpenAI key
-#             added through inferd's, a permit for an app on the key (since porter's accounts split the permits and their
-#             Revoke are the AI keys', inferd's); the Accounts pane reads accountd, inferd and (if it runs) syncd
+#             added through the same sheet, a permit for an app on the key (the permits and their Revoke are the AI keys', and
+#             accountd's since porter's step 5c); the Accounts pane reads accountd, inferd (spend rows) and (if it runs) syncd
 #   D1        the list's rows are named by their account, read apart ("<account>, <provider>"), and every detail button
 #             names what it acts on: "Revoke <app> ...", "Sign in again <account>", "Remove account <account>", never the
 #             bare word [probe listing]
@@ -68,7 +68,8 @@ step_boot() {
   acc_wait 30 detent_mapped || { echo "detent never mapped" >&2; tail -5 "$OUT_DIR/detent.log" >&2; return 1; }
   sleep 4
   detent_focus
-  ACCOUNTS=($(accounts_now))
+  # accountd lists the AI key beside the identities; the sign-in rows below are the identities'.
+  ACCOUNTS=($(accounts_now | tr ' ' '\n' | grep -vxF -- "$AI_ACCOUNT"))
   echo "accounts: ${ACCOUNTS[*]}" >&2
   [ "${#ACCOUNTS[@]}" = 2 ]
 }
@@ -99,7 +100,7 @@ step_d1_names() {
   detent_press option "$(ai_get "accounts.$AI_ACCOUNT.label") …"; sleep 1.5
   acc_shot d1-ai-account
   names=$(buttons)
-  must "D1 Revoke names the app" starts_with "$names" "Revoke org.quire.Companion"
+  must "D1 Revoke names the app" starts_with "$names" "Revoke $(app_title org.quire.Companion)"
   must "D1 no bare Revoke" not lists "$names" Revoke
   reg_verdict
 }
