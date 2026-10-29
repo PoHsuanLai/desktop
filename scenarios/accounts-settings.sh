@@ -4,7 +4,7 @@
 # `casementctl debug windows`), and the daemon's own state is what is checked afterwards, never detent's.
 # Since porter's step 5c the pane reads accountd's module for every account (the identities: sign in again, remove, the
 # apps using one; the AI keys: the Language model switch, the apps' permits with their Revoke, remove), inferd's for the
-# spend rows beside them, and syncd's (not run here). The switch and the Revoke this scenario clicked on a mail account are
+# spend rows beside them, and ferry's syncd (not run here). The switch and the Revoke this scenario clicked on a mail account are
 # the AI key's now.
 # Real accountd, inferd, sill (the compositor's shell, and the sheet host), detent at its pin, the rig's fake servers.
 #

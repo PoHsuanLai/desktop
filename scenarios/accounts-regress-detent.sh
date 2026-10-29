@@ -2,7 +2,7 @@
 # Scenario `accounts-regress-detent`: detent's Accounts pane, as accounts-hunt found it wrong (probes 4, 5 and 6) and
 # detent 06f5829 fixed it. detent runs with ds-blitz's debug probe (QUIRE_DEBUG_PROBE), so its controls are read by role and
 # name; what is only text (the line under a row) is measured in the capture. Real accountd, sill (the sheet host), detent at
-# its pin, the rig's fake mail and Graph.
+# its pin, the rigs' fake mail and Graph (porter's and ferry's).
 #
 #   boot      a password account (Fake Mail) and a browser account (Microsoft) added through accountd's sheet, an OpenAI key
 #             added through the same sheet, a permit for an app on the key (the permits and their Revoke are the AI keys', and
@@ -164,7 +164,7 @@ step_scan() { scan_end; }
 
 run_steps step_boot step_d2_search step_d1_names step_d3_reauth step_d4_remove_legible step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd inferd daemon detent rig-servers secrets add; do
+  for f in accountd inferd daemon detent rig-servers ferry-rig-servers secrets add; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi

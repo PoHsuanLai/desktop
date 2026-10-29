@@ -17,14 +17,15 @@ log=${XDG_STATE_HOME:-$HOME/.local/state}/desktop-install.log
 # shellcheck source=install/cargo.sh
 . "$here/cargo.sh"
 
-all=(callers porter steward stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
+all=(callers porter steward ferry stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
 
 # build_part PART: build what PART's installer installs, as you. Parts whose installer builds as you and
 # asks for sudo itself (stoker, almanac, docket, cua, sill, mailo, files) build in their install step instead.
 build_part() {
   local s=$siblings
   case $1 in
-    porter) build_outside "$s/porter" -p accountd -p syncd -p porter-mountd ;;
+    porter) build_outside "$s/porter" -p accountd ;;
+    ferry) build_outside "$s/ferry" -p syncd -p ferry-mountd ;;
     steward) build_outside "$s/steward" -p inferd ;;
     detent) build_outside "$s/detent" -p detent ;;
     casement) build_outside "$s/casement" -p casement -p casementctl ;;
@@ -45,6 +46,7 @@ install_part() {
     callers) sudo "$d/install/system.sh" callers ;;
     porter) sudo "$s/porter/scripts/install.sh" --prefix "$p" --sysconfdir /etc --no-build ;;
     steward) sudo "$s/steward/scripts/install.sh" --prefix "$p" --sysconfdir /etc --no-build ;;
+    ferry) sudo "$s/ferry/scripts/install.sh" --prefix "$p" --no-build ;;
     stoker) "$s/stoker/scripts/install.sh" --prefix "$p" --sysconfdir /etc ;;
     almanac) "$s/almanac/scripts/install.sh" --prefix "$p" ;;
     docket) "$s/docket/scripts/install.sh" --prefix "$p" ;;
@@ -92,7 +94,7 @@ mkdir -p "$(dirname "$log")"
 
 verb=building
 for part in "${parts[@]}"; do
-  case $part in porter | steward | detent | casement | transom | turnstile | keycap | palmrest | anyview) quietly "$part" build_part "$part" ;; esac
+  case $part in porter | steward | ferry | detent | casement | transom | turnstile | keycap | palmrest | anyview) quietly "$part" build_part "$part" ;; esac
 done
 [ "$mode" = install ] || exit 0
 

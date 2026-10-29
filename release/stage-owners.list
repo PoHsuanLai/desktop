@@ -70,19 +70,10 @@ files share/quire/settings/files.settings.toml
 
 porter components.d/porter.txt
 porter libexec/quire/accountd
-porter libexec/quire/syncd
-porter libexec/quire/porter-mountd
 porter lib/systemd/user/accountd.service
-porter lib/systemd/user/syncd.service
-porter lib/systemd/user/porter-mountd.service
-porter lib/systemd/user/porter-mountd.socket
-porter lib/systemd/user/sockets.target.wants/porter-mountd.socket
 porter lib/systemd/user/accountd.service.d/*
-porter lib/systemd/user/syncd.service.d/*
 porter system/usr/lib/systemd/user/accountd.service
-porter system/usr/lib/systemd/user/syncd.service
 porter share/dbus-1/services/org.quire.Accounts1.service
-porter share/dbus-1/services/org.quire.Sync1.service
 porter share/porter/providers/*.toml
 porter share/porter/clients.toml
 porter system/etc/porter/callers.toml
@@ -100,6 +91,17 @@ steward share/doc/porter/examples/inferd.toml
 steward share/doc/porter/examples/inferd-cloud.conf
 steward system/etc/porter/inferd-callers.toml
 steward system/etc/porter/inferd-callers.toml.dist
+
+ferry components.d/ferry.txt
+ferry libexec/quire/syncd
+ferry libexec/quire/porter-mountd
+ferry lib/systemd/user/syncd.service
+ferry lib/systemd/user/syncd.service.d/*
+ferry lib/systemd/user/porter-mountd.service
+ferry lib/systemd/user/porter-mountd.socket
+ferry lib/systemd/user/sockets.target.wants/porter-mountd.socket
+ferry system/usr/lib/systemd/user/syncd.service
+ferry share/dbus-1/services/org.quire.Sync1.service
 
 agents components.d/stoker.txt
 agents components.d/almanac.txt

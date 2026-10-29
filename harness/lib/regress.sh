@@ -55,7 +55,7 @@ provider_copy() {
   sed -e "s/^id = .*/id = \"$1\"/" -e "s/^label = .*/label = \"$2\"/" "$PROV/$3.toml" >"$PROV/$1.toml"
 }
 
-# regress_boot: casement, the recorded bus, the rig (mail, Graph for Microsoft, the LLM API for an AI key), Secret Service, the
+# regress_boot: casement, the recorded bus, porter's rig (mail, the LLM API for an AI key) and ferry's (the issuer and Graph for Microsoft), Secret Service, the
 # provider files. The scenario starts the daemons itself.
 regress_boot() {
   start_compositor || return 1
@@ -63,7 +63,8 @@ regress_boot() {
   build || return 1
   [ -z "${REGRESS_THEME:-}" ] || printf '[appearance]\ntheme = "%s"\n' "$REGRESS_THEME" >"$CONFIG/quire/appearance.toml"
   scan_begin
-  rig_start --graph --imap --smtp --tls implicit --llm-api || return 1
+  rig_start --imap --smtp --tls implicit --llm-api || return 1
+  ferry_rig_start || return 1
   secrets_start || return 1
   acc_config; acc_fake_mail_provider; acc_provider_openai_on_rig
 }
