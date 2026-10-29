@@ -21,7 +21,7 @@ gate_extra = "./scripts/check-consumer.sh"
 
 [repo.sill]
 url = "https://github.com/PoHsuanLai/sill.git"
-rev = "0810d68af2a14683fd2e9c24d97f5676310284c7"
+rev = "bc8e7cbfaf00858b9199dff13ac0c7436ebf9b46"
 branch = "master"
 gate = "lane"
 gate_args = "--features sill/debug"
@@ -60,13 +60,20 @@ gate = "lane"
 
 [repo.porter]
 url = "https://github.com/PoHsuanLai/porter.git"
-rev = "c718d2036daad7e052e1d89f1fe0ca4679168427"
+rev = "f406782b90b67f62f0f14ec5e78aec8992b5d709"
 branch = "master"
 gate = "lane"
 
 [repo.steward]
 url = "https://github.com/PoHsuanLai/steward.git"
 rev = "72ec161084020132196e085176125a2af7798354"
+branch = "master"
+gate = "lane"
+
+[repo.ferry]
+# Sync (syncd, the Cloud-folder helper porter-mountd) and its test rig, split from porter; uses accountd's accounts through porter-client.
+url = "https://github.com/PoHsuanLai/ferry.git"
+rev = "e61b2648d8c455b6b36612aece7f51a6dd5ff96c"
 branch = "master"
 gate = "lane"
 
@@ -135,7 +142,7 @@ gate = "none"
 
 [repo.detent]
 url = "https://github.com/PoHsuanLai/detent.git"
-rev = "220f173e2e5a3a2b4efbaa93841a0f1debd22b3a"
+rev = "cd024ad6653b92359dbc5ebae3611b4444a7900d"
 branch = "master"
 gate = "none"
 

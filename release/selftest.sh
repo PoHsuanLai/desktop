@@ -152,7 +152,7 @@ owners "$so"/out/stage-turnstile "$so"/out/stage-keycap "$so"/out/stage-palmrest
 for bad in bin/turnstile bin/keycap bin/palmrest system/usr/lib/systemd/system/turnstile.service system/usr/lib/systemd/system/keycap.service \
   system/usr/lib/systemd/system/palmrest.service system/etc/udev/rules.d/72-turnstile.rules system/etc/udev/rules.d/70-palmrest.rules \
   system/etc/quire/desktop-callers.toml system/etc/polkit-1/rules.d/00-all.rules bin/anything; do
-  for job in mailo anyview casement sill porter steward agents small; do
+  for job in mailo anyview casement sill porter steward ferry agents small; do
     [ "$job" = small ] && case "$bad" in system/etc/quire/desktop-callers.toml) continue ;; esac
     mk_tar "$job" "$bad"
     owners "$so/out/stage-$job" >/dev/null 2>&1 && check "job $job was allowed to supply $bad"

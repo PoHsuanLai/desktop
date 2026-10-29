@@ -27,4 +27,4 @@ check:
 
 # every part, in install order
 parts:
-    @echo callers porter steward stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session
+    @echo callers porter steward ferry stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session

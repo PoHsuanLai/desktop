@@ -7,7 +7,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 |---|---|
 | `manifest.toml` | which rev of which repo works with which; wire protocol versions |
 | `justfile`, `install/plain.sh` | `just`: builds every part as you and installs it with one sudo, a line per part (see Installing) |
-| `install.sh` | installs the desktop: runs each component repo's own installer in order (callers, porter, steward, stoker, almanac, docket, cua, detent, casement, sill, transom, turnstile, keycap, anyview, mailo, files, palmrest, session; callers, turnstile, keycap and palmrest are this repo's `install/system.sh`) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
+| `install.sh` | installs the desktop: runs each component repo's own installer in order (callers, porter, steward, ferry, stoker, almanac, docket, cua, detent, casement, sill, transom, turnstile, keycap, anyview, mailo, files, palmrest, session; callers, turnstile, keycap and palmrest are this repo's `install/system.sh`) and the colour emoji font; `--check` lists what the machine lacks with the exact dnf, apt or pacman line; see below and `docs/distros.md` |
 | `docs/distros.md` | Ubuntu 24.04+, Fedora and Arch: what is checked, the install lines, picking the session at login, the Ubuntu AppArmor note |
 | `docs/release-notes.md` | the notes for the release being prepared, in plain words (what a person sees change); the text for the release's notes |
 | `install/` (helpers) | `distro.sh` (family from os-release, sudo/doas/pkexec), `packages.sh` (the one package table), `check.sh`, `cargo.sh` (builds a tree from `/` with `--manifest-path`, so the system linker is used), `fonts.sh` |
@@ -29,7 +29,7 @@ version manifest, the test jail and the whole-desktop gate. No Rust, no product 
 | `gate/sill-accept-skips.txt` | the scripts of sill's `dev/accept.sh --compositor casement` that may SKIP in the phase gate, with the closing phase |
 | `gate/expected-skips.toml` | scenarios not runnable yet, each with a finding id and the closing phase |
 | `scenarios/` | whole-desktop scenarios; each calls `require_jail` first and exits with the plan's codes |
-| `harness/lib/accounts.sh` | what the `accounts-*` scenarios share: porter's real daemons (accountd, syncd), steward's inferd and porter's test rig (`porter-rig-servers`, `-client`, `-secrets`) on casement's private bus with sill drawing the sheets and detent as Settings; the caller identities (a fixture /proc for the daemons' `test-proc-root` builds); the secret scan (`secret-scan.py`) over a `busctl monitor` record |
+| `harness/lib/accounts.sh` | what the `accounts-*` scenarios share: porter's real accountd, ferry's syncd, steward's inferd, porter's test rig (`porter-rig-servers`, `-client`, `-secrets`) and ferry's (`ferry-rig-servers`: the OAuth issuer and the Graph fake, `ferry-rig-client`: an app talking to syncd) on casement's private bus with sill drawing the sheets and detent as Settings; the caller identities (a fixture /proc for the daemons' `test-proc-root` builds); the secret scan (`secret-scan.py`) over a `busctl monitor` record |
 | `harness/lib/regress.sh`, `pixels.py`, `sheet-bus.py` | what the `accounts-regress-*` scenarios share: checks that fail a step (`must`), the sheet's traffic read from the recorded bus (what accountd shows it, what the keys sent back), and measurements of a capture (the card's box, equal pixels, dark text, contrast). sill's surfaces write no debug probe (shell-host does not run ds-blitz's), so the sheet is read this way; detent's controls are read by role and name |
 
 ## Installing
@@ -53,7 +53,7 @@ can be set in the environment.
 `./install.sh [--dry-run] [--prefix DIR] [--destdir DIR] [--sysconfdir DIR] [--siblings DIR] [--only NAME,...]`
 runs each component's own installer, siblings checked out side by side, in this order: callers
 (`install/system.sh callers`: `/etc/quire/desktop-callers.toml`, first because the update service and the portal backend read it when they start and refuse every caller without it), porter
-(`scripts/install.sh`: the daemons and the caller table), steward (`scripts/install.sh`: inferd, the AI broker, its unit and caller table), stoker (`scripts/install.sh`: the model catalogue inferd reads;
+(`scripts/install.sh`: the account daemon and the caller table), steward (`scripts/install.sh`: inferd, the AI broker, its unit and caller table), ferry (`scripts/install.sh`: the sync daemon syncd, the helper that shows drives in `~/Cloud`, their units and the activation file; no `--sysconfdir`), stoker (`scripts/install.sh`: the model catalogue inferd reads;
 nothing is built), almanac (`scripts/install.sh`: the memory daemon, its unit
 and `/etc/quire/memory-callers.toml`), docket (`scripts/install.sh`: the action router, the companion, the reader, the tool
 server and `quire-do`, with their units and the `/etc/quire/*-callers.toml` tables; they read porter's accounts, so they come

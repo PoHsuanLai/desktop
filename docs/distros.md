@@ -224,7 +224,7 @@ the install lines above already include (`polkit` on Fedora and Arch, `polkitd p
 `./install.sh` takes `--prefix` (default `/usr/local`), `--sysconfdir` (default `/etc`) and `--destdir`. porter goes
 under the same prefix as the rest: its daemons find the providers, the client table and the model catalog under the
 first `$XDG_DATA_DIRS` entry that has them (default `/usr/local/share:/usr/share`), and its caller tables in
-`/etc/porter` (steward installs inferd and its caller table there too). The session script, the desktop target and the login entry
+`/etc/porter` (steward installs inferd and its caller table there too; ferry, which has syncd, writes nothing under `/etc`). The session script, the desktop target and the login entry
 are installed by `install/install.sh`, which `./install.sh` runs last. casement and its user unit are installed by
 casement's own installer, which `./install.sh` runs too. Both print the exact command to run as root when they
 cannot write a place (`/etc`, `/usr/share/wayland-sessions`) themselves.

@@ -1,10 +1,11 @@
-# What the accounts-* scenarios share: porter's real daemons (accountd, syncd), steward's inferd and porter's test rig
-# (porter-rig-servers: the fakes, porter-rig-secrets: a fake Secret Service, porter-rig-client: an app; steward-rig-client: an app opening an inferd session) on the
+# What the accounts-* scenarios share: porter's real accountd, ferry's syncd, steward's inferd, porter's test rig
+# (porter-rig-servers: the fakes, porter-rig-secrets: a fake Secret Service, porter-rig-client: an app), ferry's test rig
+# (ferry-rig-servers: the OAuth issuer and the Graph fake, ferry-rig-client: an app talking to syncd) and steward-rig-client (an app opening an inferd session) on the
 # private bus casement's dev/up.sh made, with sill drawing the sheets. Sourced after harness/lib/all.sh,
 # harness/lib/scenario.sh and sill's dev/lib/all.sh (it uses their in_env, sill, surface_named, capture ...).
 #
 # Identity. The daemons (inferd is steward's, from build/steward-target) are test-proc-root builds: they name the process behind a bus connection from
-# $PROC/<pid>/cgroup (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs
+# $PROC/<pid>/cgroup (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT; syncd is ferry's, from build/ferry-target), because nothing in the jail runs
 # in a systemd scope; the role of each is the system caller table, porter's dist copy at $ACC_SYSTEM_CALLERS
 # (PORTER_SYSTEM_CALLERS: the jail cannot write /etc/porter/callers.toml, and a person's own file gives no fixed role);
 # inferd's is $INFERD_SYSTEM_CALLERS (PORTER_INFERD_CALLERS, in place of /etc/porter/inferd-callers.toml: porter
@@ -18,14 +19,16 @@
 ACC_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARIG="$SCEN_BUILD/porter-target/debug"
 ASTW="$SCEN_BUILD/steward-target/debug"
+AFER="$SCEN_BUILD/ferry-target/debug"
 ACC_PIDS=()
 ACC_BG=()
 
 # acc_need: the artefacts exist (exit 3 with the fix otherwise).
 acc_need() {
   scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" \
-    "$SCEN_BUILD/sill-pin-target/debug/sill" "$ARIG/accountd" "$ARIG/syncd" "$ASTW/inferd" \
+    "$SCEN_BUILD/sill-pin-target/debug/sill" "$ARIG/accountd" "$AFER/syncd" "$ASTW/inferd" \
     "$ARIG/porter-rig-servers" "$ARIG/porter-rig-client" "$ARIG/porter-rig-secrets" "$ASTW/steward-rig-client" \
+    "$AFER/ferry-rig-servers" "$AFER/ferry-rig-client" \
     "$SCEN_BUILD/pin/porter/providers/microsoft.toml" "$SCEN_BUILD/pin/porter/dist/callers.toml" "$@"
 }
 
@@ -118,25 +121,39 @@ acc_app() { # APP-ID PID: Settings is its service unit, any other app a Flatpak
 # --- the fakes -----------------------------------------------------------------------------------------------
 # rig_start FLAGS...: porter-rig-servers --dir $RIG_DIR/servers FLAGS; waits for rig.json.
 RIG_PID=
+FERRY_RIG_PID=
 rig_start() {
   mkdir -p "$RIG_DIR/servers"
   acc_bg "$OUT_DIR/rig-servers.log" "$ARIG/porter-rig-servers" --dir "$RIG_DIR/servers" "$@"
   RIG_PID=$ACC_LAST
   acc_wait 20 test -s "$RIG_DIR/servers/rig.json" || { echo "porter-rig-servers never wrote rig.json:" >&2; cat "$OUT_DIR/rig-servers.log" >&2; return 1; }
 }
-# rigj PATH: a value of rig.json (a dotted path, `imap.port`), or the planted secrets with `secrets`.
+# ferry_rig_start [FLAGS...]: ferry-rig-servers --dir $RIG_DIR/ferry FLAGS (--token-lifetime-s N); it always starts the OAuth
+# issuer and the Graph fake, and writes its own rig.json. It runs beside porter-rig-servers (rig_start) when a scenario
+# needs both; frigj and frigctl read and drive this one.
+ferry_rig_start() {
+  mkdir -p "$RIG_DIR/ferry"
+  acc_bg "$OUT_DIR/ferry-rig-servers.log" "$AFER/ferry-rig-servers" --dir "$RIG_DIR/ferry" "$@"
+  FERRY_RIG_PID=$ACC_LAST
+  acc_wait 20 test -s "$RIG_DIR/ferry/rig.json" || { echo "ferry-rig-servers never wrote rig.json:" >&2; cat "$OUT_DIR/ferry-rig-servers.log" >&2; return 1; }
+}
+# rigj PATH: a value of rig.json (a dotted path, `imap.port`), or the planted secrets with `secrets`. It reads porter's rig
+# (RIG_JSON_DIR, default $RIG_DIR/servers); frigj reads ferry's (oauth.*, graph.url, secrets).
 rigj() {
   python3 -I -c '
 import json, sys
 v = json.load(open(sys.argv[1]))
 for k in sys.argv[2].split("."): v = v[k]
-print("\n".join(v) if isinstance(v, list) else v)' "$RIG_DIR/servers/rig.json" "$1"
+print("\n".join(v) if isinstance(v, list) else v)' "${RIG_JSON_DIR:-$RIG_DIR/servers}/rig.json" "$1"
 }
-# rigctl METHOD TARGET [BODY]: a lever of the control endpoint; the JSON answer.
+frigj() { RIG_JSON_DIR="$RIG_DIR/ferry" rigj "$@"; }
+# rigctl METHOD TARGET [BODY]: a lever of porter's rig control endpoint; the JSON answer. frigctl: the same on ferry's rig
+# (/graph/..., /issuer/...).
 rigctl() {
   local ctl; ctl=$(rigj control) || return 1
   curl -sS -X "$1" --data-binary "${3:-}" "$ctl$2"
 }
+frigctl() { RIG_JSON_DIR="$RIG_DIR/ferry" rigctl "$@"; }
 
 secrets_start() {
   acc_bg "$OUT_DIR/secrets.log" "$ARIG/porter-rig-secrets"
@@ -153,7 +170,7 @@ acc_config() {
 }
 
 # acc_clients_for_issuer: the shipped clients.toml (/usr/share/porter, the jail's throwaway overlay) pointing the
-# Microsoft client at the fake issuer: porter takes endpoints that leave the issuer only from the shipped file, never
+# Microsoft client at the fake issuer of ferry's rig (the one its Graph fake accepts tokens from; ferry_rig_start first): porter takes endpoints that leave the issuer only from the shipped file, never
 # from the person's own (sec-4).
 acc_clients_for_issuer() {
   mkdir -p /usr/share/porter
@@ -161,18 +178,18 @@ acc_clients_for_issuer() {
 [[client]]
 issuer = "microsoft"
 channel = "stable"
-client_id = "$(rigj oauth.client_id)"
+client_id = "$(frigj oauth.client_id)"
 [client.endpoints]
-authorize = "$(rigj oauth.authorize)"
-token = "$(rigj oauth.token)"
-revoke = "$(rigj oauth.revoke)"
-device = "$(rigj oauth.device)"
+authorize = "$(frigj oauth.authorize)"
+token = "$(frigj oauth.token)"
+revoke = "$(frigj oauth.revoke)"
+device = "$(frigj oauth.device)"
 EOF
 }
 
-# acc_provider_microsoft_on_rig: the shipped microsoft.toml with Graph at the rig's drive.
+# acc_provider_microsoft_on_rig: the shipped microsoft.toml with Graph at ferry's rig drive.
 acc_provider_microsoft_on_rig() {
-  sed -e "s#https://graph.microsoft.com#$(rigj graph.url)#g" "$SCEN_BUILD/pin/porter/providers/microsoft.toml" >"$PROV/microsoft.toml"
+  sed -e "s#https://graph.microsoft.com#$(frigj graph.url)#g" "$SCEN_BUILD/pin/porter/providers/microsoft.toml" >"$PROV/microsoft.toml"
 }
 
 # acc_providers_only ID...: leaves only the named provider files (so the sheet's list is short).
@@ -188,8 +205,8 @@ acc_providers_only() {
 # Since porter's step 5c accountd holds every account: the identities, the AI keys with their permits and switches (its
 # Keys interface), and the local runtimes inferd's probe reports to it (Broker.ReportLocal, a call only the `ai_broker`
 # role may make: inferd.service in dist/callers.toml). inferd (org.quire.Inference1) holds no key; it serves the models
-# and the spend rows (`accounts.<id>.spend.*`) of the accounts accountd lists. syncd keeps its own accounts
-# (org.quire.Sync1). A page that reads a daemon never starts it (detent's live/io.rs answers NotRunning), so a scenario
+# and the spend rows (`accounts.<id>.spend.*`) of the accounts accountd lists. syncd (ferry's) has no accounts of
+# its own: it uses accountd's through porter-client over org.quire.Grants1. A page that reads a daemon never starts it (detent's live/io.rs answers NotRunning), so a scenario
 # starts every daemon its page reads before opening the page.
 # Each daemon reads its caller table at startup only: acc_config installs callers.toml before accountd and syncd start,
 # inferd_write_config writes inferd's own system table ($INFERD_SYSTEM_CALLERS) before inferd starts.
@@ -222,7 +239,7 @@ SYNCD_PID=
 syncd_start() {
   local ca; ca=$(acc_ca_env)
   acc_ship_providers
-  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" PORTER_SYSTEM_CALLERS="$ACC_SYSTEM_CALLERS" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" ${ca:+"$ca"} "$ARIG/syncd"
+  acc_bg "$OUT_DIR/syncd.log" env SYNCD_PROC_ROOT="$PROC" PORTER_SYSTEM_CALLERS="$ACC_SYSTEM_CALLERS" SYNCD_RESCAN_S="${SYNCD_RESCAN_S:-2}" ${ca:+"$ca"} "$AFER/syncd"
   SYNCD_PID=$ACC_LAST
   acc_identity syncd.service "$SYNCD_PID"
   acc_wait 20 bus_has_owner org.quire.Sync1 || { echo "syncd never took org.quire.Sync1:" >&2; cat "$OUT_DIR/syncd.log" >&2; return 1; }
@@ -283,6 +300,16 @@ EOF
 rigc() {
   local app=$1; shift
   in_env "$ARIG/porter-rig-client" --app-id "$app" --proc-root "$PROC" "$@"
+}
+# frigc APP-ID ARGS...: ferry-rig-client as that app (datasets, status, sync-resolve, watch-conflicts; same identity fixture).
+frigc() {
+  local app=$1; shift
+  in_env "$AFER/ferry-rig-client" --app-id "$app" --proc-root "$PROC" "$@"
+}
+# frigc_bg LOG APP-ID ARGS...: the same in the background; sets ACC_LAST to its pid.
+frigc_bg() {
+  local log=$1 app=$2; shift 2
+  acc_bg "$log" "$AFER/ferry-rig-client" --app-id "$app" --proc-root "$PROC" "$@"
 }
 # rigc_bg LOG APP-ID ARGS...: the same in the background; sets ACC_LAST to its pid.
 rigc_bg() {
@@ -371,7 +398,7 @@ as_app() {
 # settings_describe_at BUS PATH / settings_get_at BUS PATH KEY: a daemon's settings module (org.quire.SettingsModule1), read
 # as the Settings app. Three daemons serve one: accountd (every account: identities, AI keys with their permits and
 # switches, local runtimes; /org/quire/Accounts1/settings), inferd (only the spend rows, `accounts.<id>.spend.*`, of the
-# accounts accountd lists; /org/quire/Inference1/settings) and syncd (sync accounts, /org/quire/Sync1/settings).
+# accounts accountd lists; /org/quire/Inference1/settings) and syncd (ferry's: what it keeps of accountd's accounts, /org/quire/Sync1/settings).
 settings_describe_at() {
   as_app org.quire.Settings busctl --address="$BUS" --json=short call "$1" "$2" \
     org.quire.SettingsModule1 Describe | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["data"][0])'
@@ -399,6 +426,8 @@ ai_get() { settings_get "$1"; }
 sync_describe() { settings_describe_at org.quire.Sync1 $SYNC_SET; }
 sync_get() { settings_get_at org.quire.Sync1 $SYNC_SET "$1"; }
 sync_press() { settings_press_at org.quire.Sync1 $SYNC_SET "$1"; }
+# acc_press KEY: an action row of accountd's module (Internet Accounts owns Sign in again: accounts.<id>.reauth).
+acc_press() { settings_press_at org.quire.Accounts1 $ACC_SET "$1"; }
 
 # ai_has_account ID / has_key MODULE ID: the module lists an `accounts.<id>.` row.
 has_row_of() { # DESCRIBE-FN ID
@@ -505,10 +534,10 @@ scan_end() {
   while read -r s; do
     [ -n "$s" ] || continue
     case "$s" in *ACCESS-TOKEN*) args+=(--access-secret "$s") ;; *) args+=(--secret "$s") ;; esac
-  done < <(rigj secrets 2>/dev/null)
+  done < <(rigj secrets 2>/dev/null; [ ! -f "$RIG_DIR/ferry/rig.json" ] || frigj secrets 2>/dev/null)
   local f
   for f in "$OUT_DIR"/*.log; do
-    case "$(basename "$f")" in keys.log|input.log|rig-servers.log) ;; *) files+=(--file "$f") ;; esac
+    case "$(basename "$f")" in keys.log|input.log|rig-servers.log|ferry-rig-servers.log) ;; *) files+=(--file "$f") ;; esac
   done
   python3 -I "$HARNESS_LIB/secret-scan.py" --bus "$OUT_DIR/bus.jsonl" "${args[@]}" \
     --pattern 'fake-refresh-[0-9]+' --pattern 'fake-code-[0-9]+' --access-pattern 'fake-access-[0-9]+' \
@@ -531,7 +560,7 @@ sheet_add_fake_mail() {
 }
 
 # sheet_add_microsoft: the whole browser sign-in through the sheet as an app asks for it (accounts-oauth-browser checks
-# the steps one by one); needs the rig started with --graph, acc_clients_for_issuer and
+# the steps one by one); needs ferry's rig started (ferry_rig_start), acc_clients_for_issuer and
 # acc_provider_microsoft_on_rig. Sets ACCOUNT to the account's id.
 sheet_add_microsoft() {
   : >"$RIG_DIR/opened.log"
@@ -575,15 +604,19 @@ sheet_enter_until() {
   "$@" >/dev/null 2>&1
 }
 
-# sync_continue_keys: the keys of syncd's "Continue as" once its first sheet is up (sync_press accounts.sync.add, or the Sync
-# row's button): Return picks the identity (accountd's sheet), then syncd's own sign-in sheet lists the providers (syncd
-# gets the address only, not the provider: porter-service SignInAs) and "Micro" Return picks Microsoft. The browser step and
-# the cards after it are for sheet_enter_until.
-sync_continue_keys() {
+# sync_files_turn_on ACCOUNT: Settings turns syncd's "Keep this account's files on this computer" on for an account accountd holds
+# (Set accounts.<id>.sync.files "on"), in the background. syncd has no accounts of its own: the first time the switch goes
+# on, syncd asks accountd for a grant (org.quire.Grants1) and accountd's consent sheet shows once, for that one account (no
+# chooser, no sign-in). The answer is sync_consent_keys.
+sync_files_turn_on() {
+  { as_app org.quire.Settings busctl --address="$BUS" --json=short call org.quire.Sync1 $SYNC_SET org.quire.SettingsModule1 Set sv \
+      "accounts.$1.sync.files" s on >"$OUT_DIR/switch-on.log" 2>&1; } &
+  ACC_PIDS+=("$!")
+}
+# sync_consent_keys: accountd's consent sheet for syncd's grant is up: Return allows (the answer is kept, so the sheet shows once).
+sync_consent_keys() {
   sheet_settled; sleep 1
   sheet_key Enter
-  sleep 3; sheet_await || return 1; sheet_settled; sleep 1
-  sheet_type Micro; sleep 0.5; sheet_key Enter
 }
 
 # sheet_stray_escape: a sheet nobody expected is closed (so one failed check does not leave its sheet to take the next step's keys).

@@ -12,12 +12,14 @@
 #   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
 #   build/detent-target/debug/detent                                     detent at its pin with ds-blitz/debug-probe, for the accounts-* and detent-on-casement-at-1.5 scenarios
 #   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug,ds-blitz/debug-probe (the accounts-* scenarios: the pin has the accounts sheet; the probe is linked but writes nothing for sill's surfaces)
-#   build/porter-target/debug/{accountd,syncd}                           porter at its pin, test-proc-root builds
+#   build/porter-target/debug/accountd                                   porter at its pin, a test-proc-root build
+#   build/ferry-target/debug/syncd                                       ferry at its pin, a test-proc-root build (the sync daemon left porter)
+#   build/ferry-target/debug/ferry-rig-{servers,client}                  ferry's test rig: the OAuth issuer + Graph fake, an app client for syncd
 #   build/steward-target/debug/inferd                                    steward at its pin, a test-proc-root build
 #   build/steward-target/debug/steward-rig-client                        steward's rig: an app opening an inferd session
 #   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
 #
-#   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig, steward)
+#   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig, ferry and its rig, steward)
 #   scenario-build.sh --w2         only what scenarios/w2-excalidraw.sh needs (casement, the checkouts, sill, and the two below):
 #   build/cua-target/debug/cuad                                          cuad (the screen helper) with --features fixture-callers: a plain build identifies nobody
 #   build/docket-target/debug/{docket-bringup,accept-*}                  docket-accept's test builds (the assistant's services on a fake /proc, quire-do)
@@ -150,10 +152,10 @@ build_shell_host() {
     --example demo_popup_keys --example demo_window --example probe_toplevel)
 }
 
-# Porter's daemons and test rig (crates/porter-rig) at the manifest pin (build/pin/porter, beside the other pins so ../quire
+# Porter's accountd and test rig (crates/porter-rig) at the manifest pin (build/pin/porter, beside the other pins so ../quire
 # and ../stoker resolve). The separate porter-rig checkout an earlier pin needed is removed if a build dir still has it.
 # Test builds: `test-proc-root` makes each daemon read caller identities from a fixture /proc tree
-# (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT; steward's inferd, below, reads INFERD_PROC_ROOT), because nothing in the jail runs in a systemd scope.
+# (ACCOUNTD_PROC_ROOT; ferry's syncd, below, reads SYNCD_PROC_ROOT and steward's inferd INFERD_PROC_ROOT), because nothing in the jail runs in a systemd scope.
 # A release build ignores the variables; the features are never default.
 build_porter() {
   local dir="$SCEN_BUILD/pin/porter" old="$SCEN_BUILD/pin/porter-rig"
@@ -161,13 +163,17 @@ build_porter() {
     git -C "$HOME/porter" worktree remove --force "$old" 2>/dev/null || rm -rf "$old"
     git -C "$HOME/porter" worktree prune
   fi
-  # One invocation per daemon: `-p a -p b --features a/f,b/f` left syncd without its feature (the binary then ignores
-  # SYNCD_PROC_ROOT and no caller is known), `-p x --features f` is what each needs.
-  local d
-  for d in accountd syncd; do
-    (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p "$d" --features test-proc-root) || return 1
-  done
+  (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p accountd --features test-proc-root) || return 1
   (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p porter-rig)
+}
+
+# Ferry's syncd and test rig at the manifest pin (build/pin/ferry, beside the other pins so ../quire and ../porter resolve). syncd is a
+# test build like porter's accountd: `test-proc-root` makes it read caller identities from a fixture /proc tree (SYNCD_PROC_ROOT).
+# One invocation per package: `-p a -p b --features a/f,b/f` once left a daemon without its feature (the binary then ignores the
+# variable and no caller is known). ferry-rig gives ferry-rig-servers (the issuer and Graph) and ferry-rig-client.
+build_ferry() {
+  (cd "$SCEN_BUILD/pin/ferry" && CARGO_TARGET_DIR="$SCEN_BUILD/ferry-target" cargo build -p syncd --features test-proc-root \
+    && CARGO_TARGET_DIR="$SCEN_BUILD/ferry-target" cargo build -p ferry-rig)
 }
 
 # Steward's inferd at the manifest pin (build/pin/steward, beside the other pins so ../quire, ../porter and ../stoker resolve). A test
@@ -221,6 +227,7 @@ fi
 stage "every repo at its manifest rev" pinned
 stage "detent (at its pin)" build_detent
 stage "sill at its pin (--features debug)" build_sill_pin
-stage "porter at its pin: daemons (test-proc-root) and porter-rig" build_porter
+stage "porter at its pin: accountd (test-proc-root) and porter-rig" build_porter
+stage "ferry at its pin: syncd (test-proc-root) and ferry-rig" build_ferry
 stage "steward at its pin: inferd (test-proc-root) and steward-rig-client" build_steward
 echo "scenario-build: done ($SCEN_BUILD)"

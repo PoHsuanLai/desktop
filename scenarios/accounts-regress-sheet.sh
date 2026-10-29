@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Scenario `accounts-regress-sheet`: the add-account sheet and the consent window, as accounts-hunt found them
 # wrong (probes 1, 2, 3 and 6) and sill 245cc25 fixed them. Each step fails when its bug comes back. Real accountd,
-# sill drawing the sheets, the rig's fake mail and Graph; no probe of sill's surfaces exists (see harness/lib/regress.sh),
+# sill drawing the sheets, the rigs' fake mail and Graph (porter's and ferry's); no probe of sill's surfaces exists (see harness/lib/regress.sh),
 # so a check reads the bus record (what accountd shows the sheet, what the keys made it send) or compares captures.
 #
 #   boot      casement, recorded bus, rig, accountd with 14 filler providers (at least 24 rows: the shipped providers
@@ -201,7 +201,7 @@ step_scan() { scan_end; }
 run_steps step_boot step_s4_cancel_stays step_s2_google step_s1_other step_s5_titles step_s6_no_client step_add \
   step_s5_agent_id step_s3_long_id step_s7_browser_wait step_scan
 if [ "$STATUS" != 0 ]; then
-  for f in accountd inferd daemon rig-servers secrets add; do
+  for f in accountd inferd daemon rig-servers ferry-rig-servers secrets add; do
     [ -f "$OUT_DIR/$f.log" ] && { echo "--- $f.log (tail)" >&2; tail -15 "$OUT_DIR/$f.log" >&2; }
   done
 fi

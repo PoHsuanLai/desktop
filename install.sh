@@ -12,10 +12,10 @@
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: callers, porter, steward, stoker, almanac, docket, cua, detent, casement, sill,
+#   --only NAMES   just these components (comma separated: callers, porter, steward, ferry, stoker, almanac, docket, cua, detent, casement, sill,
 #                  transom, turnstile, keycap, anyview, mailo, files, palmrest, session, fonts)
 #
-# Order: callers (the list of the desktop's own programs, /etc/quire/desktop-callers.toml, this repo's dist/), porter (the account daemons and the caller table), steward (inferd, the AI broker, and its caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
+# Order: callers (the list of the desktop's own programs, /etc/quire/desktop-callers.toml, this repo's dist/), porter (the account daemon and the caller table), steward (inferd, the AI broker, and its caller table), ferry (the sync daemon syncd and the helper that shows drives in ~/Cloud, with their units), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
 # docket (the action router, the companion, the reader and the tool server, with their caller tables; they read
 # porter's accounts), cua (the computer-use daemon cuad, for apps that are not ours, and its caller table), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
@@ -84,7 +84,7 @@ source "$HERE/install/rootheld.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(callers porter steward stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
+ORDER=(callers porter steward ferry stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -163,6 +163,13 @@ describe() {
       args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       writes=("$destdir$prefix" "$destdir$sysconfdir") ;;
+    ferry)
+      # syncd, the helper that shows drives in ~/Cloud (porter-mountd) and its socket, their units and org.quire.Sync1's activation
+      # file. Its installer has no --sysconfdir: it writes nothing under /etc (syncd's caller row is in porter's table).
+      script=scripts/install.sh
+      args=(--prefix "$prefix")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix") ;;
     stoker)
       # The model catalogue (<prefix>/share/stoker/catalog), which inferd reads from the first XDG_DATA_DIRS entry that has it.
       # Nothing to build. Its installer takes --sysconfdir but writes nothing under it for the catalogue.
