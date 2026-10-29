@@ -12,10 +12,11 @@
 #   build/pin/<repo>                                                     every manifest repo at its pinned rev (detent builds against these)
 #   build/detent-target/debug/detent                                     detent at its pin with ds-blitz/debug-probe, for the accounts-* and detent-on-casement-at-1.5 scenarios
 #   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug,ds-blitz/debug-probe (the accounts-* scenarios: the pin has the accounts sheet; the probe is linked but writes nothing for sill's surfaces)
-#   build/porter-target/debug/{accountd,syncd,inferd}                    porter at its pin, test-proc-root builds
+#   build/porter-target/debug/{accountd,syncd}                           porter at its pin, test-proc-root builds
+#   build/steward-target/debug/inferd                                    steward at its pin, a test-proc-root build
 #   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
 #
-#   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig)
+#   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig, steward)
 #   scenario-build.sh --w2         only what scenarios/w2-excalidraw.sh needs (casement, the checkouts, sill, and the two below):
 #   build/cua-target/debug/cuad                                          cuad (the screen helper) with --features fixture-callers: a plain build identifies nobody
 #   build/docket-target/debug/{docket-bringup,accept-*}                  docket-accept's test builds (the assistant's services on a fake /proc, quire-do)
@@ -151,7 +152,7 @@ build_shell_host() {
 # Porter's daemons and test rig (crates/porter-rig) at the manifest pin (build/pin/porter, beside the other pins so ../quire
 # and ../stoker resolve). The separate porter-rig checkout an earlier pin needed is removed if a build dir still has it.
 # Test builds: `test-proc-root` makes each daemon read caller identities from a fixture /proc tree
-# (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs in a systemd scope.
+# (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT; steward's inferd, below, reads INFERD_PROC_ROOT), because nothing in the jail runs in a systemd scope.
 # A release build ignores the variables; the features are never default.
 build_porter() {
   local dir="$SCEN_BUILD/pin/porter" old="$SCEN_BUILD/pin/porter-rig"
@@ -162,10 +163,16 @@ build_porter() {
   # One invocation per daemon: `-p a -p b --features a/f,b/f` left syncd without its feature (the binary then ignores
   # SYNCD_PROC_ROOT and no caller is known), `-p x --features f` is what each needs.
   local d
-  for d in accountd syncd inferd; do
+  for d in accountd syncd; do
     (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p "$d" --features test-proc-root) || return 1
   done
   (cd "$dir" && CARGO_TARGET_DIR="$SCEN_BUILD/porter-target" cargo build -p porter-rig)
+}
+
+# Steward's inferd at the manifest pin (build/pin/steward, beside the other pins so ../quire, ../porter and ../stoker resolve). A test
+# build like porter's daemons: `test-proc-root` makes it read caller identities from a fixture /proc tree (INFERD_PROC_ROOT).
+build_steward() {
+  (cd "$SCEN_BUILD/pin/steward" && CARGO_TARGET_DIR="$SCEN_BUILD/steward-target" cargo build -p inferd --features test-proc-root)
 }
 
 # cuad, the screen helper, from the sibling checkout. The fixture-callers feature makes it read caller identities from a fake
@@ -213,4 +220,5 @@ stage "every repo at its manifest rev" pinned
 stage "detent (at its pin)" build_detent
 stage "sill at its pin (--features debug)" build_sill_pin
 stage "porter at its pin: daemons (test-proc-root) and porter-rig" build_porter
+stage "steward at its pin: inferd (test-proc-root)" build_steward
 echo "scenario-build: done ($SCEN_BUILD)"

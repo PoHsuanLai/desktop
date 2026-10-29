@@ -99,7 +99,8 @@ floor_image() {
     casementctl | casement-probe | casement-shell-exec) path="${SCEN_TOOLS:?floor_image: scenario.sh is not sourced}/bin/$1" ;;
     transom) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/transom-target/debug/transom" ;;
     sill) path="${FLOOR_SILL_TARGET:-${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/sill-target}/debug/sill" ;; # FLOOR_SILL_TARGET: the accounts rig runs sill at its pin
-    accountd | inferd | syncd) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/porter-target/debug/$1" ;;
+    accountd | syncd) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/porter-target/debug/$1" ;;
+    inferd) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/steward-target/debug/inferd" ;;
     xdg-desktop-portal) path=/usr/libexec/xdg-desktop-portal ;;
     casement) path="${SCEN_TOOLS:?floor_image: scenario.sh is not sourced}/bin/casement" ;;
     cuad) path="${SCEN_BUILD:?floor_image: scenario.sh is not sourced}/cua-target/debug/cuad" ;;

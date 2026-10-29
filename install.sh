@@ -7,15 +7,15 @@
 #   --dry-run      print the plan (what runs, in which order, what is left to you), run nothing, build nothing
 #   --prefix DIR   where the software goes (default $PREFIX, else /usr/local)
 #   --destdir DIR  a staging root put in front of every path (default $DESTDIR, else none)
-#   --sysconfdir   where porter's caller tables go (default $SYSCONFDIR, else /etc); almanac, docket and cua always use /etc/quire; stoker writes nothing there
+#   --sysconfdir   where porter's and steward's caller tables go (default $SYSCONFDIR, else /etc); almanac, docket and cua always use /etc/quire; stoker writes nothing there
 #   --siblings DIR where the component repos are checked out side by side (default: the parent of this repo)
 #   --check        change nothing: look for what the desktop needs on this machine (Fedora, Ubuntu/Debian, Arch;
 #                  the family comes from /etc/os-release) and print the exact dnf, apt or pacman line for what
 #                  is missing; exit 1 when something needed is missing. --runtime-only leaves out the build tools
-#   --only NAMES   just these components (comma separated: callers, porter, stoker, almanac, docket, cua, detent, casement, sill,
+#   --only NAMES   just these components (comma separated: callers, porter, steward, stoker, almanac, docket, cua, detent, casement, sill,
 #                  transom, turnstile, keycap, anyview, mailo, files, palmrest, session, fonts)
 #
-# Order: callers (the list of the desktop's own programs, /etc/quire/desktop-callers.toml, this repo's dist/), porter (the account daemons and the caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
+# Order: callers (the list of the desktop's own programs, /etc/quire/desktop-callers.toml, this repo's dist/), porter (the account daemons and the caller table), steward (inferd, the AI broker, and its caller table), stoker (the model catalogue inferd reads), almanac (the memory daemon and its caller table),
 # docket (the action router, the companion, the reader and the tool server, with their caller tables; they read
 # porter's accounts), cua (the computer-use daemon cuad, for apps that are not ours, and its caller table), detent (Settings), casement (the compositor and
 # its user unit), sill (the shell), transom (the portal backend: screen sharing, screenshots; its
@@ -84,7 +84,7 @@ source "$HERE/install/rootheld.sh"
 source "$HERE/install/check.sh"
 # shellcheck source=install/fonts.sh
 source "$HERE/install/fonts.sh"
-ORDER=(callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
+ORDER=(callers porter steward stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session)
 
 prefix=${PREFIX:-/usr/local}
 destdir=${DESTDIR:-}
@@ -153,6 +153,12 @@ describe() {
       [ -z "$destdir" ] || args+=(--destdir "$destdir")
       writes=("$destdir/etc/quire") ;;
     porter)
+      script=scripts/install.sh
+      args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
+      [ -z "$destdir" ] || args+=(--destdir "$destdir")
+      writes=("$destdir$prefix" "$destdir$sysconfdir") ;;
+    steward)
+      # inferd, the AI broker, its unit and its caller table (<sysconfdir>/porter/inferd-callers.toml). Same shape as porter's.
       script=scripts/install.sh
       args=(--prefix "$prefix" --sysconfdir "$sysconfdir")
       [ -z "$destdir" ] || args+=(--destdir "$destdir")

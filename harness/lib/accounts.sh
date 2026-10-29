@@ -1,14 +1,14 @@
-# What the accounts-* scenarios share: porter's real daemons (accountd, syncd, inferd) and porter's test rig
+# What the accounts-* scenarios share: porter's real daemons (accountd, syncd), steward's inferd and porter's test rig
 # (porter-rig-servers: the fakes, porter-rig-secrets: a fake Secret Service, porter-rig-client: an app) on the
 # private bus casement's dev/up.sh made, with sill drawing the sheets. Sourced after harness/lib/all.sh,
 # harness/lib/scenario.sh and sill's dev/lib/all.sh (it uses their in_env, sill, surface_named, capture ...).
 #
-# Identity. The daemons are test-proc-root builds: they name the process behind a bus connection from
+# Identity. The daemons (inferd is steward's, from build/steward-target) are test-proc-root builds: they name the process behind a bus connection from
 # $PROC/<pid>/cgroup (ACCOUNTD_PROC_ROOT, SYNCD_PROC_ROOT, INFERD_PROC_ROOT), because nothing in the jail runs
 # in a systemd scope; the role of each is the system caller table, porter's dist copy at $ACC_SYSTEM_CALLERS
 # (PORTER_SYSTEM_CALLERS: the jail cannot write /etc/porter/callers.toml, and a person's own file gives no fixed role);
 # inferd's is $INFERD_SYSTEM_CALLERS (PORTER_INFERD_CALLERS, in place of /etc/porter/inferd-callers.toml: porter
-# reads no [callers] from inferd.toml since CALLER-INFERD).
+# reads no [callers] from inferd.toml since CALLER-INFERD; steward's dist/inferd-callers.toml is its shipped copy).
 # `acc_identity UNIT PID` writes a unit's cgroup (sill.service, syncd.service, inferd.service) and, for a service
 # unit, its main pid ($PROC/units/<unit>); `acc_app APP PID` names detent the Settings unit (org.quire.Settings.service)
 # and any other app a Flatpak (its scope and $PROC/<pid>/root/.flatpak-info).
@@ -17,13 +17,14 @@
 
 ACC_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARIG="$SCEN_BUILD/porter-target/debug"
+ASTW="$SCEN_BUILD/steward-target/debug"
 ACC_PIDS=()
 ACC_BG=()
 
 # acc_need: the artefacts exist (exit 3 with the fix otherwise).
 acc_need() {
   scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" \
-    "$SCEN_BUILD/sill-pin-target/debug/sill" "$ARIG/accountd" "$ARIG/syncd" "$ARIG/inferd" \
+    "$SCEN_BUILD/sill-pin-target/debug/sill" "$ARIG/accountd" "$ARIG/syncd" "$ASTW/inferd" \
     "$ARIG/porter-rig-servers" "$ARIG/porter-rig-client" "$ARIG/porter-rig-secrets" \
     "$SCEN_BUILD/pin/porter/providers/microsoft.toml" "$SCEN_BUILD/pin/porter/dist/callers.toml" "$@"
 }
@@ -247,7 +248,7 @@ inferd_start() { # needs $CONFIG/inferd/inferd.toml and $INFERD_SYSTEM_CALLERS (
   cp "$SCEN_BUILD"/pin/stoker/catalog/*.toml "$DATA/stoker/catalog/"
   local ca; ca=$(acc_ca_env)
   acc_ship_providers
-  acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" PORTER_INFERD_CALLERS="$INFERD_SYSTEM_CALLERS" ${ca:+"$ca"} "$ARIG/inferd"
+  acc_bg "$OUT_DIR/inferd.log" env INFERD_PROC_ROOT="$PROC" PORTER_INFERD_CALLERS="$INFERD_SYSTEM_CALLERS" ${ca:+"$ca"} "$ASTW/inferd"
   INFERD_PID=$ACC_LAST
   acc_identity inferd.service "$INFERD_PID"
   acc_wait 20 bus_has_owner org.quire.Inference1 || { echo "inferd never took org.quire.Inference1:" >&2; cat "$OUT_DIR/inferd.log" >&2; return 1; }
