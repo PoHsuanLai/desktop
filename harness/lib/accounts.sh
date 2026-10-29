@@ -1,5 +1,5 @@
 # What the accounts-* scenarios share: porter's real daemons (accountd, syncd), steward's inferd and porter's test rig
-# (porter-rig-servers: the fakes, porter-rig-secrets: a fake Secret Service, porter-rig-client: an app) on the
+# (porter-rig-servers: the fakes, porter-rig-secrets: a fake Secret Service, porter-rig-client: an app; steward-rig-client: an app opening an inferd session) on the
 # private bus casement's dev/up.sh made, with sill drawing the sheets. Sourced after harness/lib/all.sh,
 # harness/lib/scenario.sh and sill's dev/lib/all.sh (it uses their in_env, sill, surface_named, capture ...).
 #
@@ -25,7 +25,7 @@ ACC_BG=()
 acc_need() {
   scenario_need "$SCEN_TOOLS/bin/casement" "$SCEN_TOOLS/bin/casementctl" "$SCEN_TOOLS/bin/fake-logind" \
     "$SCEN_BUILD/sill-pin-target/debug/sill" "$ARIG/accountd" "$ARIG/syncd" "$ASTW/inferd" \
-    "$ARIG/porter-rig-servers" "$ARIG/porter-rig-client" "$ARIG/porter-rig-secrets" \
+    "$ARIG/porter-rig-servers" "$ARIG/porter-rig-client" "$ARIG/porter-rig-secrets" "$ASTW/steward-rig-client" \
     "$SCEN_BUILD/pin/porter/providers/microsoft.toml" "$SCEN_BUILD/pin/porter/dist/callers.toml" "$@"
 }
 
@@ -288,6 +288,11 @@ rigc() {
 rigc_bg() {
   local log=$1 app=$2; shift 2
   acc_bg "$log" "$ARIG/porter-rig-client" --app-id "$app" --proc-root "$PROC" "$@"
+}
+# rigo APP-ID NEED ARGS...: steward-rig-client as that app, opening an inferd session (the same identity fixture).
+rigo() {
+  local app=$1; shift
+  in_env "$ASTW/steward-rig-client" --app-id "$app" --proc-root "$PROC" open "$@"
 }
 
 # --- the sheet, as sill draws it -----------------------------------------------------------------------------

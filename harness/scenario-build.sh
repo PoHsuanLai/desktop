@@ -14,6 +14,7 @@
 #   build/sill-pin-target/debug/sill                                     sill at its pin, --features debug,ds-blitz/debug-probe (the accounts-* scenarios: the pin has the accounts sheet; the probe is linked but writes nothing for sill's surfaces)
 #   build/porter-target/debug/{accountd,syncd}                           porter at its pin, test-proc-root builds
 #   build/steward-target/debug/inferd                                    steward at its pin, a test-proc-root build
+#   build/steward-target/debug/steward-rig-client                        steward's rig: an app opening an inferd session
 #   build/porter-target/debug/porter-rig-{servers,client,secrets}        porter's test rig: fakes, an app client, a fake Secret Service
 #
 #   scenario-build.sh --accounts   only what the accounts-* scenarios need (casement, the pins, detent, sill at its pin, porter and its rig, steward)
@@ -172,7 +173,8 @@ build_porter() {
 # Steward's inferd at the manifest pin (build/pin/steward, beside the other pins so ../quire, ../porter and ../stoker resolve). A test
 # build like porter's daemons: `test-proc-root` makes it read caller identities from a fixture /proc tree (INFERD_PROC_ROOT).
 build_steward() {
-  (cd "$SCEN_BUILD/pin/steward" && CARGO_TARGET_DIR="$SCEN_BUILD/steward-target" cargo build -p inferd --features test-proc-root)
+  (cd "$SCEN_BUILD/pin/steward" && CARGO_TARGET_DIR="$SCEN_BUILD/steward-target" cargo build -p inferd --features test-proc-root \
+    && CARGO_TARGET_DIR="$SCEN_BUILD/steward-target" cargo build -p steward-rig --bin steward-rig-client)
 }
 
 # cuad, the screen helper, from the sibling checkout. The fixture-callers feature makes it read caller identities from a fake
@@ -220,5 +222,5 @@ stage "every repo at its manifest rev" pinned
 stage "detent (at its pin)" build_detent
 stage "sill at its pin (--features debug)" build_sill_pin
 stage "porter at its pin: daemons (test-proc-root) and porter-rig" build_porter
-stage "steward at its pin: inferd (test-proc-root)" build_steward
+stage "steward at its pin: inferd (test-proc-root) and steward-rig-client" build_steward
 echo "scenario-build: done ($SCEN_BUILD)"

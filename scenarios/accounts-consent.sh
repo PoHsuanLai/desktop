@@ -96,7 +96,7 @@ step_once() {
   # The use: a session on the key with a prompt. inferd reads the key (spending the once-permit) before the turn goes out;
   # the turn itself then fails at the network in the jail, which is fine: the read already happened. A refusal for want
   # of a hosted model ("unavailable") comes before the read, so it means the catalog is missing and nothing was tested.
-  rigc $app open llm --class files --prompt hello >"$OUT_DIR/once-use.log" 2>&1
+  rigo $app llm --class files --prompt hello >"$OUT_DIR/once-use.log" 2>&1
   grep -q '"result":"opened"' "$OUT_DIR/once-use.log" || { echo "the once-permit did not open a session: $(cat "$OUT_DIR/once-use.log")" >&2; return 1; }
   if grep -q 'unavailable' "$OUT_DIR/once-use.log"; then
     echo "the use was refused before the key was read (no hosted model to route to; is the stoker catalog in place?): $(tail -n 3 "$OUT_DIR/once-use.log")" >&2
@@ -104,7 +104,7 @@ step_once() {
   fi
   # Used once: spent, and a second use is not let through.
   [ "$(grant_field $app scope)" = none ] || { echo "a once-permit is still there after its key was read (scope $(grant_field $app scope)): it opens sessions again and again" >&2; return 1; }
-  rigc $app open llm --class files --prompt again >"$OUT_DIR/once-again.log" 2>&1
+  rigo $app llm --class files --prompt again >"$OUT_DIR/once-again.log" 2>&1
   # A session may open, but its turn must be refused for want of a permit (the key is not read again).
   grep -q '"needs_grant"' "$OUT_DIR/once-again.log" || {
     echo "a turn after the once-permit was spent was not refused for want of a permit: $(cat "$OUT_DIR/once-again.log")" >&2; return 1
