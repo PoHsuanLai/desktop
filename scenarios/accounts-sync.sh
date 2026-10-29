@@ -11,9 +11,10 @@
 #   grant     Settings makes syncd's Files grant: detent starts, Accounts; the account (accountd's) is listed in syncd's rows with
 #             its files switch off and no Add Account button (syncd signs nobody in); the account's own switch "Keep this
 #             account's files on this computer" is turned on in the real window: accountd's consent sheet shows once, for that
-#             one account, no chooser (capture 2-consent, Return); `accounts.<id>.sync.files` is "on" in syncd's settings module
-#             (capture 6-sync-on); the switch is then turned off and on again: off takes the permit back, on makes it again
-#             without a second sheet
+#             one account, no chooser (capture 2-consent, Tab to Always Allow, Return); `accounts.<id>.sync.files` is "on" in syncd's
+#             settings module (capture 6-sync-on) and accountd lists the permit (org.quire.Sync, scope always) under the account;
+#             setting the switch on again asks nothing; the switch is then turned off (the permit is deleted) and on again, which
+#             asks again, once, and is answered the same way
 #   mirror    syncd reads grants again every 2 s (SYNCD_RESCAN_S=2; the default is 600 s); the dataset
 #             `<account segment>/storage_app_folder` is listed to its owner (org.quire.Files); a file the rig puts on the drive
 #             (the remote edit lever /graph/put) shows in $XDG_DATA_HOME/porter/storage/<account>/
@@ -54,6 +55,8 @@ sync_files() { sync_get "accounts.$SYNC_ACCOUNT.sync.files"; }
 sync_label() { sync_get "accounts.$SYNC_ACCOUNT.label"; }
 sync_on() { [ "$(sync_files)" = on ]; }
 sync_off() { [ "$(sync_files)" = off ]; }
+# Set by step_conflict from the Conflict signal; step_resolve fails cleanly when that step did not get that far.
+NUMBER= DATASET=
 dataset_listed() { frigc $OWNER datasets 2>/dev/null | grep -q "$(segment)/storage_app_folder"; }
 
 step_boot() {
@@ -96,12 +99,21 @@ step_grant() {
   sheet_gone || { echo "the consent sheet did not go after the answer" >&2; return 1; }
   acc_wait 30 sync_on || { acc_shot 5-sync-not-on; echo "allowing syncd did not switch the files on: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
   acc_shot 6-sync-on
+  # The permit is accountd's: syncd's `sync.files` reads it (an allowing grant of org.quire.Sync for this account), and accountd's
+  # own settings module lists it under the account. Always Allow, not Allow Once: a once permit is spent by syncd's first relay.
+  [ "$(acc_permit_scope "$SYNC_ACCOUNT" $SYNC_APP)" = always ] || { echo "accountd's permit for $SYNC_APP on $SYNC_ACCOUNT is '$(acc_permit_scope "$SYNC_ACCOUNT" $SYNC_APP)', not always" >&2; return 1; }
+  # Turning the switch on while the permit is held asks nothing (Keep::set_sync finds the grant): the answer is kept.
+  sync_files_turn_on "$SYNC_ACCOUNT"; sleep 3
+  ! sheet_shown || { sheet_stray_escape; echo "a second consent sheet showed for an account syncd is already allowed" >&2; return 1; }
+  # Off takes the permit back (revoke deletes it). On again is a new ask: RequestGrant draws the sheet every time it is asked.
   detent_press switch "$SYNC_FILES_LABEL"; sleep 1
   acc_wait 15 sync_off || { echo "the switch did not take the permit back: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
-  # The answer is kept: turning it on again asks nothing.
-  detent_press switch "$SYNC_FILES_LABEL"; sleep 1
-  acc_wait 15 sync_on || { echo "the switch did not make the permit: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
-  ! sheet_shown || { echo "a second consent sheet showed for the same account" >&2; return 1; }
+  [ -z "$(acc_permit_ids "$SYNC_ACCOUNT" $SYNC_APP)" ] || { echo "the permit is still listed after the switch went off: $(acc_permit_ids "$SYNC_ACCOUNT" $SYNC_APP)" >&2; return 1; }
+  detent_press switch "$SYNC_FILES_LABEL"
+  sheet_await || { echo "turning the switch on after it was taken back asked nothing: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
+  sheet_settled; sync_consent_keys
+  sheet_gone || { echo "the consent sheet did not go after the second answer" >&2; return 1; }
+  acc_wait 30 sync_on || { echo "the switch did not make the permit: accounts.$SYNC_ACCOUNT.sync.files is '$(sync_files)'" >&2; return 1; }
 }
 
 step_mirror() {
@@ -134,6 +146,7 @@ for l in open(sys.argv[1]):
 }
 
 step_resolve() {
+  [ -n "$DATASET" ] && [ -n "$NUMBER" ] || { echo "no Conflict was seen, so there is nothing to resolve" >&2; return 1; }
   frigc $OWNER sync-resolve "$DATASET" "$NUMBER" keep_remote >"$OUT_DIR/resolve.log" 2>&1 || { echo "Resolve failed: $(cat "$OUT_DIR/resolve.log")" >&2; return 1; }
   acc_wait 90 local_is a.txt "remote two" || { echo "after keep_remote the local file is '$(cat "$(folder)/a.txt")', not 'remote two'" >&2; return 1; }
   remote_is a.txt "remote two" || { echo "the drive no longer holds 'remote two': $(frigctl GET "/graph/file?path=a.txt")" >&2; return 1; }

@@ -605,19 +605,45 @@ sheet_enter_until() {
 }
 
 # sync_files_turn_on ACCOUNT: Settings turns syncd's "Keep this account's files on this computer" on for an account accountd holds
-# (Set accounts.<id>.sync.files "on"), in the background. syncd has no accounts of its own: the first time the switch goes
-# on, syncd asks accountd for a grant (org.quire.Grants1) and accountd's consent sheet shows once, for that one account (no
-# chooser, no sign-in). The answer is sync_consent_keys.
+# (Set accounts.<id>.sync.files s "on"), in the background: the call returns only after the person answers, because syncd's
+# Keep::set_sync awaits Grants1.RequestGrant. syncd has no accounts of its own: when accountd holds no allowing grant of syncd's for
+# the account, syncd asks (ConsentOffer.account is the account) and accountd draws its consent sheet for that one account (no
+# chooser, no sign-in); one already held is not asked again. The answer is sync_consent_keys.
 sync_files_turn_on() {
   { as_app org.quire.Settings busctl --address="$BUS" --json=short call org.quire.Sync1 $SYNC_SET org.quire.SettingsModule1 Set sv \
       "accounts.$1.sync.files" s on >"$OUT_DIR/switch-on.log" 2>&1; } &
   ACC_PIDS+=("$!")
 }
-# sync_consent_keys: accountd's consent sheet for syncd's grant is up: Return allows (the answer is kept, so the sheet shows once).
+# sync_consent_keys: accountd's consent sheet for syncd's grant is up: Tab moves to Always Allow (Allow Once is first) and Return
+# presses it, so the answer is kept as an `always` permit. Return alone is Allow Once, a permit accountd spends on its first use
+# (porter-service-grants relay.rs open_authenticated -> spend_once): syncd's first relay to Graph would take it back and the mirror
+# would stop at the supervisor's next look.
 sync_consent_keys() {
   sheet_settled; sleep 1
-  sheet_key Enter
+  sheet_key Tab; sheet_key Enter
 }
+
+# acc_permit_ids ACCOUNT APP: the ids of the permits (`accounts.<id>.grant.<grant>`) APP holds on ACCOUNT, as accountd's
+# settings module lists them (the `.app` row of each permit is the app's name). accountd keeps every grant of an account
+# there, AI or not; the apps using an identity (`used_by`) are Identities1.RegisterUse's list and name nobody syncd asked for.
+acc_permit_ids() {
+  local gid
+  settings_describe 2>/dev/null | python3 -I -c '
+import json, re, sys
+pat = re.compile("^accounts\\." + re.escape(sys.argv[1]) + "\\.grant\\.(.+)\\.app$")
+for k in json.load(sys.stdin)["key"]:
+    m = pat.match(k["path"])
+    if m: print(m.group(1))' "$1" | while read -r gid; do
+    [ "$(settings_get "accounts.$1.grant.$gid.app" 2>/dev/null)" = "$2" ] && echo "$gid"
+  done
+}
+# acc_permit_scope ACCOUNT APP: the `scope` (once, always, session) of APP's first permit on ACCOUNT, or `none`.
+acc_permit_scope() {
+  local gid; gid=$(acc_permit_ids "$1" "$2" | head -n 1)
+  [ -n "$gid" ] || { echo none; return; }
+  settings_get "accounts.$1.grant.$gid.scope"
+}
+SYNC_APP=org.quire.Sync
 
 # sheet_stray_escape: a sheet nobody expected is closed (so one failed check does not leave its sheet to take the next step's keys).
 sheet_stray_escape() { sheet_shown && { sheet_key Escape; sheet_gone 8; }; }

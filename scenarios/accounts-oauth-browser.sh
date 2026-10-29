@@ -17,9 +17,9 @@
 #   stored    the account is `ok` in accountd's settings module, signed_in is in the audit file, the account is in
 #             the registry (and, by the scan below, no token is in any file)
 #   graph     the files switch of the account in syncd's rows is turned on (accounts.<id>.sync.files, as Settings sets it): accountd's
-#             consent sheet shows once, for that one account (capture, Return; no chooser, no second sign-in), and syncd reaches
+#             consent sheet shows once, for that one account (capture, Always Allow; no chooser, no second sign-in), and syncd reaches
 #             Graph with the issuer's access token (GET /v1.0/me/drive...: the ferry rig's hits lever lists a request with a
-#             bearer); accountd's identity lists syncd as an app using it
+#             bearer); accountd lists syncd's permit (org.quire.Sync, always) under the account
 #   scan      the secret scan
 #
 # budget: 240
@@ -88,7 +88,10 @@ step_graph() {
   sheet_settled; sheet_shot 3-consent
   sync_consent_keys
   acc_wait 90 graph_bearer || { echo "Graph saw no request with the issuer's token from syncd: $(frigctl GET /graph/hits)" >&2; tail -10 "$OUT_DIR/syncd.log" >&2; return 1; }
-  acc_wait 20 eval '[ -n "$(settings_get "accounts.$ACCOUNT.used_by.0")" ]' || { echo "the identity names no app that uses it after syncd was allowed to use it" >&2; return 1; }
+  # accountd lists the permit under the account (`accounts.<id>.grant.<grant>.app`); `used_by` is Identities1.RegisterUse's list, which
+  # an app makes when it signs in with an identity, and syncd holds a grant instead.
+  acc_wait 20 eval '[ -n "$(acc_permit_ids "$ACCOUNT" $SYNC_APP)" ]' || { echo "accountd lists no permit of $SYNC_APP on the account after syncd was allowed to use it" >&2; return 1; }
+  [ "$(acc_permit_scope "$ACCOUNT" $SYNC_APP)" = always ] || { echo "syncd's permit is '$(acc_permit_scope "$ACCOUNT" $SYNC_APP)', not always" >&2; return 1; }
   echo "graph: $(frigctl GET /graph/hits)" >&2
 }
 
