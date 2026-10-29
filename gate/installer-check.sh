@@ -26,6 +26,7 @@ STUB
   chmod +x "$f"
 }
 stub porter/scripts/install.sh porter
+stub steward/scripts/install.sh steward
 stub stoker/scripts/install.sh stoker
 stub almanac/scripts/install.sh almanac
 stub docket/scripts/install.sh docket
@@ -73,7 +74,7 @@ inst() { env -u PREFIX -u DESTDIR -u SYSCONFDIR -u RUSTFLAGS SUDO=asroot "$INSTA
 plan=$(inst --dry-run --destdir "$dest") || fail "dry run failed"
 [ ! -s "$log" ] || fail "the dry run ran an installer: $(cat "$log")"
 order=$(printf '%s\n' "$plan" | grep -E '^[0-9]+\.' | awk '{print $2}' | tr '\n' ' ')
-[ "$order" = "callers porter stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session " ] || fail "plan order is: $order"
+[ "$order" = "callers porter steward stoker almanac docket cua detent casement sill transom turnstile keycap anyview mailo files palmrest session " ] || fail "plan order is: $order"
 printf '%s\n' "$plan" | grep -q 'callers .*runs .*install/system.sh callers --destdir' || fail "the callers table is not placed first, into the staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'turnstile .*runs .*install/system.sh turnstile --prefix /usr/local --destdir' || fail "the input service does not run into a staging root: $plan"
 printf '%s\n' "$plan" | grep -q 'keycap .*runs .*install/system.sh keycap --prefix /usr/local --destdir' || fail "the keyboard map is not placed by the desktop's own script: $plan"
