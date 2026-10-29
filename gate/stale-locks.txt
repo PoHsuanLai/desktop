@@ -8,13 +8,9 @@ keycap Cargo.lock 4f5ceb2a3b39eee8564a37c9a9e90f3baf169070 locks casement-protoc
 anyview Cargo.lock 3d5c3a453a866791fe691ed8fdc72a57fa62383d locks almanac 05c5b8c0, docket 77be9598, porter 31799cfa and prov 628083b3; separate app (anyview session relocks)
 casement Cargo.lock 11c9705d9940052e5c9145618420b8508f13c60f locks keycap bc3d4175 by git; the compositor talks to keycap over its socket
 casement wlcs-casement/Cargo.lock 11c9705d9940052e5c9145618420b8508f13c60f the conformance shim locks casement-protocols fa664f1f and keycap bc3d4175; outside casement's gate
-steward Cargo.lock 72ec161084020132196e085176125a2af7798354 locks quire d17e19da; inferd and the router are separate programs (agent session relocks)
-docket Cargo.lock 576145b9dacbafe4d3e299289ec1adf228091a14 locks quire d17e19da; separate programs (agent session relocks)
-cua Cargo.lock 75c29d95fc30f2ea3650ba63fb13106a09b49ee1 locks casement-protocols fa664f1f and keycap bc3d4175; separate program (agent session relocks)
-almanac Cargo.lock 7d813546fbbf82152aad1cff8a12ffbf4d8c81d3 locks steward 832ad19c; 72ec1610 only adds steward-rig (a scenario test client), nothing almanac uses
-files Cargo.lock 1cd179ffdd7ced141ab77b350440a1d0258079a3 locks steward 832ad19c; 72ec1610 only adds steward-rig (a scenario test client), nothing files uses
 porter Cargo.lock f406782b90b67f62f0f14ec5e78aec8992b5d709 locks quire d17e19da; accountd is a separate program (mailo session relocks onto v0.3.58)
 ferry Cargo.lock e61b2648d8c455b6b36612aece7f51a6dd5ff96c locks quire d17e19da; syncd and porter-mountd are separate programs (mailo session relocks)
-prov Cargo.lock 336086056fa18dd014f7853c7179de8587a25792 locks porter c718d203; nothing prov uses moved in f406782b (the sync crates went to ferry) (agent session relocks)
-mailo Cargo.lock 1d117e3051828655d5632696bfa624406d099bfd locks porter c718d203; mailo reaches accountd over the bus, which f406782b leaves as it was (mailo session relocks)
 detent Cargo.lock cd024ad6653b92359dbc5ebae3611b4444a7900d locks keycap bc3d4175 (its keycap-client pin follows casement's) and through it casement-protocols fa664f1f
+steward Cargo.lock baedbb000103c7dcc3c73d5f2871c7a1e9dfd33e locks quire d17e19da through porter f406782b's own pin; separate programs (follows porter's v0.3.58 relock)
+docket Cargo.lock fe272208251a7aa9528df5ebc347f3a8498aec9c locks quire d17e19da through porter f406782b's own pin; separate programs (follows porter's v0.3.58 relock)
+cua Cargo.lock 33c0a52ee698e9acde55fbfc32f8974017279a39 locks casement-protocols fa664f1f through keycap 4f5ceb2a's shell-verbs pin (Whopper moves it); separate program

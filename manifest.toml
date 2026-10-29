@@ -66,7 +66,7 @@ gate = "lane"
 
 [repo.steward]
 url = "https://github.com/PoHsuanLai/steward.git"
-rev = "72ec161084020132196e085176125a2af7798354"
+rev = "baedbb000103c7dcc3c73d5f2871c7a1e9dfd33e"
 branch = "master"
 gate = "lane"
 
@@ -85,26 +85,26 @@ gate = "lane"
 
 [repo.prov]
 url = "https://github.com/PoHsuanLai/prov.git"
-rev = "336086056fa18dd014f7853c7179de8587a25792"
+rev = "03c855eb4c80779522cf712075dead4a761adc4f"
 branch = "master"
 gate = "lane"
 
 [repo.almanac]
 url = "https://github.com/PoHsuanLai/almanac.git"
-rev = "7d813546fbbf82152aad1cff8a12ffbf4d8c81d3"
+rev = "c1bbec7e5a9cbf22122abd31ca8630871dbbfbb3"
 branch = "master"
 gate = "lane"
 gate_args = "--exclude recall-fastembed"
 
 [repo.docket]
 url = "https://github.com/PoHsuanLai/docket.git"
-rev = "576145b9dacbafe4d3e299289ec1adf228091a14"
+rev = "fe272208251a7aa9528df5ebc347f3a8498aec9c"
 branch = "master"
 gate = "lane"
 
 [repo.cua]
 url = "https://github.com/PoHsuanLai/cua.git"
-rev = "75c29d95fc30f2ea3650ba63fb13106a09b49ee1"
+rev = "33c0a52ee698e9acde55fbfc32f8974017279a39"
 branch = "master"
 gate = "lane"
 
@@ -130,13 +130,13 @@ gate = "lane"
 
 [repo.mailo]
 url = "https://github.com/PoHsuanLai/mailo.git"
-rev = "1d117e3051828655d5632696bfa624406d099bfd"
+rev = "ea3b3a20475d804b945f6876cfe8e74bc44bb613"
 branch = "master"
 gate = "none"
 
 [repo.files]
 url = "https://github.com/PoHsuanLai/files.git"
-rev = "1cd179ffdd7ced141ab77b350440a1d0258079a3"
+rev = "d4fc361d4437d4a8ba02fbc4f4cc490d8f651599"
 branch = "master"
 gate = "none"
 
