@@ -13,3 +13,5 @@ steward Cargo.lock 72ec161084020132196e085176125a2af7798354 locks quire d17e19da
 docket Cargo.lock 576145b9dacbafe4d3e299289ec1adf228091a14 locks quire d17e19da; separate programs (agent session relocks)
 cua Cargo.lock 75c29d95fc30f2ea3650ba63fb13106a09b49ee1 locks casement-protocols fa664f1f and keycap bc3d4175; separate program (agent session relocks)
 detent Cargo.lock 220f173e2e5a3a2b4efbaa93841a0f1debd22b3a locks keycap bc3d4175 (its keycap-client pin follows casement's) and through it casement-protocols fa664f1f
+almanac Cargo.lock 7d813546fbbf82152aad1cff8a12ffbf4d8c81d3 locks steward 832ad19c; 72ec1610 only adds steward-rig (a scenario test client), nothing almanac uses
+files Cargo.lock 1cd179ffdd7ced141ab77b350440a1d0258079a3 locks steward 832ad19c; 72ec1610 only adds steward-rig (a scenario test client), nothing files uses
