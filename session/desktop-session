@@ -63,6 +63,8 @@
 # Every decision is appended to guard.log, which is kept across logins in
 # ${XDG_STATE_HOME:-$HOME/.local/state}/desktop-session/ (the runtime folder is erased when the session
 # ends, and this log is what explains a session that ended); it is rotated once, at 256 KiB.
+# Before the first casement starts, the script waits (at most 20 s) for logind to make this session the seat's active
+# one: until then the login screen's compositor still holds the display and casement would open it without master.
 # Before the first casement starts, `slipway recover` runs (not in a nested test run, and only when slipway is
 # installed): it puts the previous version back when the latest update failed to start in several different
 # restarts of the computer. Exit 5 means it did, and the session then starts that version.
@@ -604,6 +606,26 @@ manual_way_back() {
     guard "what happened is written in $guard_log"
 }
 
+# The login screen's compositor holds the display until logind hands the seat to this session; a casement started
+# before that opens the display without master, and (before it learnt to ask again) stayed black. Waits for the
+# seat's active session to be this one, at most 20 s (a seat that never says, or a login without a seat, is not
+# waited on). Skipped in a nested test run.
+wait_for_seat() {
+    [ -z "$nested" ] || return 0
+    [ -n "${XDG_SESSION_ID:-}" ] || return 0
+    have loginctl || return 0
+    local tries=0 active=
+    while [ "$tries" -lt 100 ]; do
+        active=$("$(bin loginctl)" show-seat "${XDG_SEAT:-seat0}" -p ActiveSession --value 2>/dev/null) || return 0
+        [ -n "$active" ] || return 0
+        [ "$active" != "$XDG_SESSION_ID" ] || return 0
+        sleep 0.2
+        tries=$((tries + 1))
+    done
+    guard "the seat did not become this session's in 20 s ($active has it); starting casement anyway"
+}
+
+wait_for_seat
 recover_update
 remove_old_dropin
 end_stale_session
