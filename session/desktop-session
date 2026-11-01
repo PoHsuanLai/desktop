@@ -614,15 +614,31 @@ wait_for_seat() {
     [ -z "$nested" ] || return 0
     [ -n "${XDG_SESSION_ID:-}" ] || return 0
     have loginctl || return 0
-    local tries=0 active=
+    local tries=0 active= greeter=
     while [ "$tries" -lt 100 ]; do
         active=$("$(bin loginctl)" show-seat "${XDG_SEAT:-seat0}" -p ActiveSession --value 2>/dev/null) || return 0
         [ -n "$active" ] || return 0
-        [ "$active" != "$XDG_SESSION_ID" ] || return 0
+        if [ "$active" = "$XDG_SESSION_ID" ]; then
+            # The seat is ours the moment the session starts, but the login screen's compositor keeps the GPU
+            # for a few seconds more, until its own session is gone: a display opened before that has no master
+            # and every mode is refused (EINVAL), for good. Its session, class "greeter", is on the seat until then.
+            greeter=$(greeter_on_seat) || return 0
+            [ -n "$greeter" ] || return 0
+        fi
         sleep 0.2
         tries=$((tries + 1))
     done
-    guard "the seat did not become this session's in 20 s ($active has it); starting casement anyway"
+    guard "the seat did not become this session's, or the login screen did not let go, in 20 s (${greeter:-$active}); starting casement anyway"
+}
+
+# The id of a greeter session still on this seat, or nothing; fails when the seat cannot be read.
+greeter_on_seat() {
+    local ids id
+    ids=$("$(bin loginctl)" show-seat "${XDG_SEAT:-seat0}" -p Sessions --value 2>/dev/null) || return 1
+    for id in $ids; do
+        [ "$("$(bin loginctl)" show-session "$id" -p Class --value 2>/dev/null)" = greeter ] && { echo "$id"; return 0; }
+    done
+    return 0
 }
 
 wait_for_seat
