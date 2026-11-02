@@ -66,14 +66,14 @@ gate = "lane"
 
 [repo.steward]
 url = "https://github.com/PoHsuanLai/steward.git"
-rev = "baedbb000103c7dcc3c73d5f2871c7a1e9dfd33e"
+rev = "bb40ee51c373738fa586ed179445c954602bb7bf"
 branch = "master"
 gate = "lane"
 
 [repo.ferry]
 # Sync (syncd, the Cloud-folder helper porter-mountd) and its test rig, split from porter; uses accountd's accounts through porter-client.
 url = "https://github.com/PoHsuanLai/ferry.git"
-rev = "e61b2648d8c455b6b36612aece7f51a6dd5ff96c"
+rev = "da49fdb9af762144a0a09989282f2148aad502ba"
 branch = "master"
 gate = "lane"
 
